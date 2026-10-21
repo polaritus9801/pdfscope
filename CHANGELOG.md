@@ -10,6 +10,12 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Model providers behind one interface: OpenAI-compatible endpoints (OpenAI, DeepSeek, MiMo,
+  Moonshot, OpenRouter, Gemini's compatibility endpoint, Ollama) and Anthropic's native Messages API.
+  Streaming normalises reasoning tokens, answer tokens and usage — including cache hits — into one
+  event type.
+- A live test against MiMo `mimo-v2.6-flash`, ignored by default because it needs a key and spends
+  tokens.
 - Text layer and selection: text on a page is selectable, the selection is reported as a page plus a
   normalised rectangle plus the quote, and `加入引用` turns it into a chip in the reference tray.
   Scanned pages say so instead of silently selecting nothing.

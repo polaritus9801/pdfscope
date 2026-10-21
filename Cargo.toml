@@ -52,6 +52,10 @@ futures = "0.3"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
+# HTTP client and streaming
+reqwest = { version = "0.13", default-features = false, features = ["json", "stream", "rustls", "rustls-native-certs"] }
+async-stream = "0.3"
+
 # Web
 axum = "0.8"
 tower = "0.5"
