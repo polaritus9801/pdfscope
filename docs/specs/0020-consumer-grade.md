@@ -163,6 +163,9 @@ documents; toasts never block input. A mis-shown banner costs one click, not dat
   second a 23 MB file, the third both correct and small). A banner under the header says 还没有配置模型
   and opens settings when no key is stored. Verified with a fake bridge reporting no key: banner
   visible, sample loads as `示例.pdf`, 3 pages, Chinese text intact.
+- **P7 measurements**: an 11.7 MB, 80-page image PDF renders its first page in **60 ms**; typing
+  latency is **17 ms** median (19 ms max) over 20 keystrokes. Both spec budgets are met and recorded
+  in `docs/performance.md`. Window-geometry restore still needs a human pass.
 - **P1 audit**: the grep for hard-coded `px` outside the token block stood at **223** declarations.
   This round migrated every spacing, radius, type and offset declaration whose value sits on the
   scale, then snapped off-scale spacing (6/10/14/18/20/22) to the nearest step: **223 → 109**. The

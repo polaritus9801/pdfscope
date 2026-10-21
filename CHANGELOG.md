@@ -10,6 +10,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Changed
 
+- `docs/performance.md` now records the 10 MB first-page budget (60 ms) and typing latency (17 ms),
+  both inside the spec's targets.
+
+
 - The shell was restyled without touching the palette or fonts: floating panel card, paper-like page,
   blurred header and a vertical tool pill with a real active state.
 - The three tools are now modes (文字 / 框选 / 页); 框选 toggles and follows the renderer when Esc
