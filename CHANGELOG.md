@@ -10,6 +10,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Changed
 
+- Settings are a full dialog with a category rail (general, model, prompt) instead of a card inside
+  the AI panel.
+
+
 - Settings live behind a gear at the far right of the top bar and now include the theme and the
   system prompt; the panel's own settings button and the theme cycle button are gone.
 

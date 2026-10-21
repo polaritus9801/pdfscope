@@ -161,6 +161,7 @@ pub fn AiPanel(
     let form_key = RwSignal::new(String::new());
     let form_prompt = RwSignal::new(String::new());
     let form_theme = RwSignal::new("system".to_owned());
+    let tab = RwSignal::new(0_u8);
     let form_error = RwSignal::new(Option::<String>::None);
 
     // Load the stored configuration once.
@@ -967,110 +968,196 @@ pub fn AiPanel(
             </div>
 
             <Show when=move || open.get()>
-                <div class="sheet">
-                    <div class="sheet-card">
-                        <h2 class="sheet-title">"模型设置"</h2>
-
-                        <label class="field">
-                            <span>"厂商"</span>
-                            <select
-                                on:change=move |event| {
-                                    let chosen = event_target_value(&event);
-                                    if let Some((protocol, base)) = preset(&chosen) {
-                                        form_protocol.set(protocol.to_owned());
-                                        form_base.set(base.to_owned());
-                                    }
-                                    form_preset.set(chosen);
-                                }
-                            >
-                                {PRESET_LABELS
-                                    .iter()
-                                    .map(|label| {
-                                        let value = *label;
-                                        let selected = move || form_preset.get() == value;
-                                        view! {
-                                            <option value=value selected=selected>
-                                                {value}
-                                            </option>
-                                        }
-                                    })
-                                    .collect_view()}
-                            </select>
-                        </label>
-
-                        <label class="field">
-                            <span>"接口地址"</span>
-                            <input
-                                type="text"
-                                prop:value=move || form_base.get()
-                                on:input=move |event| form_base.set(event_target_value(&event))
-                            />
-                        </label>
-
-                        <label class="field">
-                            <span>"模型"</span>
-                            <input
-                                type="text"
-                                prop:value=move || form_model.get()
-                                on:input=move |event| form_model.set(event_target_value(&event))
-                            />
-                        </label>
-
-                        <label class="field">
-                            <span>"主题"</span>
-                            <select on:change=move |event| form_theme.set(event_target_value(&event))>
-                                <option value="system" selected=move || form_theme.get() == "system">"跟随系统"</option>
-                                <option value="light" selected=move || form_theme.get() == "light">"浅色"</option>
-                                <option value="dark" selected=move || form_theme.get() == "dark">"深色"</option>
-                            </select>
-                        </label>
-
-                        <label class="field">
-                            <span>"系统提示词"</span>
-                            <textarea
-                                class="prompt-field"
-                                prop:value=move || form_prompt.get()
-                                on:input=move |event| form_prompt.set(event_target_value(&event))
-                            ></textarea>
-                        </label>
-
-                        <label class="field">
-                            <span>"API Key"</span>
-                            <input
-                                type="password"
-                                placeholder="保存在本机（仅自己可读）"
-                                prop:value=move || form_key.get()
-                                on:input=move |event| form_key.set(event_target_value(&event))
-                            />
-                        </label>
-
-                        {move || {
-                            form_error
-                                .get()
-                                .map(|message| view! { <p class="error sheet-error">{message}</p> })
-                        }}
-
-                        {move || {
-                            test_result
-                                .get()
-                                .map(|message| view! { <p class="range-summary">{message}</p> })
-                        }}
-
-                        <div class="sheet-actions">
+                <div
+                    class="settings-overlay"
+                    on:click=move |event: web_sys::MouseEvent| {
+                        // A click on the backdrop closes; a click inside the dialog does not.
+                        if event.target() == event.current_target() {
+                            open.set(false);
+                        }
+                    }
+                >
+                    <div class="settings-dialog">
+                        <header class="settings-head">
+                            <h2>"设置"</h2>
                             <button
-                                class="button"
-                                on:click=test
-                                prop:disabled=move || testing.get()
+                                class="icon-button"
+                                title="关闭"
+                                on:click=move |_| open.set(false)
                             >
-                                {move || if testing.get() { "测试中…" } else { "测试连接" }}
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+                                    <path d="M6 6l12 12M18 6L6 18" />
+                                </svg>
                             </button>
+                        </header>
+
+                        <div class="settings-body">
+                            <nav class="settings-nav">
+                                <button
+                                    class="settings-tab"
+                                    class:active=move || tab.get() == 0
+                                    on:click=move |_| tab.set(0)
+                                >
+                                    "通用设置"
+                                </button>
+                                <button
+                                    class="settings-tab"
+                                    class:active=move || tab.get() == 1
+                                    on:click=move |_| tab.set(1)
+                                >
+                                    "模型"
+                                </button>
+                                <button
+                                    class="settings-tab"
+                                    class:active=move || tab.get() == 2
+                                    on:click=move |_| tab.set(2)
+                                >
+                                    "提示词"
+                                </button>
+                            </nav>
+
+                            <div class="settings-content">
+                                <Show when=move || tab.get() == 0>
+                                    <section class="settings-section">
+                                        <h3>"外观"</h3>
+                                        <p class="settings-hint">"选择界面的明暗，跟随系统会随 macOS 切换。"</p>
+                                        <div class="theme-cards">
+                                            {[
+                                                ("system", "跟随系统", "<rect x=\"3\" y=\"4\" width=\"18\" height=\"13\" rx=\"2\"/><path d=\"M8 20h8M12 17v3\"/>"),
+                                                ("light", "浅色", "<circle cx=\"12\" cy=\"12\" r=\"4\"/><path d=\"M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19\"/>"),
+                                                ("dark", "深色", "<path d=\"M20 14a8 8 0 1 1-9.9-7.7A7 7 0 0 0 20 14Z\"/>"),
+                                            ]
+                                                .into_iter()
+                                                .map(|(value, label, path)| {
+                                                    view! {
+                                                        <button
+                                                            class="theme-card"
+                                                            class:active=move || form_theme.get() == value
+                                                            on:click=move |_| form_theme.set(value.to_owned())
+                                                        >
+                                                            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" inner_html=path></svg>
+                                                            <span>{label}</span>
+                                                        </button>
+                                                    }
+                                                })
+                                                .collect_view()}
+                                        </div>
+                                    </section>
+
+
+                                </Show>
+
+                                <Show when=move || tab.get() == 1>
+                                    <section class="settings-section">
+                                        <h3>"服务"</h3>
+                                        <p class="settings-hint">"任何 OpenAI 兼容或 Anthropic 兼容的接口都可以。"</p>
+
+                                        <label class="settings-row">
+                                            <span>"厂商"</span>
+                                            <select
+                                                on:change=move |event| {
+                                                    let chosen = event_target_value(&event);
+                                                    if let Some((protocol, base)) = preset(&chosen) {
+                                                        form_protocol.set(protocol.to_owned());
+                                                        form_base.set(base.to_owned());
+                                                    }
+                                                    form_preset.set(chosen);
+                                                }
+                                            >
+                                                {PRESET_LABELS
+                                                    .iter()
+                                                    .map(|label| {
+                                                        let value = *label;
+                                                        let selected = move || form_preset.get() == value;
+                                                        view! {
+                                                            <option value=value selected=selected>
+                                                                {value}
+                                                            </option>
+                                                        }
+                                                    })
+                                                    .collect_view()}
+                                            </select>
+                                        </label>
+
+                                        <label class="settings-row">
+                                            <span>"接口地址"</span>
+                                            <input
+                                                type="text"
+                                                prop:value=move || form_base.get()
+                                                on:input=move |event| form_base.set(event_target_value(&event))
+                                            />
+                                        </label>
+
+                                        <label class="settings-row">
+                                            <span>"模型"</span>
+                                            <input
+                                                type="text"
+                                                prop:value=move || form_model.get()
+                                                on:input=move |event| form_model.set(event_target_value(&event))
+                                            />
+                                        </label>
+
+                                    <section class="settings-section">
+                                        <h3>"API Key"</h3>
+                                        <p class="settings-hint">"保存在本机配置目录的 api-key 文件，权限 0600，只有这个用户能读。"</p>
+                                        <label class="settings-row">
+                                            <span>"密钥"</span>
+                                            <input
+                                                type="password"
+                                                placeholder="留空表示沿用已保存的 key"
+                                                prop:value=move || form_key.get()
+                                                on:input=move |event| form_key.set(event_target_value(&event))
+                                            />
+                                        </label>
+                                    </section>
+
+                                        <div class="settings-row">
+                                            <span>"连接"</span>
+                                            <button
+                                                class="button"
+                                                on:click=test
+                                                prop:disabled=move || testing.get()
+                                            >
+                                                {move || if testing.get() { "测试中…" } else { "测试连接" }}
+                                            </button>
+                                        </div>
+                                    </section>
+                                </Show>
+
+                                <Show when=move || tab.get() == 2>
+                                    <section class="settings-section">
+                                        <h3>"系统提示词"</h3>
+                                        <p class="settings-hint">"每次提问都会带上这段指令。清空会恢复默认。"</p>
+                                        <textarea
+                                            class="prompt-field"
+                                            prop:value=move || form_prompt.get()
+                                            on:input=move |event| form_prompt.set(event_target_value(&event))
+                                        ></textarea>
+                                    </section>
+                                </Show>
+
+                                {move || {
+                                    form_error
+                                        .get()
+                                        .map(|message| view! { <p class="error settings-error">{message}</p> })
+                                }}
+                                {move || {
+                                    test_result
+                                        .get()
+                                        .map(|message| view! { <p class="settings-ok">{message}</p> })
+                                }}
+                            </div>
+                        </div>
+
+                        <footer class="settings-foot">
+                            <span class="settings-path">"配置保存在本机，不会上传。"</span>
                             <button class="button" on:click=move |_| open.set(false)>
                                 "取消"
                             </button>
                             <button class="button button-primary" on:click=save>
                                 "保存"
                             </button>
-                        </div>
+                        </footer>
                     </div>
                 </div>
             </Show>

@@ -60,6 +60,13 @@ panel that could not be collapsed.
 - The prompt and theme are stored in `settings.json` with defaults, so an older file still loads;
   the prompt has a fallback if it is emptied.
 
+## Sixth pass — settings as a dialog
+
+The sheet became a full dialog: a left rail (通用设置 / 模型 / 提示词), a content column with sections
+and dividers, and a footer with the save controls. The key moved under 模型, where it belongs; the
+theme is three cards; the inputs share the dialog's styling. `docs/images/settings-dialog.png` records
+the result.
+
 ## Non-goals
 
 - Continuous scrolling, single/double page modes and page-by-page navigation are **not** in this
