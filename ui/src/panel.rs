@@ -278,6 +278,13 @@ pub fn AiPanel(
 
             let started = js_sys::Date::now();
             let callback = Closure::<dyn Fn(JsValue)>::new(move |event: JsValue| {
+                let flush_pending = move || {
+                    let text = pending.get();
+                    pending.set(String::new());
+                    if !text.is_empty() {
+                        answer.update(|buffer| buffer.push_str(&text));
+                    }
+                };
                 let kind = text_of(&event, "kind").unwrap_or_default();
                 match kind.as_str() {
                     "reasoning" => {
@@ -318,10 +325,12 @@ pub fn AiPanel(
                         status.set(format!("输入 {prompt} · 输出 {completion} · 缓存 {cached}"));
                     }
                     "stopped" => {
+                        flush_pending();
                         streaming.set(false);
                         status.set("已停止".to_owned());
                     }
                     "done" => {
+                        flush_pending();
                         streaming.set(false);
                         let elapsed = js_sys::Date::now() - started;
                         if elapsed > 0.0 {
@@ -331,6 +340,7 @@ pub fn AiPanel(
                         }
                     }
                     "error" => {
+                        flush_pending();
                         streaming.set(false);
                         failed.set(true);
                         status.set(

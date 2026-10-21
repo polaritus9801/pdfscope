@@ -113,3 +113,5 @@ request is refused above the cap rather than truncated.
   every change, so per-token updates were quadratic in the answer length.
 - `⌘↵` sends and `Esc` stops, handled on the composer rather than globally so they never fight the
   page's own shortcuts.
+- The coalescing buffer is flushed before `done`, `stopped` or `error`, so the last fragment never
+  arrives after the status line has already settled.
