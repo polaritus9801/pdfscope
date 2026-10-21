@@ -104,6 +104,7 @@ pub fn AiPanel(
     page: RwSignal<u32>,
     pages: RwSignal<u32>,
     hovered: RwSignal<Option<(u32, (f64, f64, f64, f64))>>,
+    clear_selection: Callback<()>,
 ) -> impl IntoView {
     let configured = RwSignal::new(false);
     let model = RwSignal::new("未配置".to_owned());
@@ -137,8 +138,10 @@ pub fn AiPanel(
         if total == 0 {
             return;
         }
-        page.set(target.clamp(1, total));
-        let _ = crate::call("flash", &[]);
+        clear_selection.run(());
+        let target = target.clamp(1, total);
+        page.set(target);
+        let _ = crate::call("flash", &[JsValue::from(target)]);
     };
 
     let form_preset = RwSignal::new("MiMo".to_owned());
@@ -757,11 +760,7 @@ pub fn AiPanel(
                                             on:mouseleave=move |_| hovered.set(None)
                                             on:click=move |event: web_sys::MouseEvent| {
                                                 if event.shift_key() {
-                                                    let total = pages.get();
-                                                    if total > 0 {
-                                                        page.set(page_number.clamp(1, total));
-                                                    }
-                                                    let _ = crate::call("flash", &[]);
+                                                    jump(page_number);
                                                 } else {
                                                     redeem(index);
                                                 }

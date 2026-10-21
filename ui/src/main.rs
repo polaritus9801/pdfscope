@@ -2,7 +2,9 @@
 //!
 //! Leptos owns application state — which page, which zoom, what is selected, what the reference tray
 //! holds — and the JavaScript module behind [`call`] owns PDF.js, the canvas and the text layer. The
-//! two meet at `window.PDFScope` (calls in) and `window.__pdfscopeSelection` (one report out).
+//! two meet at `window.PDFScope` (calls in) and the `window.__pdfscope*` callbacks (reports out).
+//! Page shells are Rust's: the renderer mounts its canvas and text layer into them, so tints and the
+//! selection bar keep living in application state.
 
 use leptos::prelude::*;
 use leptos::task::spawn_local;
@@ -55,6 +57,47 @@ pub(crate) struct Passage {
     pub(crate) page: u32,
     pub(crate) quote: String,
     pub(crate) rect: (f64, f64, f64, f64),
+}
+
+/// One page's size at scale 1, as the renderer measured it.
+#[derive(Clone, Copy, PartialEq)]
+struct PageSize {
+    width: f64,
+    height: f64,
+}
+
+/// The renderer's page sizes, used to reserve the right height before a canvas exists.
+fn parse_page_sizes(value: &JsValue) -> Vec<PageSize> {
+    let Some(entries) = value.dyn_ref::<js_sys::Array>() else {
+        return Vec::new();
+    };
+
+    let mut sizes = Vec::with_capacity(entries.length() as usize);
+    for entry in entries.iter() {
+        let width = read_number(&entry, "width").unwrap_or(0.0);
+        let height = read_number(&entry, "height").unwrap_or(0.0);
+        let fallback = sizes.last().copied().unwrap_or(PageSize {
+            width: 612.0,
+            height: 792.0,
+        });
+        sizes.push(if width > 0.0 && height > 0.0 {
+            PageSize { width, height }
+        } else {
+            fallback
+        });
+    }
+    sizes
+}
+
+/// The CSS position of a normalised rectangle inside its page.
+fn rect_style((x, y, width, height): (f64, f64, f64, f64)) -> String {
+    format!(
+        "left:{:.3}%; top:{:.3}%; width:{:.3}%; height:{:.3}%;",
+        x * 100.0,
+        y * 100.0,
+        width * 100.0,
+        height * 100.0,
+    )
 }
 
 fn read_number(value: &JsValue, key: &str) -> Option<f64> {
@@ -137,10 +180,115 @@ impl Theme {
     }
 }
 
+/// One page shell. Rust owns the shell and its overlays; the renderer fills `.page-layer` with a
+/// canvas and a text layer only while this page is inside the render window.
+#[component]
+fn PageView(
+    number: u32,
+    width: f64,
+    height: f64,
+    passages: RwSignal<Vec<Passage>>,
+    regions: RwSignal<Vec<Region>>,
+    selection: RwSignal<Option<Selection>>,
+    hovered: RwSignal<Option<(u32, (f64, f64, f64, f64))>>,
+) -> impl IntoView {
+    let add_reference = Callback::new(move |_: ()| {
+        if let Some(current) = selection.get() {
+            passages.update(|list| {
+                list.push(Passage {
+                    page: current.page,
+                    quote: current.text.clone(),
+                    rect: current.rect,
+                });
+            });
+            selection.set(None);
+            let _ = call("clearSelection", &[]);
+        }
+    });
+
+    let copy_quote = Callback::new(move |_: ()| {
+        if let Some(current) = selection.get() {
+            let _ = call("copy", &[JsValue::from_str(&current.text)]);
+        }
+    });
+
+    let id = format!("page-{number}");
+    let style = format!("aspect-ratio: {width} / {height};");
+    let page_attribute = number.to_string();
+
+    view! {
+        <div class="page" id=id data-page=page_attribute style=style>
+            <div class="page-layer"></div>
+
+            {move || {
+                let mut tints = Vec::new();
+                for passage in passages.get() {
+                    if passage.page == number {
+                        tints.push(passage.rect);
+                    }
+                }
+                for region in regions.get() {
+                    if region.page == number {
+                        tints.push(region.rect);
+                    }
+                }
+                tints
+                    .into_iter()
+                    .map(|rect| view! { <div class="ref-tint" style=rect_style(rect)></div> })
+                    .collect_view()
+            }}
+
+            {move || {
+                hovered
+                    .get()
+                    .filter(|(target, _)| *target == number)
+                    .map(|(_, rect)| {
+                        view! { <div class="hover-tint" style=rect_style(rect)></div> }
+                    })
+            }}
+
+            {move || {
+                selection
+                    .get()
+                    .filter(|current| current.page == number)
+                    .map(|current| {
+                        let (x, y, width, _) = current.rect;
+                        let left = (x + width / 2.0) * 100.0;
+                        let top = y * 100.0;
+                        let style = format!("left: {left:.2}%; top: {top:.2}%;");
+                        let page_label = format!("p.{}", current.page);
+                        let quote = truncate(&current.text, 26);
+                        view! {
+                            <div class="selection-anchor" style=style>
+                                <div class="selection-bar">
+                                    <span class="selection-page">{page_label}</span>
+                                    <span class="selection-quote">{quote}</span>
+                                    <button
+                                        class="button button-primary selection-action"
+                                        on:click=move |_| add_reference.run(())
+                                    >
+                                        "加入引用"
+                                    </button>
+                                    <button
+                                        class="button selection-action"
+                                        on:click=move |_| copy_quote.run(())
+                                    >
+                                        "复制"
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                    })
+            }}
+        </div>
+    }
+}
+
 #[component]
 fn App() -> impl IntoView {
     let page = RwSignal::new(1_u32);
     let pages = RwSignal::new(0_u32);
+    let page_sizes = RwSignal::new(Vec::<PageSize>::new());
     let zoom = RwSignal::new(100_u32);
     let ready = RwSignal::new(false);
     let file_name = RwSignal::new(String::new());
@@ -151,18 +299,37 @@ fn App() -> impl IntoView {
     let regions = RwSignal::new(Vec::<Region>::new());
     let hovered = RwSignal::new(None::<(u32, (f64, f64, f64, f64))>);
 
+    // Explicit navigation dismisses what was selected on the old page. Scroll-driven page updates
+    // intentionally do not: the page indicator follows the reader, but the selection stays put.
+    let clear_selection = Callback::new(move |_: ()| {
+        selection.set(None);
+        let _ = call("clearSelection", &[]);
+    });
+
+    let navigate = Callback::new(move |target: u32| {
+        let total = pages.get();
+        if total == 0 {
+            return;
+        }
+        clear_selection.run(());
+        page.set(target.clamp(1, total));
+    });
+
     let go = move |delta: i64| {
         let total = pages.get();
         if total == 0 {
             return;
         }
         let next = (i64::from(page.get()) + delta).clamp(1, i64::from(total)) as u32;
-        page.set(next);
+        navigate.run(next);
     };
 
     let zoom_by = move |delta: i64| {
-        let next = (i64::from(zoom.get()) + delta).clamp(50, 300) as u32;
-        zoom.set(next);
+        let _ = call("zoomBy", &[JsValue::from(delta)]);
+    };
+
+    let fit_width = move |_| {
+        let _ = call("fitWidth", &[]);
     };
 
     let open = move |event: web_sys::Event| {
@@ -178,6 +345,10 @@ fn App() -> impl IntoView {
 
         file_name.set(file.name());
         error.set(None);
+        pages.set(0);
+        page_sizes.set(Vec::new());
+        zoom.set(100);
+        ready.set(false);
         passages.set(Vec::new());
         regions.set(Vec::new());
         selection.set(None);
@@ -196,7 +367,23 @@ fn App() -> impl IntoView {
 
             match settle(handle).await {
                 Ok(count) => {
-                    pages.set(count.as_f64().unwrap_or(0.0) as u32);
+                    let count = count.as_f64().unwrap_or(0.0).max(0.0) as u32;
+                    pages.set(count);
+
+                    let mut sizes = Vec::new();
+                    if count > 0 {
+                        if let Some(value) = call("pageSizes", &[]) {
+                            sizes = parse_page_sizes(&value);
+                        }
+                    }
+                    sizes.truncate(count as usize);
+                    let fallback = sizes.last().copied().unwrap_or(PageSize {
+                        width: 612.0,
+                        height: 792.0,
+                    });
+                    sizes.resize(count as usize, fallback);
+                    page_sizes.set(sizes);
+
                     page.set(1);
                     ready.set(true);
                 }
@@ -212,43 +399,33 @@ fn App() -> impl IntoView {
         else {
             return;
         };
-        let total = pages.get();
-        if total == 0 {
+        if pages.get() == 0 {
             return;
         }
         if let Ok(requested) = input.value().trim().parse::<u32>() {
-            page.set(requested.clamp(1, total));
+            navigate.run(requested);
         }
         input.set_value(&page.get().to_string());
-    };
-
-    let add_reference = move |_| {
-        if let Some(current) = selection.get() {
-            passages.update(|list| {
-                list.push(Passage {
-                    page: current.page,
-                    quote: current.text.clone(),
-                    rect: current.rect,
-                });
-            });
-            selection.set(None);
-            call("clearSelection", &[]);
-        }
-    };
-
-    let copy_quote = move |_| {
-        if let Some(current) = selection.get() {
-            call("copy", &[JsValue::from_str(&current.text)]);
-        }
     };
 
     let on_key = move |event: web_sys::KeyboardEvent| {
         let typing = event
             .target()
             .and_then(|target| target.dyn_into::<web_sys::HtmlElement>().ok())
-            .map(|element| element.tag_name() == "INPUT")
+            .map(|element| matches!(element.tag_name().as_str(), "INPUT" | "TEXTAREA"))
             .unwrap_or(false);
         if typing {
+            return;
+        }
+
+        if (event.meta_key() || event.ctrl_key()) && event.key() == "ArrowUp" {
+            navigate.run(1);
+            event.prevent_default();
+            return;
+        }
+        if (event.meta_key() || event.ctrl_key()) && event.key() == "ArrowDown" {
+            navigate.run(pages.get());
+            event.prevent_default();
             return;
         }
 
@@ -267,9 +444,9 @@ fn App() -> impl IntoView {
         match event.key().as_str() {
             "ArrowLeft" | "PageUp" => go(-1),
             "ArrowRight" | "PageDown" => go(1),
-            "+" | "=" => zoom_by(25),
-            "-" => zoom_by(-25),
-            "0" => zoom.set(100),
+            "+" | "=" => zoom_by(1),
+            "-" => zoom_by(-1),
+            "0" => fit_width(()),
             "Escape" => {
                 selection.set(None);
                 call("clearSelection", &[]);
@@ -343,11 +520,15 @@ fn App() -> impl IntoView {
         callback.forget();
     });
 
-    // Pinch gestures arrive as ctrl+wheel; the renderer reports the new zoom here.
+    // The renderer owns the transient zoom; Rust only displays the percent it reports.
     Effect::new(move |_| {
         let callback = Closure::<dyn Fn(JsValue)>::new(move |value: JsValue| {
-            if let Some(next) = value.as_f64() {
-                zoom.set((next as u32).clamp(50, 300));
+            let Some(reported) = read_number(&value, "percent") else {
+                return;
+            };
+            let next = (reported.round() as u32).clamp(50, 400);
+            if zoom.get() != next {
+                zoom.set(next);
             }
         });
         if let Some(window) = web_sys::window() {
@@ -360,24 +541,40 @@ fn App() -> impl IntoView {
         callback.forget();
     });
 
-    // A page change invalidates whatever was selected on the previous page.
+    // The renderer reports the page under the reading line as the reader scrolls. Navigation in
+    // the other direction (the page field, `‹`, citations) is a signal change that `render` sees.
     Effect::new(move |_| {
-        let _ = page.get();
-        selection.set(None);
+        let callback = Closure::<dyn Fn(JsValue)>::new(move |value: JsValue| {
+            let Some(reported) = value.as_f64() else {
+                return;
+            };
+            let total = pages.get();
+            if total == 0 {
+                return;
+            }
+            let next = (reported.round() as u32).clamp(1, total);
+            if page.get() != next {
+                page.set(next);
+            }
+        });
+        if let Some(window) = web_sys::window() {
+            let _ = js_sys::Reflect::set(
+                &window,
+                &JsValue::from_str("__pdfscopePage"),
+                callback.as_ref(),
+            );
+        }
+        callback.forget();
     });
 
-    // Repaint whenever the page or the zoom changes, once a document exists.
+    // Scroll the reader whenever the page changes; zoom is owned by the renderer.
     Effect::new(move |_| {
         let requested_page = page.get();
-        let requested_zoom = zoom.get();
         if !ready.get() {
             return;
         }
         spawn_local(async move {
-            if let Some(handle) = call(
-                "render",
-                &[JsValue::from(requested_page), JsValue::from(requested_zoom)],
-            ) {
+            if let Some(handle) = call("render", &[JsValue::from(requested_page)]) {
                 let _ = settle(handle).await;
             }
         });
@@ -445,20 +642,24 @@ fn App() -> impl IntoView {
                 <div class="bar-right">
                     <button
                         class="button"
-                        prop:disabled=move || { zoom.get() <= 50 }
-                        on:click=move |_| zoom_by(-25)
+                        prop:disabled=move || { !ready.get() || zoom.get() <= 50 }
+                        on:click=move |_| zoom_by(-1)
                     >
                         "−"
                     </button>
                     <span class="zoom">{move || format!("{}%", zoom.get())}</span>
                     <button
                         class="button"
-                        prop:disabled=move || { zoom.get() >= 300 }
-                        on:click=move |_| zoom_by(25)
+                        prop:disabled=move || { !ready.get() || zoom.get() >= 400 }
+                        on:click=move |_| zoom_by(1)
                     >
                         "+"
                     </button>
-                    <button class="button" on:click=move |_| zoom.set(100)>
+                    <button
+                        class="button"
+                        prop:disabled=move || !ready.get()
+                        on:click=move |_| fit_width(())
+                    >
                         "适应宽度"
                     </button>
                     <button
@@ -529,84 +730,33 @@ fn App() -> impl IntoView {
                 }
             >
 
-                <div class="page" id="page" class:hidden=move || !ready.get()>
-                    <canvas id="page-canvas"></canvas>
-                    <div id="text-layer" class="textLayer"></div>
-
+                <div
+                    class="pages-scaler"
+                    id="pages-scaler"
+                    class:hidden=move || !ready.get()
+                >
+                    <div class="pages" id="pages">
                     {move || {
-                        let current = page.get();
-                        let mut tints: Vec<(f64, f64, f64, f64)> = Vec::new();
-                        for passage in passages.get() {
-                            if passage.page == current {
-                                tints.push(passage.rect);
-                            }
-                        }
-                        for region in regions.get() {
-                            if region.page == current {
-                                tints.push(region.rect);
-                            }
-                        }
-                        tints
+                        page_sizes
+                            .get()
                             .into_iter()
-                            .map(|(x, y, width, height)| {
-                                let style = format!(
-                                    "left:{:.3}%; top:{:.3}%; width:{:.3}%; height:{:.3}%;",
-                                    x * 100.0,
-                                    y * 100.0,
-                                    width * 100.0,
-                                    height * 100.0,
-                                );
-                                view! { <div class="ref-tint" style=style></div> }
+                            .enumerate()
+                            .map(|(index, size)| {
+                                view! {
+                                    <PageView
+                                        number={(index + 1) as u32}
+                                        width=size.width
+                                        height=size.height
+                                        passages=passages
+                                        regions=regions
+                                        selection=selection
+                                        hovered=hovered
+                                    />
+                                }
                             })
                             .collect_view()
                     }}
-
-                    {move || {
-                        hovered
-                            .get()
-                            .filter(|(target, _)| *target == page.get())
-                            .map(|(_, (x, y, width, height))| {
-                                let style = format!(
-                                    "left:{:.3}%; top:{:.3}%; width:{:.3}%; height:{:.3}%;",
-                                    x * 100.0,
-                                    y * 100.0,
-                                    width * 100.0,
-                                    height * 100.0,
-                                );
-                                view! { <div class="hover-tint" style=style></div> }
-                            })
-                    }}
-
-                    {move || {
-                        selection
-                            .get()
-                            .map(|current| {
-                                let (x, y, width, _) = current.rect;
-                                let left = (x + width / 2.0) * 100.0;
-                                let top = y * 100.0;
-                                let style = format!("left: {left:.2}%; top: {top:.2}%;");
-                                let page_label = format!("p.{}", current.page);
-                                let quote = truncate(&current.text, 26);
-                                view! {
-                                    <div class="selection-bar" style=style>
-                                        <span class="selection-page">{page_label}</span>
-                                        <span class="selection-quote">{quote}</span>
-                                        <button
-                                            class="button button-primary selection-action"
-                                            on:click=add_reference
-                                        >
-                                            "加入引用"
-                                        </button>
-                                        <button
-                                            class="button selection-action"
-                                            on:click=copy_quote
-                                        >
-                                            "复制"
-                                        </button>
-                                    </div>
-                                }
-                            })
-                    }}
+                    </div>
                 </div>
 
                 <div class="empty" class:hidden=move || ready.get()>
@@ -646,6 +796,7 @@ fn App() -> impl IntoView {
                 page=page
                 pages=pages
                 hovered=hovered
+                clear_selection=clear_selection
             />
             </div>
         </div>

@@ -215,18 +215,31 @@ body {
 .stage {
   position: relative;
   flex: 1;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
+  min-width: 0;
   overflow: auto;
+  /* We own scroll anchoring during zoom; the browser must not adjust it as the scaler resizes. */
+  overflow-anchor: none;
   padding: 24px;
 }
 
-#page-canvas {
-  display: block;
-  background: #ffffff;
-  border-radius: 2px;
-  box-shadow: var(--shadow-panel);
+/* The column is laid out once at the base width. Zoom transforms the whole column; the scaler
+   around it carries the scaled scroll size, so no page reflows while the reader pinches. */
+.pages-scaler {
+  position: relative;
+  margin: 0 auto;
+}
+
+.pages {
+  width: 100%;
+  transform: scale(var(--view-scale, 1));
+  transform-origin: 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.pages.zooming {
+  will-change: transform;
 }
 
 .hidden {
@@ -277,13 +290,24 @@ body {
 
 .page {
   position: relative;
-  display: inline-block;
+  display: block;
+  width: 100%;
+  background: #ffffff;
   box-shadow: var(--shadow-panel);
   border-radius: 2px;
 }
 
-#page-canvas {
-  box-shadow: none;
+.page-layer {
+  position: absolute;
+  inset: 0;
+}
+
+.page-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: block;
+  background: #ffffff;
   border-radius: 2px;
 }
 
@@ -328,8 +352,21 @@ body {
   font-size: 12px;
 }
 
+/* The anchor is counter-scaled against the column transform, so the bar keeps its type size at
+   any zoom while its percentage position still follows the page. */
+.selection-anchor {
+  position: absolute;
+  width: 0;
+  height: 0;
+  transform: scale(var(--ui-scale, 1));
+  transform-origin: 0 0;
+  z-index: 5;
+}
+
 .selection-bar {
   position: absolute;
+  left: 0;
+  top: 0;
   transform: translate(-50%, calc(-100% - 8px));
   display: flex;
   align-items: center;
@@ -340,7 +377,6 @@ body {
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-float);
   white-space: nowrap;
-  z-index: 5;
 }
 
 .selection-page {
@@ -422,11 +458,6 @@ body {
   display: flex;
   flex: 1;
   min-height: 0;
-}
-
-.stage {
-  flex: 1;
-  min-width: 0;
 }
 
 .panel {
@@ -618,11 +649,11 @@ body {
   }
 }
 
-.page.capturing {
+.stage.capturing .page {
   cursor: crosshair;
 }
 
-.page.capturing .textLayer {
+.stage.capturing .textLayer {
   pointer-events: none;
 }
 
