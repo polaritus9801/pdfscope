@@ -262,6 +262,8 @@ fn App() -> impl IntoView {
     let error = RwSignal::new(Option::<String>::None);
     let settings_open = RwSignal::new(false);
     let reading = RwSignal::new(false);
+    // Starts true so the banner does not flash before settings load.
+    let configured = RwSignal::new(true);
     let toasts = RwSignal::new(Vec::<(f64, String)>::new());
 
     // A toast is the app's smallest unit of feedback: one line, three seconds, at most three.
@@ -801,6 +803,15 @@ fn App() -> impl IntoView {
 
 
 
+            <Show when=move || !configured.get()>
+                <div class="key-banner">
+                    <span>"还没有配置模型，提问前需要填一个 API Key。"</span>
+                    <button class="button" on:click=move |_| settings_open.set(true)>
+                        "去设置"
+                    </button>
+                </div>
+            </Show>
+
             <div class="workspace">
                 {move || {
                     if !find_open.get() {
@@ -1084,6 +1095,14 @@ fn App() -> impl IntoView {
                             </li>
                         </ol>
                         <button
+                            class="button welcome-action"
+                            on:click=move |_| {
+                                let _ = call("openSample", &[JsValue::from_str("sample.pdf")]);
+                            }
+                        >
+                            "试试示例"
+                        </button>
+                        <button
                             class="button button-primary welcome-action"
                             on:click=move |_| {
                                 if let Some(input) = web_sys::window()
@@ -1170,6 +1189,7 @@ fn App() -> impl IntoView {
                 clear_selection=clear_selection
                 open=settings_open
                 notify=notify
+                configured=configured
             />
             </div>
         </div>

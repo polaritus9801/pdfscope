@@ -1298,6 +1298,20 @@ window.PDFScope = {
     return document_.numPages;
   },
 
+  /// Loads a bundled document through the same path as a file picker.
+  async openSample(url) {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    const file = new File([blob], "示例.pdf", { type: "application/pdf" });
+    const transfer = new DataTransfer();
+    transfer.items.add(file);
+    const input = document.getElementById("file-input");
+    if (!input) return false;
+    input.files = transfer.files;
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    return true;
+  },
+
   /// Turns the remembered reading position on or off.
   setRememberPosition(value) {
     rememberPosition = Boolean(value);

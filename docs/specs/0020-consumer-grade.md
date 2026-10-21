@@ -153,6 +153,11 @@ documents; toasts never block input. A mis-shown banner costs one click, not dat
   and toasts, leaving the document and progress bar. Verified: `.app.reading` true, header
   `display: none`, Esc returns. First-page timing recorded in `docs/performance.md` (79 ms on a
   six-page fixture). Window geometry memory is **not** done.
+- **P2 sample and banner**: the welcome card gains 试试示例, which loads a bundled 3-page PDF through
+  the same path as the file picker (67 KB, subset CJK font — the first attempt rendered boxes, the
+  second a 23 MB file, the third both correct and small). A banner under the header says 还没有配置模型
+  and opens settings when no key is stored. Verified with a fake bridge reporting no key: banner
+  visible, sample loads as `示例.pdf`, 3 pages, Chinese text intact.
 - **P1 audit**: a grep for hard-coded `px` outside the token block finds **210** declarations. P1's
   acceptance ("only tokens and icon sizes") is therefore **not met**; converting them per component
   is recorded as remaining work rather than claimed.

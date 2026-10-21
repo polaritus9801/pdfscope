@@ -172,8 +172,8 @@ pub fn AiPanel(
     clear_selection: Callback<()>,
     open: RwSignal<bool>,
     notify: Callback<String>,
+    configured: RwSignal<bool>,
 ) -> impl IntoView {
-    let configured = RwSignal::new(false);
     let model = RwSignal::new("未配置".to_owned());
     let answer = RwSignal::new(String::new());
     let turns = RwSignal::new(Vec::<Turn>::new());

@@ -1919,3 +1919,15 @@ mark.find-hit {
   color: var(--accent);
   border-color: var(--accent);
 }
+
+.key-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--ink);
+  background: var(--accent-soft);
+  border-bottom: 1px solid var(--border);
+}

@@ -37,6 +37,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- 试试示例 on the welcome card: a bundled three-page PDF, opened through the normal file path.
+- A banner under the header when no API key is stored, with a shortcut into settings.
+
+
 - Reading mode (`⌥⌘F`): the document only, with `Esc` or a chip to return.
 - `docs/performance.md`, with the first measurement and its caveats.
 
