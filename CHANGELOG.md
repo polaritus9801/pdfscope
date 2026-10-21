@@ -10,6 +10,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Changed
 
+- Every remaining pixel value in the stylesheet is either a token or annotated `/* size */`;
+  `just tokens` enforces it in `just check`.
+
+
 - Spacing, radii, type sizes and offsets now come from the token scale; off-scale spacing snapped to
   the nearest step (223 → 109 hard-coded declarations).
 

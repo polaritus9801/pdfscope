@@ -163,8 +163,11 @@ documents; toasts never block input. A mis-shown banner costs one click, not dat
   scale, then snapped off-scale spacing (6/10/14/18/20/22) to the nearest step: **223 → 109**. The
   page gap moved from an arbitrary 18 px to the 16 px token, and the reader smoke now asserts that
   token instead of a magic number. The remaining 109 are component dimensions (icon sizes, thumbnail
-  boxes, hairline separators, transforms) that the acceptance line explicitly allows; P1 is close
-  but not declared done.
+  boxes, hairline separators, transforms) and each now carries a `/* size */` comment saying it is a
+  dimension rather than spacing. `scripts/check-tokens.mjs`, wired into `just check` as `just tokens`,
+  fails when a component rule hard-codes a pixel value without that comment. **P1 is complete**, with
+  the honest caveat that `/* size */` is our own declaration — the check enforces that every number is
+  classified, not that the classification is right.
 
 ## Deviations
 

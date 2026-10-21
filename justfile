@@ -42,7 +42,10 @@ test:  # Run the test suite.
 doc:  # Build documentation, treating warnings as errors.
     RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps
 
-check: ui fmt-check lint test doc  # Everything CI runs, locally (UI first: the shell embeds it).
+tokens:  # Fail if a component rule hard-codes a pixel value without saying why.
+    node scripts/check-tokens.mjs
+
+check: ui tokens fmt-check lint test doc  # Everything CI runs, locally (UI first: the shell embeds it).
     @printf '\nAll checks passed.\n'
 
 check-fast: fmt lint  # The cheap half, for a quick loop.
