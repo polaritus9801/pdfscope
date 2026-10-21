@@ -37,6 +37,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- A reading progress bar under the document, draggable and keyboard-adjustable, with `page / total`.
+- The reading position is remembered per document: reopening a file returns to the page you left.
+
+
 - Design tokens for spacing, radii, elevation, type and motion; the settings dialog and the shared
   control vocabulary now read from them, and `prefers-reduced-motion` disables motion entirely.
 

@@ -27,6 +27,8 @@ const MAX_CANVAS_DIM = 32767;
 let document_ = null;
 let pageSizes = [];
 let currentPage = 1;
+let documentName = "";
+let restorePage = 0;
 let initialized = false;
 
 /** Base layout at 100 %: the column never reflows during a zoom. */
@@ -96,6 +98,31 @@ function nextFrame() {
 
 function clamp(value, minimum, maximum) {
   return Math.min(Math.max(value, minimum), maximum);
+}
+
+function storageKey() {
+  return documentName ? `pdfscope:pos:${documentName}` : "";
+}
+
+function rememberedPage() {
+  const key = storageKey();
+  if (!key) return 0;
+  try {
+    const value = Number(window.localStorage?.getItem(key));
+    return Number.isFinite(value) && value > 0 ? value : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function rememberPage(page) {
+  const key = storageKey();
+  if (!key) return;
+  try {
+    window.localStorage?.setItem(key, String(page));
+  } catch {
+    /* private mode or quota; remembering a position is best effort */
+  }
 }
 
 function clampedPage(number) {
@@ -239,6 +266,7 @@ function syncCurrentPage() {
   const page = pageAtFocus();
   if (page !== currentPage) {
     currentPage = page;
+    rememberPage(page);
     window.__pdfscopePage?.(page);
   }
 }
@@ -253,6 +281,7 @@ function scrollToAnchor(anchor) {
   const current = pageRect.top + anchor.fraction * pageRect.height;
   stage.scrollTop += current - target;
   currentPage = anchor.page;
+  rememberPage(anchor.page);
   programmaticUntil = performance.now() + PROGRAMMATIC_SCROLL_MS;
   window.__pdfscopePage?.(anchor.page);
 }
@@ -268,6 +297,7 @@ function scrollToPageNow(number) {
     stage.scrollTop += pageRect.top - stageRect.top - 16;
   }
   currentPage = target;
+  rememberPage(target);
   programmaticUntil = performance.now() + PROGRAMMATIC_SCROLL_MS;
   window.__pdfscopePage?.(target);
 }
@@ -1143,7 +1173,8 @@ window.addEventListener("keydown", (event) => {
 
 window.PDFScope = {
   /** @param {Uint8Array} bytes */
-  async load(bytes) {
+  async load(bytes, name = "") {
+    documentName = typeof name === "string" ? name : "";
     stopZoom();
     releaseAll();
     baseWidth = 0;
@@ -1177,6 +1208,7 @@ window.PDFScope = {
 
     document_ = await pdfjs.getDocument({ data: bytes }).promise;
     pageSizes = await measurePages(document_.numPages);
+    restorePage = rememberedPage();
     reportZoom(true);
     return document_.numPages;
   },
@@ -1188,7 +1220,8 @@ window.PDFScope = {
 
   async render(pageNumber) {
     if (!document_) return;
-    const target = clampedPage(pageNumber);
+    const target = clampedPage(restorePage > 0 ? restorePage : pageNumber);
+    restorePage = 0;
 
     const shells = await waitForShells();
     if (!shells) return;

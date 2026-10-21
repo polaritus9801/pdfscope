@@ -327,7 +327,7 @@ fn App() -> impl IntoView {
             };
 
             let bytes = js_sys::Uint8Array::new(&buffer);
-            let Some(handle) = call("load", &[bytes.into()]) else {
+            let Some(handle) = call("load", &[bytes.into(), file.name().into()]) else {
                 error.set(Some("阅读器还没准备好，请重试。".to_owned()));
                 return;
             };
@@ -771,6 +771,21 @@ fn App() -> impl IntoView {
                             view! { <p class="error">{message}</p> }
                         })
                 }}
+
+                <div class="progress-strip" class:hidden=move || !ready.get()>
+                    <input
+                        class="progress-range"
+                        type="range"
+                        min="1"
+                        max=move || pages.get().max(1).to_string()
+                        prop:value=move || page.get().to_string()
+                        aria-label="阅读进度"
+                        on:input=jump
+                    />
+                    <span class="progress-count">
+                        {move || format!("{} / {}", page.get(), pages.get().max(1))}
+                    </span>
+                </div>
             </main>
 
             <div class="rail">

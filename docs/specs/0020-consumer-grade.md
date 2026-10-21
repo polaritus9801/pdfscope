@@ -124,7 +124,11 @@ documents; toasts never block input. A mis-shown banner costs one click, not dat
   found five tokens referenced but never defined (`accent-soft`, `accent-strong`, `radius-full`,
   `shadow-float`), which had made hover and selected states transparent across the shell; all are
   defined for light, dark and system-dark.
-- **P3–P7** not started.
+- **P3** in progress: a progress strip (a real range input, so drag and arrow keys work) sits at the
+  bottom of the reader, and the page is remembered per document name in `localStorage` — verified by
+  opening a fixture, going to page 3, reloading, and landing on page 3. Outline, thumbnails and
+  `⌘F` remain.
+- **P4–P7** not started.
 
 ## Deviations
 
