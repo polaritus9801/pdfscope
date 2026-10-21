@@ -28,7 +28,7 @@ Three scopes exist. Exactly one is active at a time, and it is **always visible*
 |---|---|---|
 | **Selected text** | drag over text, or arrow-select | The quote plus the paragraph around it |
 | **This page** | click the page chip (the default) | The page's text, or its image if it has no text layer |
-| **Page range** | click the page indicator, or edit the range chip | Pages `a..=b`, labelled per page |
+| **Page range** | drag on the page strip, type in the range field, or click the page indicator | The listed page segments, labelled per page |
 
 Asking is always explicit: nothing is sent on selection, capture, or range change. The user presses
 Send (or `⌘↵`). A capture is shown as a removable chip before it can be sent.
@@ -41,12 +41,16 @@ No library schema change. The scope is request state:
 pub enum AskScope {
     Selection { page: PageIndex, anchor: Anchor },
     Page { page: PageIndex },
-    Range { start: PageIndex, end: PageIndex },
+    Range { pages: Vec<PageSpan> },
 }
 ```
 
-Validation: `Range` requires `start <= end` and `end < page_count`; an empty or whitespace-only
-selection is refused at capture, not at send.
+`PageSpan` is a contiguous inclusive run (`start <= end`). Validation: every span is ordered and
+inside the document, spans are normalised (sorted, adjacent and overlapping spans merged), and an
+empty or whitespace-only selection is refused at capture, not at send.
+
+The multi-segment shape exists from the start so that typing `31-45, 60` is supported without a
+schema change later. The v1 drag gesture produces a single span.
 
 ## Interface
 
@@ -61,7 +65,9 @@ selection is refused at capture, not at send.
 | Text selection | — | reading surface | page has a text layer | drag across glyphs, release | `Shift`+arrows extends | long-press, then drag handles | floating bar appears above the selection; scope chip reads `选中 · p.31` | clicking empty page area dismisses; nothing is sent |
 | Ask | `问` | floating bar above selection | a selection exists | click | `⌘↵` | tap | AI panel focuses its input with the quote attached as a chip | `Esc` closes the bar; the selection remains |
 | Capture area | `框选` | floating bar, and page surface | any page, including scans | click then drag; or hold `⌥` and drag directly | hold `⌥`, drag with arrows not supported in v1 | tap `框选`, then drag | a marquee is drawn; on release an image chip appears in the panel with a preview and `✕` | `Esc` before release cancels; the chip can be removed before sending |
-| Page range | `31 / 404` | toolbar, right of the page navigation | a document is open | click opens a small popover with `from` / `to` fields | `⌘G` focuses the same popover | tap the indicator | chip becomes `范围 · 31–45`; the popover closes | invalid (`from` > `to`, outside document) → inline message, confirm disabled; a range above 20 pages shows an estimate and requires confirmation |
+| Page strip | page ticks | under the page, above the AI input | a document is open | drag across ticks selects a span; drag an edge to resize | `Shift`+arrows extend the span; `⌘G` focuses it | drag handles on the strip | the span highlights live and the range field rewrites on every tick crossed | `Esc` restores the previous span; a span above 20 pages shows an estimate and requires confirmation |
+| Range field | `31–45` | AI panel, beside the strip | a document is open | click to edit | type freely; `↵` commits | tap to edit | a valid entry rewrites the strip and the scope chip immediately | invalid input (`from` > `to`, outside the document) marks the field only, leaves the strip and chip untouched, and disables Send |
+| Page indicator | `31 / 404` | toolbar, right of the navigation | a document is open | click opens the range editor with the field focused | `⌘G` | tap | the editor opens; nothing changes until an edit is committed | closing the editor without a valid entry changes nothing |
 | Scope chips | `选中` `本页` `范围` | AI panel header | panel open | click | `Tab` to move, `↵` to choose | tap | the next question uses that scope; a typed question is preserved | switching scope never clears the input |
 | Copy quote | `复制` | floating bar | a selection exists | click | `⌘C` copies plain text; the button copies the Markdown block | tap | clipboard holds `> quote` + `p.31`; a toast confirms | clipboard denied → toast with the reason |
 
@@ -99,14 +105,30 @@ because the chip states exactly what will go.
 
 ## Design review
 
-- Reviewed with: — (pending)
-- Decisions: —
+- Reviewed with: z1mLi on 2026-10-21
+- Decisions:
+  - Box capture ships with **both** triggers: `⌥`-drag as the accelerator and the `框选` button as
+    the guarantee. (Open question 2, answered.)
+  - A page range is set by **both** a direct drag on the page strip and a typed field, bound to the
+    same state in both directions. Typing valid text redraws the strip; dragging rewrites the text.
+    Invalid text never mutates the strip. (Open question 3, answered.)
+  - Preset questions (`解释` / `翻译`) on the floating bar are **deferred**, not rejected. (Open
+    question 4, parked.)
+  - The multi-segment model is accepted even though v1's drag produces one span, so that typed input
+    does not force a schema change later.
+- Still open: the primary placement of the three scopes (open question 1).
 
 ## Test plan
 
-- Unit: range validation, empty selection refusal, scope serialisation.
+- Unit: range parsing (`31`, `31-45`, `31-45, 60`, full-width dash, whitespace), span ordering and
+  merging, rejection of out-of-document pages, empty selection refusal, scope serialisation.
+- Unit: the parser and the formatter are inverses — formatting a parsed range and parsing it again
+  yields the same spans.
 - Integration: scope chips drive the request body; switching scope preserves the typed question;
   a capture chip can be removed and is then absent from the request.
+- Integration (synchronisation): typing a valid range redraws the strip; typing invalid text leaves
+  the strip and scope chip unchanged and disables Send; dragging across the strip rewrites the field
+  on every tick; committing from the page indicator focuses the field, not the strip.
 - End-to-end: select → ask → the request carries the quote and page; drag a box → the request
   carries an image and no text; set `31–45` → the request carries 15 page labels.
 - Accessibility: every control reachable by keyboard; the floating bar does not trap focus.
@@ -133,11 +155,17 @@ because the chip states exactly what will go.
 
 ## Open questions
 
-1. **Which is the primary path?** Three permanent buttons (option A) or scopes-in-panel (option C)?
-   C is proposed because it keeps the page free of modes, but A is more discoverable on day one.
-2. **Box capture trigger:** `⌥`-drag (fast, invisible) or click `框选` first (explicit, one extra
-   step)? Proposed: both, with `⌥`-drag as the accelerator and the button as the guarantee.
-3. **Page range input:** a `from`/`to` picker, or a text field accepting `31-45, 60`? Proposed:
-   picker first, text parsing later — parsing is a feature with its own error messages.
-4. **Should the floating bar offer preset questions** (`解释` / `翻译`) beside `问`? Proposed: no in
-   v1; presets multiply the surface before the core loop is proven.
+1. **Where do the three scopes live?** Both options are wireframed in the review thread:
+
+   - **A — three permanent buttons on the page** (`选中` / `框选` / `范围`). Clicking one arms a
+     mode; the next drag does that thing. Discoverable, but the page now has modes, and "drag text
+     while box mode is armed" is a real failure.
+   - **C — scopes in the AI panel** (`选中 · p.31` / `本页` / `范围 · 31–45`), with the page always
+     doing the direct thing: drag selects text, `⌥`-drag draws a box. The chips say what the next
+     question is about and can also be clicked to change it.
+
+   Proposed: C. It keeps the page mode-free, and it is the only option that accommodates both box
+   triggers without adding a fourth button.
+
+2. **Does a typed range accept several segments** (`31-45, 60`)? Proposed: yes, in the model and the
+   parser; the strip edits the segment under the cursor.
