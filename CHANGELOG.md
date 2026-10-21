@@ -10,6 +10,12 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Desktop shell: a Tauri window that opens a PDF through the system file picker, renders pages with
+  PDF.js at fit width, and navigates and zooms with the keyboard or the toolbar. The page stays white
+  in dark mode. PDF.js is vendored and reached through a three-function contract, so the Rust side
+  never touches a canvas.
+- The lilac theme tokens (`docs/design/tokens.md`), applied to the shell.
+- `just ui`, `just desktop` and `just ui-dev` for the UI and the desktop loop.
 - Anchoring: a selection is captured with its page, quote, surrounding context and a page hash, and
   resolved later to `Exact`, `Relocated`, `Ambiguous` or `NeedsReview` — never to a guessed
   position.

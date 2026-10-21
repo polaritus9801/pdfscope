@@ -2,7 +2,7 @@
 /target
 **/*.rs.bk
 
-# UI / web build output (arrives with the UI crate)
+# UI build output
 /ui/dist
 /ui/target
 node_modules

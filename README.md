@@ -35,10 +35,12 @@ PDFScope is built around the opposite assumption — the page is the unit of wor
 
 ## Status
 
-Early. The repository is a deliberately complete foundation — workspace boundaries, CI, decision
-records, and an agent workflow — before any product behaviour exists. See
-[`docs/specs/`](docs/specs/) for what is planned and [`docs/adr/`](docs/adr/) for what has been
-decided and why.
+Early, and honest about it. The repository has a complete foundation — workspace boundaries, CI,
+decision records, an agent workflow — plus the first working slice: a desktop window that opens a
+PDF, renders it, and navigates. See [`docs/specs/`](docs/specs/) for what exists and what is next,
+and [`docs/adr/`](docs/adr/) for what has been decided and why.
+
+![The shell with no document open](docs/images/shell-empty.png)
 
 ## Stack
 

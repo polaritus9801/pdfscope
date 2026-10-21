@@ -1,9 +1,9 @@
 # 0004 — The status line
 
-- **Status:** draft
+- **Status:** accepted
 - **Author:** z1mLi
 - **Date:** 2026-10-21
-- **Approved by:** —
+- **Approved by:** z1mLi ("继续做")
 
 ## Goal
 

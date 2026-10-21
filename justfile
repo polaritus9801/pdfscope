@@ -21,11 +21,13 @@ setup:  # Configure git hooks and verify the toolchain.
     @cargo --version
     @printf '\nReady. Run `just check`.\n'
 
-fmt:  # Format the workspace.
+fmt:  # Format the workspace and the UI.
     cargo fmt --all
+    cd ui && cargo fmt
 
 fmt-check:  # Fail if formatting differs.
     cargo fmt --all --check
+    cd ui && cargo fmt --check
 
 lint:  # Run clippy with warnings denied.
     cargo clippy --workspace --all-targets --all-features -- -D warnings
@@ -36,7 +38,7 @@ test:  # Run the test suite.
 doc:  # Build documentation, treating warnings as errors.
     RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps
 
-check: fmt-check lint test doc  # Everything CI runs, locally.
+check: ui fmt-check lint test doc  # Everything CI runs, locally (UI first: the shell embeds it).
     @printf '\nAll checks passed.\n'
 
 check-fast: fmt lint  # The cheap half, for a quick loop.
@@ -51,6 +53,18 @@ outdated:  # Dependency freshness. Requires `cargo install cargo-outdated`.
 
 run:  # Run the web server on the default port.
     cargo run -p pdfscope-server
+
+ui:  # Build the UI bundle into ui/dist.
+    cd ui && trunk build
+
+ui-dev:  # Serve the UI with hot reload on :8080.
+    cd ui && trunk serve --port 8080
+
+desktop: ui  # Build the UI, then run the desktop shell.
+    cargo run -p pdfscope-desktop
+
+desktop-check: ui  # Type-check the desktop shell.
+    cargo check -p pdfscope-desktop
 
 new-spec name:  # Scaffold docs/specs/NNNN-name.md.
     @./scripts/new-doc.sh spec "{{name}}"
