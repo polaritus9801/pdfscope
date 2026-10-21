@@ -12,8 +12,6 @@ minor releases may contain breaking changes; they are always called out.
 
 - The API key is stored in a `0600` file next to the settings instead of the OS keychain: no prompt on
   launch, and the trade is written down in `SECURITY.md`.
-
-
 - Markdown now uses `pulldown-cmark`: tables, strikethrough and task lists join headings, lists,
   emphasis and code. Raw HTML stays escaped and citations still become interceptable links.
 - The panel keeps the conversation: finished exchanges stay on screen and the last four are sent with
@@ -21,6 +19,15 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Smooth zoom: trackpad pinch (WKWebView `gesture*` and Chromium `ctrl`+wheel), eased `ctrl`/`⌘`+wheel,
+  and animated `+`/`−`/`0`. The page is anchored under the pointer (or the reading line for
+  buttons), text stays visible throughout, the sharp canvas is swapped in after the hand stops, and
+  a column narrower than the stage re-centres. Max 400 %; see `0017-smooth-zoom.md`.
+- The reader is a continuous column: every page is a placeholder sized from the PDF, only the visible
+  pages plus one either side keep a canvas, the page field follows the scroll, zoom anchors the line
+  the reader is on, and `⌘↑`/`⌘↓` jump to the ends. Selection, box capture, reference tints and
+  `[p.N]` jumps resolve to the page that owns them rather than to whichever page was last drawn.
+  Verified in headless Chrome against 40-page and 400-page fixtures (`scripts/ui-smoke/reader.mjs`).
 - Hovering a history reference tints its rectangle when you are on that page and marks its position on
   a thin rail; hovering never scrolls the document.
 - `测试连接` in the settings sheet: one tiny request verifies the key, endpoint and model before they
@@ -39,6 +46,10 @@ minor releases may contain breaking changes; they are always called out.
 - Rotated PDF pages now select the text under the pointer: the text layer gets PDF.js's
   `data-main-rotation` transforms, and a stale selection bar clears when the selection collapses or
   the page re-renders.
+- Zoom no longer flashes, jumps or leaves the text blank: the column is transformed as one layer,
+  the text layer stays mounted, and the old canvas remains until the resting bitmap is ready.
+- Arrow keys in the question box no longer turn pages; the keyboard shortcuts now ignore both inputs
+  and textareas.
 - Dragging the panel divider no longer flashes a text selection on either side: the drag suppresses
   selection and clears the current one.
 
