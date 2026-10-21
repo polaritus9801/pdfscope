@@ -35,6 +35,12 @@ panel that could not be collapsed.
   inline code. Everything is escaped first, and page citations become links with `data-page` that the
   panel intercepts — the renderer lives in `pdfscope-core::markdown`, so it is unit-tested.
 
+## Third pass
+
+- Dragging the panel divider no longer starts a text selection: the drag clears any existing
+  selection, marks the document `resizing` (so the browser cannot start one), and prevents the
+  default on pointer down and move. Both the system highlight and our own selection bar stay put.
+
 ## Non-goals
 
 - Continuous scrolling, single/double page modes and page-by-page navigation are **not** in this

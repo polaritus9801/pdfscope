@@ -542,18 +542,28 @@ pub fn AiPanel(
             <div
                 class="panel-resize"
                 on:pointerdown=move |event: web_sys::PointerEvent| {
+                    event.prevent_default();
                     if let Some(target) = event
                         .current_target()
                         .and_then(|target| target.dyn_into::<web_sys::HtmlElement>().ok())
                     {
                         let _ = target.set_pointer_capture(event.pointer_id());
                     }
+                    // Without this a fast drag starts selecting text on both sides of the split.
+                    if let Some(root) = web_sys::window()
+                        .and_then(|window| window.document())
+                        .and_then(|document| document.document_element())
+                    {
+                        let _ = root.class_list().add_1("resizing");
+                    }
+                    let _ = crate::call("clearSelection", &[]);
                     dragging.set(true);
                 }
                 on:pointermove=move |event: web_sys::PointerEvent| {
                     if !dragging.get() {
                         return;
                     }
+                    event.prevent_default();
                     let viewport = web_sys::window()
                         .and_then(|window| window.inner_width().ok())
                         .and_then(|value| value.as_f64())
@@ -561,7 +571,15 @@ pub fn AiPanel(
                     let next = (viewport - f64::from(event.client_x())).clamp(260.0, 640.0);
                     width.set(next as u32);
                 }
-                on:pointerup=move |_| dragging.set(false)
+                on:pointerup=move |_| {
+                    dragging.set(false);
+                    if let Some(root) = web_sys::window()
+                        .and_then(|window| window.document())
+                        .and_then(|document| document.document_element())
+                    {
+                        let _ = root.class_list().remove_1("resizing");
+                    }
+                }
             ></div>
             <div class="panel-head">
                 <button

@@ -344,6 +344,7 @@ window.PDFScope = {
 
   clearSelection() {
     window.getSelection()?.removeAllRanges();
+    window.__pdfscopeCleared?.();
   },
 
   async copy(text) {

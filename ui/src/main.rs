@@ -330,6 +330,19 @@ fn App() -> impl IntoView {
         callback.forget();
     });
 
+    // The renderer clears the browser selection; the bar must go with it.
+    Effect::new(move |_| {
+        let callback = Closure::<dyn Fn()>::new(move || selection.set(None));
+        if let Some(window) = web_sys::window() {
+            let _ = js_sys::Reflect::set(
+                &window,
+                &JsValue::from_str("__pdfscopeCleared"),
+                callback.as_ref(),
+            );
+        }
+        callback.forget();
+    });
+
     // Pinch gestures arrive as ctrl+wheel; the renderer reports the new zoom here.
     Effect::new(move |_| {
         let callback = Closure::<dyn Fn(JsValue)>::new(move |value: JsValue| {

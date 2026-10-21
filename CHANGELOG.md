@@ -32,6 +32,9 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Fixed
 
+- Dragging the panel divider no longer flashes a text selection on either side: the drag suppresses
+  selection and clears the current one.
+
 - The window no longer scrolls as a whole: only the reader and the panel body do.
 - Box capture fires: its pointer listeners are on the document, because the page element does not
   exist when the renderer module loads.
