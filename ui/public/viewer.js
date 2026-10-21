@@ -100,6 +100,39 @@ function clamp(value, minimum, maximum) {
   return Math.min(Math.max(value, minimum), maximum);
 }
 
+let thumbnailObserver = null;
+const thumbnailCache = new Map();
+
+async function renderThumbnail(element) {
+  const number = Number(element.dataset.page);
+  if (!number || !document_ || element.dataset.rendered === "true") return;
+  element.dataset.rendered = "true";
+
+  try {
+    let url = thumbnailCache.get(number);
+    if (!url) {
+      const page = await document_.getPage(number);
+      const base = page.getViewport({ scale: 1 });
+      const scale = 150 / base.width;
+      const viewport = page.getViewport({ scale });
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.ceil(viewport.width));
+      canvas.height = Math.max(1, Math.ceil(viewport.height));
+      const context = canvas.getContext("2d");
+      await page.render({ canvasContext: context, viewport }).promise;
+      url = canvas.toDataURL("image/png");
+      thumbnailCache.set(number, url);
+    }
+    const image = document.createElement("img");
+    image.src = url;
+    image.alt = `第 ${number} 页`;
+    image.loading = "lazy";
+    element.replaceChildren(image);
+  } catch {
+    element.dataset.rendered = "failed";
+  }
+}
+
 function storageKey() {
   return documentName ? `pdfscope:pos:${documentName}` : "";
 }
@@ -1255,8 +1288,31 @@ window.PDFScope = {
     document_ = await pdfjs.getDocument({ data: bytes }).promise;
     pageSizes = await measurePages(document_.numPages);
     restorePage = rememberedPage();
+    thumbnailCache.clear();
+    thumbnailObserver?.disconnect();
+    thumbnailObserver = null;
     reportZoom(true);
     return document_.numPages;
+  },
+
+  /// Renders a thumbnail for every `.thumb[data-page]` that scrolls into view. Cached per page.
+  thumbnails() {
+    const targets = document.querySelectorAll(".thumb[data-page]:not([data-queued])");
+    if (targets.length === 0) return;
+
+    if (!thumbnailObserver) {
+      thumbnailObserver = new IntersectionObserver((entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          void renderThumbnail(entry.target);
+        }
+      }, { rootMargin: "200px" });
+    }
+
+    for (const target of targets) {
+      target.dataset.queued = "1";
+      thumbnailObserver.observe(target);
+    }
   },
 
   /// Counts matches for `query` across the document and highlights the rendered pages.

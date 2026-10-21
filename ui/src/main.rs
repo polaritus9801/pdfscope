@@ -286,6 +286,19 @@ fn App() -> impl IntoView {
     });
     let outline = RwSignal::new(Vec::<(String, u32, u8)>::new());
     let outline_open = RwSignal::new(false);
+    let rail_tab = RwSignal::new(0_u8);
+
+    let schedule_thumbnails = move || {
+        if let Some(window) = web_sys::window() {
+            let callback = Closure::once_into_js(move || {
+                let _ = call("thumbnails", &[]);
+            });
+            let _ = window.set_timeout_with_callback_and_timeout_and_arguments_0(
+                callback.unchecked_ref(),
+                60,
+            );
+        }
+    };
     let find_open = RwSignal::new(false);
     let find_text = RwSignal::new(String::new());
     let find_total = RwSignal::new(0_u32);
@@ -719,8 +732,8 @@ fn App() -> impl IntoView {
                 <div class="bar-right">
                     <button
                         class="button icon-only"
-                        title="目录"
-                        prop:disabled=move || outline.get().is_empty()
+                        title="目录与缩略图"
+                        prop:disabled=move || !ready.get()
                         on:click=move |_| outline_open.update(|open| *open = !*open)
                     >
                         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
@@ -835,7 +848,25 @@ fn App() -> impl IntoView {
                 <Show when=move || outline_open.get()>
                     <aside class="outline">
                         <div class="outline-head">
-                            <span>"目录"</span>
+                            <div class="rail-tabs">
+                                <button
+                                    class="rail-tab"
+                                    class:active=move || rail_tab.get() == 0
+                                    on:click=move |_| rail_tab.set(0)
+                                >
+                                    "目录"
+                                </button>
+                                <button
+                                    class="rail-tab"
+                                    class:active=move || rail_tab.get() == 1
+                                    on:click=move |_| {
+                                        rail_tab.set(1);
+                                        schedule_thumbnails();
+                                    }
+                                >
+                                    "缩略图"
+                                </button>
+                            </div>
                             <button
                                 class="icon-button"
                                 title="关闭"
@@ -844,7 +875,39 @@ fn App() -> impl IntoView {
                                 "✕"
                             </button>
                         </div>
-                        <div class="outline-list">
+                        {move || {
+                            if rail_tab.get() == 1 {
+                                view! {
+                                    <div class="thumb-list">
+                                        {(1..=pages.get())
+                                            .map(|number| {
+                                                view! {
+                                                    <button
+                                                        class="thumb"
+                                                        data-page=number
+                                                        title=format!("第 {number} 页")
+                                                        on:click=move |_| {
+                                                            page.set(number);
+                                                            outline_open.set(false);
+                                                        }
+                                                    >
+                                                        <span class="thumb-number">{number}</span>
+                                                    </button>
+                                                }
+                                            })
+                                            .collect_view()}
+                                    </div>
+                                }
+                                    .into_any()
+                            } else {
+                                view! {
+                                    <div class="outline-list">
+                            {move || {
+                                outline
+                                    .get()
+                                    .is_empty()
+                                    .then(|| view! { <p class="outline-empty">"这份文件没有目录"</p> })
+                            }}
                             {move || {
                                 outline
                                     .get()
@@ -876,7 +939,11 @@ fn App() -> impl IntoView {
                                     })
                                     .collect_view()
                             }}
-                        </div>
+                                    </div>
+                                }
+                                    .into_any()
+                            }
+                        }}
                     </aside>
                 </Show>
 

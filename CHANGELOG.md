@@ -37,6 +37,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Page thumbnails in the same rail as the outline, rendered lazily and cached; a document without a
+  table of contents can still use them.
+
+
 - Toasts for completed actions (settings saved, copied), at most three at a time.
 - A field-level error under 最大输出, and an offline-specific message when the network is down.
 
