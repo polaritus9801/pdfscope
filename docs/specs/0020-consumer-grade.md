@@ -145,7 +145,11 @@ documents; toasts never block input. A mis-shown banner costs one click, not dat
   citation; the composer grows with its content up to 150 px and then scrolls. Verified by rendering
   an answer with `[p.31]` (定位 / 复制 / 重新生成) and by typing six lines (70 → 131 px). Keyboard
   coverage of the actions is inherent — they are buttons in tab order.
-- **P5, P7** not started.
+- **P5** started: settings now has six tabs — 通用设置 (theme, answer font size), 阅读 (remember
+  position), 模型, 提示词, 快捷键 (a cheat sheet), 关于 (version and where data lives). Font size
+  applies immediately through `--answer-size`; the remember-position switch reaches the viewer via
+  `setRememberPosition`. Two unit tests cover old-file defaults and a round trip.
+- **P7** not started.
 
 ## Deviations
 

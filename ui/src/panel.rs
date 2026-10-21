@@ -70,6 +70,22 @@ const PRESET_LABELS: &[&str] = &[
     "Ollama",
 ];
 
+/// Applies the answer text size to the document root.
+fn apply_font_size(size: &str) {
+    if let (Ok(size), Some(root)) = (
+        size.parse::<u16>(),
+        web_sys::window()
+            .and_then(|window| window.document())
+            .and_then(|document| document.document_element()),
+    ) {
+        let _ = root.dyn_into::<web_sys::HtmlElement>().map(|element| {
+            element
+                .style()
+                .set_property("--answer-size", &format!("{size}px"))
+        });
+    }
+}
+
 /// Whether the WebView thinks it has no network.
 fn offline() -> bool {
     web_sys::window()
@@ -205,6 +221,8 @@ pub fn AiPanel(
     let form_theme = RwSignal::new("system".to_owned());
     let form_max = RwSignal::new(String::new());
     let form_max_error = RwSignal::new(Option::<String>::None);
+    let form_font_size = RwSignal::new("14".to_owned());
+    let form_remember = RwSignal::new(true);
     let tab = RwSignal::new(0_u8);
     let form_error = RwSignal::new(Option::<String>::None);
 
@@ -236,6 +254,18 @@ pub fn AiPanel(
                     apply_theme(&stored);
                     form_theme.set(stored);
                 }
+                form_font_size.set(
+                    number_of(&value, "font_size")
+                        .map(|size| (size as u16).to_string())
+                        .unwrap_or_else(|| "14".to_owned()),
+                );
+                form_remember.set(flag_of(&value, "remember_position").unwrap_or(true));
+                apply_font_size(&form_font_size.get());
+                let _ = crate::call(
+                    "setRememberPosition",
+                    &[JsValue::from_bool(form_remember.get())],
+                );
+
                 form_max.set(
                     number_of(&value, "max_tokens")
                         .map(|limit| (limit as u32).to_string())
@@ -633,6 +663,16 @@ pub fn AiPanel(
             },
         };
         let _ = js_sys::Reflect::set(&payload, &JsValue::from_str("max_tokens"), &limit);
+        let _ = js_sys::Reflect::set(
+            &payload,
+            &JsValue::from_str("font_size"),
+            &JsValue::from_f64(f64::from(form_font_size.get().parse::<u16>().unwrap_or(14))),
+        );
+        let _ = js_sys::Reflect::set(
+            &payload,
+            &JsValue::from_str("remember_position"),
+            &JsValue::from_bool(form_remember.get()),
+        );
 
         let key = form_key.get();
         if !key.trim().is_empty() {
@@ -660,6 +700,11 @@ pub fn AiPanel(
                         configured.set(true);
                         model.set(form_model.get());
                         apply_theme(&form_theme.get());
+                        apply_font_size(&form_font_size.get());
+                        let _ = crate::call(
+                            "setRememberPosition",
+                            &[JsValue::from_bool(form_remember.get())],
+                        );
                         notify.run("设置已保存".to_owned());
                         form_key.set(String::new());
                     }
@@ -1246,14 +1291,35 @@ pub fn AiPanel(
                                     class:active=move || tab.get() == 1
                                     on:click=move |_| tab.set(1)
                                 >
-                                    "模型"
+                                    "阅读"
                                 </button>
                                 <button
                                     class="settings-tab"
                                     class:active=move || tab.get() == 2
                                     on:click=move |_| tab.set(2)
                                 >
+                                    "模型"
+                                </button>
+                                <button
+                                    class="settings-tab"
+                                    class:active=move || tab.get() == 3
+                                    on:click=move |_| tab.set(3)
+                                >
                                     "提示词"
+                                </button>
+                                <button
+                                    class="settings-tab"
+                                    class:active=move || tab.get() == 4
+                                    on:click=move |_| tab.set(4)
+                                >
+                                    "快捷键"
+                                </button>
+                                <button
+                                    class="settings-tab"
+                                    class:active=move || tab.get() == 5
+                                    on:click=move |_| tab.set(5)
+                                >
+                                    "关于"
                                 </button>
                             </nav>
 
@@ -1289,6 +1355,48 @@ pub fn AiPanel(
                                 </Show>
 
                                 <Show when=move || tab.get() == 1>
+                                    <section class="settings-section">
+                                        <h3>"阅读"</h3>
+                                        <p class="settings-hint">"重新打开文件时回到上次读到的位置。"</p>
+                                        <label class="settings-row">
+                                            <span>"记住阅读位置"</span>
+                                            <input
+                                                type="checkbox"
+                                                prop:checked=move || form_remember.get()
+                                                on:change=move |event| {
+                                                    form_remember.set(event_target_checked(&event));
+                                                }
+                                            />
+                                        </label>
+                                    </section>
+                                </Show>
+
+                                <Show when=move || tab.get() == 4>
+                                    <section class="settings-section">
+                                        <h3>"快捷键"</h3>
+                                        <dl class="shortcuts">
+                                            <dt>"⌘O"</dt><dd>"打开 PDF"</dd>
+                                            <dt>"⌘F"</dt><dd>"文档内查找"</dd>
+                                            <dt>"⌘↑ / ⌘↓"</dt><dd>"跳到首页 / 末页"</dd>
+                                            <dt>"[ / ]"</dt><dd>"上一页 / 下一页"</dd>
+                                            <dt>"Enter"</dt><dd>"发送问题"</dd>
+                                            <dt>"Shift / ⌘ + Enter"</dt><dd>"在问题里换行"</dd>
+                                            <dt>"Esc"</dt><dd>"关闭查找或停止回答"</dd>
+                                        </dl>
+                                    </section>
+                                </Show>
+
+                                <Show when=move || tab.get() == 5>
+                                    <section class="settings-section">
+                                        <h3>"关于"</h3>
+                                        <p class="settings-hint">"PDFScope 0.1.0 · 本地优先的 PDF 阅读与提问工具。"</p>
+                                        <p class="settings-hint">
+                                            "配置与密钥保存在本机应用目录，不会上传；只有提问时才会把引用内容发送给你选择的模型服务。"
+                                        </p>
+                                    </section>
+                                </Show>
+
+                                <Show when=move || tab.get() == 2>
                                     <section class="settings-section">
                                         <h3>"服务"</h3>
                                         <p class="settings-hint">"任何 OpenAI 兼容或 Anthropic 兼容的接口都可以。"</p>
@@ -1339,6 +1447,30 @@ pub fn AiPanel(
                                         </label>
 
                                     <section class="settings-section">
+                                        <h3>"字号"</h3>
+                                        <p class="settings-hint">"回答正文的大小。"</p>
+                                        <label class="settings-row">
+                                            <span>"字号"</span>
+                                            <select on:change=move |event| form_font_size.set(event_target_value(&event))>
+                                                {(12..=18)
+                                                    .map(|size| {
+                                                        let value = size.to_string();
+                                                        let selected = {
+                                                            let value = value.clone();
+                                                            move || form_font_size.get() == value
+                                                        };
+                                                        view! {
+                                                            <option value=value.clone() selected=selected>
+                                                                {format!("{size} px")}
+                                                            </option>
+                                                        }
+                                                    })
+                                                    .collect_view()}
+                                            </select>
+                                        </label>
+                                    </section>
+
+                                    <section class="settings-section">
                                         <h3>"API Key"</h3>
                                         <p class="settings-hint">"保存在本机配置目录的 api-key 文件，权限 0600，只有这个用户能读。"</p>
                                         <label class="settings-row">
@@ -1386,7 +1518,7 @@ pub fn AiPanel(
                                     </section>
                                 </Show>
 
-                                <Show when=move || tab.get() == 2>
+                                <Show when=move || tab.get() == 3>
                                     <section class="settings-section">
                                         <h3>"系统提示词"</h3>
                                         <p class="settings-hint">"每次提问都会带上这段指令。清空会恢复默认。"</p>

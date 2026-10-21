@@ -37,6 +37,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Settings gained 阅读, 快捷键 and 关于 tabs; answer font size and the remember-position switch apply
+  immediately and persist.
+
+
 - **定位** on answers that cite a page: jumps to the first citation in the document.
 - The composer grows with its content up to 150 px, then scrolls.
 

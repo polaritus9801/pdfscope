@@ -50,6 +50,20 @@ pub(crate) struct Settings {
     /// Upper bound on generated tokens; `None` means no limit.
     #[serde(default)]
     pub(crate) max_tokens: Option<u32>,
+    /// Answer text size in pixels.
+    #[serde(default = "default_font_size")]
+    pub(crate) font_size: u16,
+    /// Whether to reopen a document where it was left.
+    #[serde(default = "default_true")]
+    pub(crate) remember_position: bool,
+}
+
+fn default_font_size() -> u16 {
+    14
+}
+
+fn default_true() -> bool {
+    true
 }
 
 fn default_prompt() -> String {
@@ -70,6 +84,8 @@ impl Default for Settings {
             system_prompt: default_prompt(),
             theme: default_theme(),
             max_tokens: None,
+            font_size: default_font_size(),
+            remember_position: true,
         }
     }
 }
@@ -94,6 +110,12 @@ pub(crate) struct SettingsInput {
     /// Upper bound on generated tokens; absent or null means no limit.
     #[serde(default)]
     pub(crate) max_tokens: Option<u32>,
+    /// Answer text size in pixels.
+    #[serde(default)]
+    pub(crate) font_size: Option<u16>,
+    /// Whether to reopen a document where it was left.
+    #[serde(default)]
+    pub(crate) remember_position: Option<bool>,
     /// A new key, when the user typed one. `None` keeps the stored key.
     pub(crate) api_key: Option<String>,
 }
@@ -115,6 +137,10 @@ pub(crate) struct SettingsView {
     pub(crate) theme: String,
     /// Upper bound on generated tokens; `None` means no limit.
     pub(crate) max_tokens: Option<u32>,
+    /// Answer text size in pixels.
+    pub(crate) font_size: u16,
+    /// Whether to reopen a document where it was left.
+    pub(crate) remember_position: bool,
     /// Whether a key is stored. The key itself never crosses this boundary.
     pub(crate) has_key: bool,
 }
@@ -183,6 +209,8 @@ pub(crate) fn load_settings(app: tauri::AppHandle) -> Result<SettingsView, Strin
         system_prompt: settings.system_prompt,
         theme: settings.theme,
         max_tokens: settings.max_tokens,
+        font_size: settings.font_size,
+        remember_position: settings.remember_position,
         has_key: has_key(&app),
     })
 }
@@ -214,6 +242,8 @@ pub(crate) fn save_settings(app: tauri::AppHandle, settings: SettingsInput) -> R
             .unwrap_or_else(default_prompt),
         theme: settings.theme.unwrap_or_else(default_theme),
         max_tokens: settings.max_tokens,
+        font_size: settings.font_size.unwrap_or_else(default_font_size),
+        remember_position: settings.remember_position.unwrap_or(true),
     };
 
     let path = settings_path(&app)?;
@@ -284,4 +314,34 @@ pub(crate) fn provider(app: &tauri::AppHandle) -> Result<(Settings, pdfscope_ai:
     let settings = read_settings(app);
     let key = read_key(app).ok_or_else(|| "还没有保存 API Key".to_owned())?;
     Ok((settings, pdfscope_ai::Secret::new(key)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn older_files_get_defaults_for_new_fields() {
+        let json = r#"{"preset":"MiMo","protocol":"openai","base_url":"https://x","model":"m"}"#;
+        let settings: Settings = serde_json::from_str(json).unwrap();
+
+        assert_eq!(settings.font_size, 14);
+        assert!(settings.remember_position);
+        assert_eq!(settings.max_tokens, None);
+    }
+
+    #[test]
+    fn preferences_survive_a_round_trip() {
+        let settings = Settings {
+            font_size: 18,
+            remember_position: false,
+            ..Settings::default()
+        };
+
+        let json = serde_json::to_string(&settings).unwrap();
+        let back: Settings = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(back.font_size, 18);
+        assert!(!back.remember_position);
+    }
 }

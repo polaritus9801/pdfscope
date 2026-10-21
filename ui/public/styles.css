@@ -609,7 +609,7 @@ body {
 
 .answer-text {
   margin: 0;
-  font-size: var(--text-md);
+  font-size: var(--answer-size, var(--text-md));
   line-height: 1.7;
   /* Was pre-wrap for plain text; with HTML output it turned the newlines between
      block tags into visible blank lines. */
@@ -1860,4 +1860,22 @@ mark.find-hit {
   padding: var(--space-3);
   font-size: var(--text-sm);
   color: var(--ink-faint);
+}
+
+.shortcuts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--space-2) var(--space-5);
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.shortcuts dt {
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}
+
+.shortcuts dd {
+  margin: 0;
+  color: var(--ink-muted);
 }

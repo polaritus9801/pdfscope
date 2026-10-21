@@ -28,6 +28,7 @@ let document_ = null;
 let pageSizes = [];
 let currentPage = 1;
 let documentName = "";
+let rememberPosition = true;
 let restorePage = 0;
 let initialized = false;
 
@@ -138,6 +139,7 @@ function storageKey() {
 }
 
 function rememberedPage() {
+  if (!rememberPosition) return 0;
   const key = storageKey();
   if (!key) return 0;
   try {
@@ -149,6 +151,7 @@ function rememberedPage() {
 }
 
 function rememberPage(page) {
+  if (!rememberPosition) return;
   const key = storageKey();
   if (!key) return;
   try {
@@ -1293,6 +1296,11 @@ window.PDFScope = {
     thumbnailObserver = null;
     reportZoom(true);
     return document_.numPages;
+  },
+
+  /// Turns the remembered reading position on or off.
+  setRememberPosition(value) {
+    rememberPosition = Boolean(value);
   },
 
   /// Renders a thumbnail for every `.thumb[data-page]` that scrolls into view. Cached per page.
