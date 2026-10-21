@@ -6,7 +6,7 @@ use wasm_bindgen::closure::Closure;
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 
-use pdfscope_core::{Segment, segments};
+use pdfscope_core::{Segment, parse_ranges, segments};
 
 use crate::{Passage, Region};
 
@@ -70,6 +70,17 @@ const PRESET_LABELS: &[&str] = &[
     "Ollama",
 ];
 
+/// Fetches a page's text from the renderer.
+async fn fetch_page_text(number: u32) -> String {
+    let Some(promise) = crate::call("pageText", &[JsValue::from(number)]) else {
+        return String::new();
+    };
+    match JsFuture::from(js_sys::Promise::from(promise)).await {
+        Ok(value) => value.as_string().unwrap_or_default(),
+        Err(_) => String::new(),
+    }
+}
+
 #[component]
 pub fn AiPanel(
     passages: RwSignal<Vec<Passage>>,
@@ -85,6 +96,10 @@ pub fn AiPanel(
     let streaming = RwSignal::new(false);
     let question = RwSignal::new(String::new());
     let open = RwSignal::new(false);
+    let failed = RwSignal::new(false);
+    let ranges = RwSignal::new(Vec::<pdfscope_core::PageSpan>::new());
+    let range_input = RwSignal::new(String::new());
+    let range_error = RwSignal::new(Option::<String>::None);
 
     let jump = move |target: u32| {
         let total = pages.get();
@@ -127,6 +142,14 @@ pub fn AiPanel(
         }
     });
 
+    let add_range = move |_| match parse_ranges(&range_input.get(), pages.get().max(1)) {
+        Ok(spans) => {
+            ranges.set(spans);
+            range_error.set(None);
+        }
+        Err(error) => range_error.set(Some(error.to_string())),
+    };
+
     let send = move |_| {
         if streaming.get() {
             return;
@@ -143,88 +166,134 @@ pub fn AiPanel(
         answer.set(String::new());
         thinking.set(0);
         streaming.set(true);
-        status.set("连接中…".to_owned());
+        failed.set(false);
+        status.set("准备中…".to_owned());
 
-        let references = js_sys::Array::new();
-        for passage in passages.get() {
-            let item = js_sys::Object::new();
-            let _ = js_sys::Reflect::set(
-                &item,
-                &JsValue::from_str("page"),
-                &JsValue::from(passage.page),
-            );
-            let _ = js_sys::Reflect::set(
-                &item,
-                &JsValue::from_str("quote"),
-                &JsValue::from_str(&passage.quote),
-            );
-            references.push(&item);
-        }
+        let passages_now = passages.get();
+        let regions_now = regions.get();
+        let ranges_now = ranges.get();
+        let current_page = page.get();
 
-        let images = js_sys::Array::new();
-        for region in regions.get() {
-            let item = js_sys::Object::new();
-            let _ = js_sys::Reflect::set(
-                &item,
-                &JsValue::from_str("page"),
-                &JsValue::from(region.page),
-            );
-            let _ = js_sys::Reflect::set(
-                &item,
-                &JsValue::from_str("image"),
-                &JsValue::from_str(&region.image),
-            );
-            images.push(&item);
-        }
-
-        let started = js_sys::Date::now();
-        let callback = Closure::<dyn Fn(JsValue)>::new(move |event: JsValue| {
-            let kind = text_of(&event, "kind").unwrap_or_default();
-            match kind.as_str() {
-                "reasoning" => {
-                    if let Some(delta) = text_of(&event, "text") {
-                        thinking.update(|count| *count += delta.chars().count());
+        spawn_local(async move {
+            // Page text is fetched here, not in Rust: the renderer owns the document.
+            let mut context: Vec<(u32, String)> = Vec::new();
+            if !ranges_now.is_empty() {
+                'outer: for span in &ranges_now {
+                    for number in span.start..=span.end {
+                        if context.len() >= 20 {
+                            break 'outer;
+                        }
+                        context.push((number, fetch_page_text(number).await));
                     }
                 }
-                "text" => {
-                    if let Some(delta) = text_of(&event, "text") {
-                        answer.update(|buffer| buffer.push_str(&delta));
-                    }
-                }
-                "usage" => {
-                    let prompt = number_of(&event, "prompt").unwrap_or(0.0) as u64;
-                    let completion = number_of(&event, "completion").unwrap_or(0.0) as u64;
-                    let cached = number_of(&event, "cached").unwrap_or(0.0) as u64;
-                    status.set(format!("输入 {prompt} · 输出 {completion} · 缓存 {cached}"));
-                }
-                "done" => {
-                    streaming.set(false);
-                    let elapsed = js_sys::Date::now() - started;
-                    if elapsed > 0.0 {
-                        let characters = answer.get().chars().count() as f64;
-                        // Roughly two characters per token for CJK; labelled as an estimate.
-                        let rate = (characters / 2.0) / (elapsed / 1000.0);
-                        status.update(|line| line.push_str(&format!(" · ≈ {rate:.0} tok/s")));
-                    }
-                }
-                "error" => {
-                    streaming.set(false);
-                    status.set(text_of(&event, "message").unwrap_or_else(|| "请求失败".to_owned()));
-                }
-                _ => {}
+            } else if passages_now.is_empty() && regions_now.is_empty() {
+                context.push((current_page, fetch_page_text(current_page).await));
             }
-        });
 
-        let _ = bridge(
-            "ask",
-            &[
-                JsValue::from_str(&asked),
-                references.into(),
-                images.into(),
-                callback.as_ref().clone(),
-            ],
-        );
-        callback.forget();
+            let references = js_sys::Array::new();
+            for passage in &passages_now {
+                let item = js_sys::Object::new();
+                let _ = js_sys::Reflect::set(
+                    &item,
+                    &JsValue::from_str("page"),
+                    &JsValue::from(passage.page),
+                );
+                let _ = js_sys::Reflect::set(
+                    &item,
+                    &JsValue::from_str("quote"),
+                    &JsValue::from_str(&passage.quote),
+                );
+                references.push(&item);
+            }
+
+            let images = js_sys::Array::new();
+            for region in &regions_now {
+                let item = js_sys::Object::new();
+                let _ = js_sys::Reflect::set(
+                    &item,
+                    &JsValue::from_str("page"),
+                    &JsValue::from(region.page),
+                );
+                let _ = js_sys::Reflect::set(
+                    &item,
+                    &JsValue::from_str("image"),
+                    &JsValue::from_str(&region.image),
+                );
+                images.push(&item);
+            }
+
+            let pages_array = js_sys::Array::new();
+            for (number, text) in &context {
+                let item = js_sys::Object::new();
+                let _ = js_sys::Reflect::set(
+                    &item,
+                    &JsValue::from_str("page"),
+                    &JsValue::from(*number),
+                );
+                let _ = js_sys::Reflect::set(
+                    &item,
+                    &JsValue::from_str("text"),
+                    &JsValue::from_str(text),
+                );
+                pages_array.push(&item);
+            }
+
+            let started = js_sys::Date::now();
+            let callback = Closure::<dyn Fn(JsValue)>::new(move |event: JsValue| {
+                let kind = text_of(&event, "kind").unwrap_or_default();
+                match kind.as_str() {
+                    "reasoning" => {
+                        if let Some(delta) = text_of(&event, "text") {
+                            thinking.update(|count| *count += delta.chars().count());
+                        }
+                    }
+                    "text" => {
+                        if let Some(delta) = text_of(&event, "text") {
+                            answer.update(|buffer| buffer.push_str(&delta));
+                        }
+                    }
+                    "usage" => {
+                        let prompt = number_of(&event, "prompt").unwrap_or(0.0) as u64;
+                        let completion = number_of(&event, "completion").unwrap_or(0.0) as u64;
+                        let cached = number_of(&event, "cached").unwrap_or(0.0) as u64;
+                        status.set(format!("输入 {prompt} · 输出 {completion} · 缓存 {cached}"));
+                    }
+                    "stopped" => {
+                        streaming.set(false);
+                        status.set("已停止".to_owned());
+                    }
+                    "done" => {
+                        streaming.set(false);
+                        let elapsed = js_sys::Date::now() - started;
+                        if elapsed > 0.0 {
+                            let characters = answer.get().chars().count() as f64;
+                            let rate = (characters / 2.0) / (elapsed / 1000.0);
+                            status.update(|line| line.push_str(&format!(" · ≈ {rate:.0} tok/s")));
+                        }
+                    }
+                    "error" => {
+                        streaming.set(false);
+                        failed.set(true);
+                        status.set(
+                            text_of(&event, "message").unwrap_or_else(|| "请求失败".to_owned()),
+                        );
+                    }
+                    _ => {}
+                }
+            });
+
+            let _ = bridge(
+                "ask",
+                &[
+                    JsValue::from_str(&asked),
+                    references.into(),
+                    images.into(),
+                    pages_array.into(),
+                    callback.as_ref().clone(),
+                ],
+            );
+            callback.forget();
+        });
     };
 
     let save = move |_| {
@@ -347,6 +416,44 @@ pub fn AiPanel(
             </div>
 
             <div class="composer">
+                <div class="range-row">
+                    <input
+                        class="range-input"
+                        type="text"
+                        placeholder="页码范围 31-45, 60"
+                        prop:value=move || range_input.get()
+                        on:input=move |event| range_input.set(event_target_value(&event))
+                    />
+                    <button class="button" on:click=add_range>
+                        "加入"
+                    </button>
+                </div>
+                {move || {
+                    range_error
+                        .get()
+                        .map(|message| {
+                            view! { <p class="range-summary range-error">{message}</p> }
+                        })
+                }}
+                {move || {
+                    if ranges.get().is_empty() {
+                        ().into_any()
+                    } else {
+                        let label = ranges
+                            .get()
+                            .iter()
+                            .map(|span| {
+                                if span.start == span.end {
+                                    format!("p.{}", span.start)
+                                } else {
+                                    format!("p.{}-{}", span.start, span.end)
+                                }
+                            })
+                            .collect::<Vec<_>>()
+                            .join(" · ");
+                        view! { <p class="range-summary">{label}</p> }.into_any()
+                    }
+                }}
                 <textarea
                     class="ask"
                     placeholder="问点什么…"
@@ -357,10 +464,23 @@ pub fn AiPanel(
                     <span class="status">{move || status.get()}</span>
                     <button
                         class="button button-primary"
-                        on:click=send
-                        prop:disabled=move || streaming.get()
+                        on:click=move |_| {
+                            if streaming.get() {
+                                let _ = bridge("stop", &[]);
+                            } else {
+                                send(());
+                            }
+                        }
                     >
-                        {move || if streaming.get() { "回答中…" } else { "发送" }}
+                        {move || {
+                            if streaming.get() {
+                                "停止"
+                            } else if failed.get() {
+                                "重试"
+                            } else {
+                                "发送"
+                            }
+                        }}
                     </button>
                 </div>
             </div>

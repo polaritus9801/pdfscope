@@ -16,10 +16,12 @@ fn main() -> anyhow::Result<()> {
     init_tracing();
 
     tauri::Builder::default()
+        .manage(ask::AskControl::default())
         .invoke_handler(tauri::generate_handler![
             settings::load_settings,
             settings::save_settings,
-            ask::ask
+            ask::ask,
+            ask::stop_ask
         ])
         .run(tauri::generate_context!())
         .context("the desktop shell stopped unexpectedly")?;

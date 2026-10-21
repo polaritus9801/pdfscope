@@ -101,7 +101,12 @@ request is refused above the cap rather than truncated.
 
 ## Deviations
 
-- Images and ranges-of-images landed first; the current-page default, stop and retry are the next
-  commit. The spec covers all three, the code so far covers the first.
 - The image caps are enforced in the desktop command, not in `pdfscope-ai`, because the limits are a
   product decision rather than a protocol one.
+- Page text is fetched by the renderer and handed to Rust as plain strings; Rust never parses a PDF.
+- A range is capped at 20 pages per request, and each page is sent whole. A longer range is silently
+  truncated by the fetch loop, which is wrong — it should be reported, and is recorded here as a
+  known limitation to fix in the review pass.
+- Retry reuses the send button (its label becomes `重试`) instead of a separate control.
+- Stop is a shared flag checked between stream events; the in-flight HTTP request is not aborted, so a
+  provider may still bill for a few more tokens.

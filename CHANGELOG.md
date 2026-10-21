@@ -10,6 +10,9 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Page context: a typed range (`31-45, 60`) or, when the tray is empty, the current page, is fetched
+  page by page and sent with `[第 N 页]` labels. A scan is labelled as having no extractable text.
+- Stop and retry: while streaming the send button becomes `停止`; a failure turns it into `重试`.
 - Multimodal requests: a captured region is sent as an image part — `image_url` on the OpenAI protocol,
   an `image` block on Anthropic — with a page label in the prompt. Six images and 4 MB each are the
   caps, checked before anything is sent.

@@ -4,6 +4,9 @@
 //! with their page, the model is told to cite them, and it is told not to invent pages it was not
 //! given. Everything else is transport.
 
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use futures::StreamExt;
 use pdfscope_ai::{ChatRequest, Image, Message, Protocol, ProviderConfig, StreamEvent};
 use serde::{Deserialize, Serialize};
@@ -25,6 +28,21 @@ pub(crate) struct RegionInput {
     pub page: u32,
     /// A `data:image/png;base64,…` URL.
     pub image: String,
+}
+
+/// Extracted text for one page, used for ranges and for the current-page default.
+#[derive(Debug, Clone, Deserialize)]
+pub(crate) struct PageContext {
+    /// One-based page number.
+    pub page: u32,
+    /// The page's text, possibly empty for a scan.
+    pub text: String,
+}
+
+/// Shared cancellation for the running answer.
+#[derive(Default)]
+pub(crate) struct AskControl {
+    stop: Arc<AtomicBool>,
 }
 
 /// What the panel receives while an answer streams.
@@ -50,6 +68,8 @@ pub(crate) enum AskEvent {
         /// Prompt tokens served from cache.
         cached: u32,
     },
+    /// The answer was stopped by the reader.
+    Stopped,
     /// The answer is complete.
     Done,
     /// The request failed.
@@ -78,6 +98,7 @@ pub(crate) fn build_request(
     question: &str,
     references: &[AskReference],
     regions: &[RegionInput],
+    context: &[PageContext],
 ) -> Result<ChatRequest, String> {
     if regions.len() > MAX_IMAGES {
         return Err(format!(
@@ -88,8 +109,19 @@ pub(crate) fn build_request(
 
     let mut prompt = String::new();
 
-    if references.is_empty() && regions.is_empty() {
+    if references.is_empty() && regions.is_empty() && context.is_empty() {
         prompt.push_str("（读者没有提供摘录或截图。请基于一般知识回答，不要编造页码。）\n\n");
+    }
+
+    for page in context {
+        if page.text.trim().is_empty() {
+            prompt.push_str(&format!(
+                "[第 {} 页]\n（这一页没有可提取的文字，可能是扫描件。）\n\n",
+                page.page
+            ));
+        } else {
+            prompt.push_str(&format!("[第 {} 页]\n{}\n\n", page.page, page.text.trim()));
+        }
     }
 
     for reference in references {
@@ -132,6 +164,8 @@ pub(crate) async fn ask(
     question: String,
     references: Vec<AskReference>,
     regions: Vec<RegionInput>,
+    context: Vec<PageContext>,
+    control: tauri::State<'_, AskControl>,
 ) -> Result<(), String> {
     if question.trim().is_empty() {
         return Err("问题不能为空".to_owned());
@@ -153,7 +187,9 @@ pub(crate) async fn ask(
     )
     .map_err(|error| error.to_string())?;
 
-    let request = build_request(&question, &references, &regions)?;
+    let request = build_request(&question, &references, &regions, &context)?;
+    let stop = control.stop.clone();
+    stop.store(false, Ordering::SeqCst);
 
     tauri::async_runtime::spawn(async move {
         let emitter = app.clone();
@@ -172,6 +208,11 @@ pub(crate) async fn ask(
         };
 
         while let Some(event) = events.next().await {
+            if stop.load(Ordering::SeqCst) {
+                send(AskEvent::Stopped);
+                return;
+            }
+
             match event {
                 Ok(StreamEvent::Reasoning(text)) => send(AskEvent::Reasoning { text }),
                 Ok(StreamEvent::Text(text)) => send(AskEvent::Text { text }),
@@ -201,6 +242,12 @@ pub(crate) async fn ask(
     Ok(())
 }
 
+/// Stops the running answer, if any.
+#[tauri::command]
+pub(crate) fn stop_ask(control: tauri::State<'_, AskControl>) {
+    control.stop.store(true, Ordering::SeqCst);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -220,6 +267,7 @@ mod tests {
                 },
             ],
             &[],
+            &[],
         )
         .unwrap();
 
@@ -232,7 +280,7 @@ mod tests {
 
     #[test]
     fn no_excerpts_says_so_instead_of_pretending() {
-        let request = build_request("介绍一下背景", &[], &[]).unwrap();
+        let request = build_request("介绍一下背景", &[], &[], &[]).unwrap();
         let prompt = &request.messages[0].content;
         assert!(prompt.contains("没有提供摘录"));
         assert!(prompt.contains("不要编造页码"));
@@ -247,12 +295,37 @@ mod tests {
                 page: 12,
                 image: "data:image/png;base64,AAAA".to_owned(),
             }],
+            &[],
         )
         .unwrap();
 
         assert!(request.messages[0].content.contains("[截图 p.12"));
         assert_eq!(request.messages[0].images.len(), 1);
         assert_eq!(request.messages[0].images[0].mime, "image/png");
+    }
+
+    #[test]
+    fn page_context_is_labelled_and_marks_scans() {
+        let request = build_request(
+            "这一章讲了什么？",
+            &[],
+            &[],
+            &[
+                PageContext {
+                    page: 31,
+                    text: "正文内容".to_owned(),
+                },
+                PageContext {
+                    page: 32,
+                    text: "   ".to_owned(),
+                },
+            ],
+        )
+        .unwrap();
+
+        let prompt = &request.messages[0].content;
+        assert!(prompt.contains("[第 31 页]\n正文内容"));
+        assert!(prompt.contains("[第 32 页]\n（这一页没有可提取的文字"));
     }
 
     #[test]
@@ -263,7 +336,7 @@ mod tests {
                 image: "data:image/png;base64,AAAA".to_owned(),
             })
             .collect();
-        assert!(build_request("q", &[], &regions).is_err());
+        assert!(build_request("q", &[], &regions, &[]).is_err());
     }
 
     #[test]
@@ -275,6 +348,7 @@ mod tests {
                 page: 1,
                 image: "not-a-data-url".to_owned(),
             }],
+            &[],
         );
         assert!(result.is_err());
     }
@@ -287,6 +361,7 @@ mod tests {
                 page: 1,
                 quote: "  引文  ".to_owned(),
             }],
+            &[],
             &[],
         )
         .unwrap();

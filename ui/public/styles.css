@@ -644,3 +644,30 @@ body {
   border-radius: 3px;
   border: 1px solid var(--border);
 }
+
+.range-row {
+  display: flex;
+  gap: 6px;
+}
+
+.range-input {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  padding: 0 8px;
+  font: inherit;
+  color: var(--ink);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.range-summary {
+  margin: -2px 0 0;
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+
+.range-error {
+  color: var(--danger);
+}

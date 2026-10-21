@@ -20,18 +20,23 @@ window.Bridge = {
     return api.core.invoke("save_settings", { settings });
   },
 
-  async ask(question, references, regions, onEvent) {
+  async stop() {
+    if (!available) return;
+    return api.core.invoke("stop_ask");
+  },
+
+  async ask(question, references, regions, context, onEvent) {
     if (!available) throw new Error("提问只在桌面版可用");
     return new Promise(async (resolve, reject) => {
       const unlisten = await api.event.listen("ask:event", (event) => {
         onEvent(event.payload);
-        if (event.payload.kind === "done" || event.payload.kind === "error") {
+        if (event.payload.kind === "done" || event.payload.kind === "error" || event.payload.kind === "stopped") {
           unlisten();
           resolve();
         }
       });
       try {
-        await api.core.invoke("ask", { question, references, regions });
+        await api.core.invoke("ask", { question, references, regions, context });
       } catch (error) {
         unlisten();
         reject(error);
