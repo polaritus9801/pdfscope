@@ -43,4 +43,11 @@ lists). Two things are ours:
 
 ## Deviations
 
+- Models write `1.` on its own line, then a blank line, then the item's text. CommonMark reads that
+  as a loose list with an empty first paragraph, which rendered as a large gap between the number and
+  its text. `to_html` now joins a bare marker to its first line before parsing.
+- `.answer-text` kept `white-space: pre-wrap` from the plain-text era; with HTML output it turned the
+  newlines between block tags into visible blank lines. It is `normal` now.
+
+
 - The transcript does not auto-scroll yet; the panel keeps whatever scroll position it had.

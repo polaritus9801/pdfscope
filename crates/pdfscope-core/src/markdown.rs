@@ -10,6 +10,7 @@ use crate::citation::{Segment, segments};
 
 /// Renders Markdown to HTML. The input is untrusted; raw HTML in it is escaped, never emitted.
 pub fn to_html(input: &str) -> String {
+    let input = normalise(input);
     let mut options = Options::empty();
     options.insert(Options::ENABLE_TABLES);
     options.insert(Options::ENABLE_STRIKETHROUGH);
@@ -19,7 +20,7 @@ pub fn to_html(input: &str) -> String {
     let mut buffer = String::new();
     let mut events: Vec<Event<'_>> = Vec::new();
 
-    for event in Parser::new_ext(input, options) {
+    for event in Parser::new_ext(&input, options) {
         match event {
             // Consecutive text is buffered: `[p.31]` arrives as five Text events, and a citation is
             // only recognisable once they are joined.
@@ -78,6 +79,58 @@ fn flush<'a>(buffer: &mut String, events: &mut Vec<Event<'a>>) {
     }
 
     buffer.clear();
+}
+
+/// Repairs the one shape models write constantly and CommonMark reads wrongly:
+///
+/// ```text
+/// 1.
+///
+///    正文
+/// ```
+///
+/// is parsed as a loose list whose item starts with an empty paragraph — which renders as a large
+/// blank gap between the number and its text. Joining the marker to its first line fixes both the
+/// gap and the alignment.
+fn normalise(input: &str) -> String {
+    let lines: Vec<&str> = input.lines().collect();
+    let mut out: Vec<String> = Vec::with_capacity(lines.len());
+    let mut index = 0;
+
+    while index < lines.len() {
+        let line = lines[index];
+        if is_bare_marker(line) {
+            let mut next = index + 1;
+            while next < lines.len() && lines[next].trim().is_empty() {
+                next += 1;
+            }
+            if next < lines.len() {
+                out.push(format!("{} {}", line.trim_end(), lines[next].trim()));
+                index = next + 1;
+                continue;
+            }
+        }
+
+        out.push(line.to_owned());
+        index += 1;
+    }
+
+    out.join("\n")
+}
+
+fn is_bare_marker(line: &str) -> bool {
+    let trimmed = line.trim();
+
+    if matches!(trimmed, "-" | "*" | "+") {
+        return true;
+    }
+
+    let digits: String = trimmed.chars().take_while(char::is_ascii_digit).collect();
+    if digits.is_empty() {
+        return false;
+    }
+
+    matches!(trimmed[digits.len()..].trim(), "." | ")" | "")
 }
 
 /// Keeps links with a safe scheme, and refuses the rest by dropping the destination.
@@ -175,6 +228,27 @@ mod tests {
         let html = to_html("[a](https://example.com) [b](javascript:alert(1))");
         assert!(html.contains("href=\"https://example.com\""));
         assert!(!html.contains("javascript:"));
+    }
+
+    #[test]
+    fn a_bare_number_is_joined_to_its_text() {
+        let html = to_html("1.\n\n   盟军的作用是自上而下。");
+        assert!(!html.contains("<li><p></p>"));
+        assert!(html.contains("<ol>"));
+        assert!(html.contains("盟军的作用是自上而下。"));
+    }
+
+    #[test]
+    fn a_number_with_text_on_the_same_line_is_untouched() {
+        let html = to_html("1. 内容");
+        assert!(html.contains("<li>内容"));
+    }
+
+    #[test]
+    fn a_bare_bullet_is_joined_too() {
+        let html = to_html("-\n\n  项目");
+        assert!(html.contains("项目"));
+        assert!(!html.contains("<li><p></p>"));
     }
 
     #[test]

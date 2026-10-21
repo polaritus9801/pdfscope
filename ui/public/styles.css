@@ -518,7 +518,9 @@ body {
 
 .answer-text {
   margin: 0;
-  white-space: pre-wrap;
+  /* Was pre-wrap for plain text; with HTML output it turned the newlines between
+     block tags into visible blank lines. */
+  white-space: normal;
   line-height: 1.65;
 }
 
@@ -1110,6 +1112,11 @@ body {
 
 .markdown li {
   margin: 2px 0;
+}
+
+/* Loose list items wrap their text in a paragraph; the list already spaces them. */
+.markdown li > p {
+  margin: 0;
 }
 
 .markdown code {

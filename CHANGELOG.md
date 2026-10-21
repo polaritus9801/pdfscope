@@ -43,6 +43,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Fixed
 
+- Markdown list items no longer leave a large blank line between the number and its text: a bare
+  `1.` line is joined to its content before parsing.
+- Answer paragraphs no longer show the blank lines that `pre-wrap` turned into real layout.
+
 - The reasoning block can be collapsed again and never reports `0.0 秒`: the streaming state is a
   plain block, the finished state an uncontrolled `<details>`.
 - `准备中` now says whether it is building context or waiting for the first token.
