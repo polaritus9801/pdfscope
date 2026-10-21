@@ -1092,3 +1092,19 @@ body {
 .markdown a.citation:hover {
   border-color: var(--accent);
 }
+
+.transcript {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.turn-question {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+
+.turn.current .turn-question {
+  color: var(--ink-muted);
+}

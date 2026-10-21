@@ -81,6 +81,15 @@ async fn fetch_page_text(number: u32) -> String {
     }
 }
 
+/// One finished exchange.
+#[derive(Clone, PartialEq)]
+pub(crate) struct Turn {
+    question: String,
+    answer: String,
+    reasoning: String,
+    seconds: f64,
+}
+
 /// A reference that was used and moved to history.
 #[derive(Clone, PartialEq)]
 enum Stored {
@@ -99,6 +108,8 @@ pub fn AiPanel(
     let configured = RwSignal::new(false);
     let model = RwSignal::new("未配置".to_owned());
     let answer = RwSignal::new(String::new());
+    let turns = RwSignal::new(Vec::<Turn>::new());
+    let current_question = RwSignal::new(String::new());
     let reasoning = RwSignal::new(String::new());
     let think_started = RwSignal::new(0.0_f64);
     let think_seconds = RwSignal::new(0.0_f64);
@@ -192,6 +203,18 @@ pub fn AiPanel(
             return;
         }
 
+        if !answer.get().trim().is_empty() {
+            let previous = Turn {
+                question: current_question.get(),
+                answer: answer.get(),
+                reasoning: reasoning.get(),
+                seconds: think_seconds.get(),
+            };
+            turns.update(|list| list.push(previous));
+        }
+
+        current_question.set(asked.clone());
+        question.set(String::new());
         answer.set(String::new());
         reasoning.set(String::new());
         think_started.set(0.0);
@@ -284,6 +307,32 @@ pub fn AiPanel(
                     &JsValue::from_str(text),
                 );
                 pages_array.push(&item);
+            }
+
+            let history = js_sys::Array::new();
+            let recent: Vec<Turn> = turns
+                .get()
+                .iter()
+                .rev()
+                .take(4)
+                .cloned()
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
+                .collect();
+            for turn in recent {
+                let item = js_sys::Object::new();
+                let _ = js_sys::Reflect::set(
+                    &item,
+                    &JsValue::from_str("question"),
+                    &JsValue::from_str(&turn.question),
+                );
+                let _ = js_sys::Reflect::set(
+                    &item,
+                    &JsValue::from_str("answer"),
+                    &JsValue::from_str(&turn.answer),
+                );
+                history.push(&item);
             }
 
             let started = js_sys::Date::now();
@@ -383,6 +432,7 @@ pub fn AiPanel(
                     references.into(),
                     images.into(),
                     pages_array.into(),
+                    history.into(),
                     callback.as_ref().clone(),
                 ],
             );
@@ -544,55 +594,94 @@ pub fn AiPanel(
                 {move || {
                     if !configured.get() {
                         view! { <p class="panel-hint">"未配置模型 · 前往设置"</p> }.into_any()
-                    } else if answer.get().is_empty() && !streaming.get() {
+                    } else if turns.get().is_empty() && answer.get().is_empty() && !streaming.get() {
                         view! { <p class="panel-hint">"选中文字加入引用，然后提问"</p> }.into_any()
                     } else {
                         view! {
-                            <div class="answer">
+                            <div
+                                class="transcript"
+                                on:click=move |event: web_sys::MouseEvent| {
+                                    let Some(target) = event
+                                        .target()
+                                        .and_then(|target| target.dyn_into::<web_sys::Element>().ok())
+                                    else {
+                                        return;
+                                    };
+                                    if let Some(number) = target
+                                        .get_attribute("data-page")
+                                        .and_then(|value| value.parse::<u32>().ok())
+                                    {
+                                        event.prevent_default();
+                                        jump(number);
+                                    }
+                                }
+                            >
                                 {move || {
-                                    let text = reasoning.get();
-                                    if text.is_empty() {
+                                    turns
+                                        .get()
+                                        .into_iter()
+                                        .map(|turn| {
+                                            let detail = if turn.reasoning.is_empty() {
+                                                ().into_any()
+                                            } else {
+                                                view! {
+                                                    <details class="think">
+                                                        <summary>
+                                                            {format!("思考 {:.1} 秒", turn.seconds)}
+                                                        </summary>
+                                                        <pre class="think-text">{turn.reasoning.clone()}</pre>
+                                                    </details>
+                                                }
+                                                    .into_any()
+                                            };
+                                            view! {
+                                                <div class="turn">
+                                                    <p class="turn-question">{turn.question.clone()}</p>
+                                                    {detail}
+                                                    <div
+                                                        class="answer-text markdown"
+                                                        inner_html=pdfscope_core::to_html(&turn.answer)
+                                                    ></div>
+                                                </div>
+                                            }
+                                        })
+                                        .collect_view()
+                                }}
+
+                                {move || {
+                                    if answer.get().is_empty() && !streaming.get() {
                                         return ().into_any();
                                     }
                                     let streaming_now = streaming.get();
-                                    let label = if streaming_now {
-                                        "思考中…".to_owned()
+                                    let detail = if reasoning.get().is_empty() {
+                                        ().into_any()
                                     } else {
-                                        let seconds = think_seconds.get();
-                                        if seconds > 0.0 {
-                                            format!("思考 {seconds:.1} 秒")
+                                        let label = if streaming_now {
+                                            "思考中…".to_owned()
                                         } else {
-                                            "思考过程".to_owned()
+                                            format!("思考 {:.1} 秒", think_seconds.get())
+                                        };
+                                        view! {
+                                            <details class="think" prop:open=streaming_now>
+                                                <summary>{label}</summary>
+                                                <pre class="think-text">{reasoning.get()}</pre>
+                                            </details>
                                         }
+                                            .into_any()
                                     };
                                     view! {
-                                        <details class="think" prop:open=streaming_now>
-                                            <summary>{label}</summary>
-                                            <pre class="think-text">{text}</pre>
-                                        </details>
+                                        <div class="turn current">
+                                            <p class="turn-question">{current_question.get()}</p>
+                                            {detail}
+                                            <div
+                                                class="answer-text markdown"
+                                                aria-live="polite"
+                                                inner_html=move || pdfscope_core::to_html(&answer.get())
+                                            ></div>
+                                        </div>
                                     }
                                         .into_any()
                                 }}
-                                <div
-                                    class="answer-text markdown"
-                                    aria-live="polite"
-                                    inner_html=move || pdfscope_core::to_html(&answer.get())
-                                    on:click=move |event: web_sys::MouseEvent| {
-                                        let Some(target) = event
-                                            .target()
-                                            .and_then(|target| target.dyn_into::<web_sys::Element>().ok())
-                                        else {
-                                            return;
-                                        };
-                                        if let Some(number) = target
-                                            .get_attribute("data-page")
-                                            .and_then(|value| value.parse::<u32>().ok())
-                                        {
-                                            event.prevent_default();
-                                            jump(number);
-                                        }
-                                    }
-                                ></div>
                             </div>
                         }
                             .into_any()

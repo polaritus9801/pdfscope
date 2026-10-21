@@ -1,188 +1,117 @@
-//! A small Markdown subset, rendered to safe HTML.
+//! Markdown, rendered to safe HTML.
 //!
-//! The model's answer is untrusted text, so everything is escaped before any markup is added. The
-//! subset is deliberate: headings, paragraphs, lists, fenced code, bold, italic, inline code, and
-//! page citations as links the interface can intercept.
+//! CommonMark plus tables, strikethrough and task lists, via `pulldown-cmark`. Two things are ours:
+//! raw HTML is escaped rather than passed through, and page citations become links the interface can
+//! intercept.
+
+use pulldown_cmark::{Event, Options, Parser, Tag, TagEnd, html};
 
 use crate::citation::{Segment, segments};
 
-/// Renders the subset to HTML. Input is escaped; only the tags produced here reach the document.
+/// Renders Markdown to HTML. The input is untrusted; raw HTML in it is escaped, never emitted.
 pub fn to_html(input: &str) -> String {
-    let mut renderer = Renderer::default();
+    let mut options = Options::empty();
+    options.insert(Options::ENABLE_TABLES);
+    options.insert(Options::ENABLE_STRIKETHROUGH);
+    options.insert(Options::ENABLE_TASKLISTS);
 
-    for line in input.lines() {
-        renderer.line(line);
-    }
+    let mut in_code = false;
+    let mut buffer = String::new();
+    let mut events: Vec<Event<'_>> = Vec::new();
 
-    renderer.finish()
-}
+    for event in Parser::new_ext(input, options) {
+        match event {
+            // Consecutive text is buffered: `[p.31]` arrives as five Text events, and a citation is
+            // only recognisable once they are joined.
+            Event::Text(text) if !in_code => buffer.push_str(&text),
 
-#[derive(Default)]
-struct Renderer {
-    out: String,
-    paragraph: Vec<String>,
-    list: Option<&'static str>,
-    code: bool,
-}
-
-impl Renderer {
-    fn line(&mut self, raw: &str) {
-        let line = raw.trim_end();
-        let trimmed = line.trim_start();
-
-        if trimmed.starts_with("```") {
-            self.flush();
-            if self.code {
-                self.out.push_str("</code></pre>");
-                self.code = false;
-            } else {
-                self.out.push_str("<pre><code>");
-                self.code = true;
+            // Raw HTML is data here, not markup. Pushing it as Text escapes it exactly once.
+            Event::Html(text) | Event::InlineHtml(text) => {
+                flush(&mut buffer, &mut events);
+                events.push(Event::Text(text));
             }
-            return;
-        }
 
-        if self.code {
-            self.out.push_str(&escape(line));
-            self.out.push('\n');
-            return;
-        }
-
-        if trimmed.is_empty() {
-            self.flush();
-            return;
-        }
-
-        if let Some((level, rest)) = heading(trimmed) {
-            self.flush();
-            self.out
-                .push_str(&format!("<h{level}>{}</h{level}>", inline(rest)));
-            return;
-        }
-
-        if let Some((tag, rest)) = list_item(trimmed) {
-            self.flush_paragraph();
-            match self.list {
-                Some(current) if current == tag => {}
-                Some(current) => {
-                    self.out.push_str(&format!("</{current}>"));
-                    self.out.push_str(&format!("<{tag}>"));
-                    self.list = Some(tag);
+            Event::Start(tag) => {
+                flush(&mut buffer, &mut events);
+                let tag = sanitise(tag);
+                if matches!(tag, Tag::CodeBlock(_)) {
+                    in_code = true;
                 }
-                None => {
-                    self.out.push_str(&format!("<{tag}>"));
-                    self.list = Some(tag);
-                }
+                events.push(Event::Start(tag));
             }
-            self.out.push_str(&format!("<li>{}</li>", inline(rest)));
-            return;
-        }
 
-        if let Some(current) = self.list.take() {
-            self.out.push_str(&format!("</{current}>"));
-        }
+            Event::End(tag) => {
+                flush(&mut buffer, &mut events);
+                if matches!(tag, TagEnd::CodeBlock) {
+                    in_code = false;
+                }
+                events.push(Event::End(tag));
+            }
 
-        self.paragraph.push(inline(trimmed));
-    }
-
-    fn finish(mut self) -> String {
-        self.flush();
-        if self.code {
-            self.out.push_str("</code></pre>");
-        }
-        self.out
-    }
-
-    fn flush(&mut self) {
-        self.flush_paragraph();
-        if let Some(list) = self.list.take() {
-            self.out.push_str(&format!("</{list}>"));
+            other => {
+                flush(&mut buffer, &mut events);
+                events.push(other);
+            }
         }
     }
 
-    fn flush_paragraph(&mut self) {
-        if self.paragraph.is_empty() {
-            return;
-        }
-        let body = self.paragraph.join("<br>");
-        self.out.push_str(&format!("<p>{body}</p>"));
-        self.paragraph.clear();
-    }
+    flush(&mut buffer, &mut events);
+
+    let mut output = String::new();
+    html::push_html(&mut output, events.into_iter());
+    output
 }
 
-fn heading(line: &str) -> Option<(usize, &str)> {
-    let level = line
-        .chars()
-        .take_while(|character| *character == '#')
-        .count();
-    if !(1..=4).contains(&level) {
-        return None;
-    }
-    let rest = line[level..].strip_prefix(' ')?;
-    Some((level, rest.trim()))
-}
-
-fn list_item(line: &str) -> Option<(&'static str, &str)> {
-    if let Some(rest) = line.strip_prefix("- ").or_else(|| line.strip_prefix("* ")) {
-        return Some(("ul", rest.trim()));
+fn flush<'a>(buffer: &mut String, events: &mut Vec<Event<'a>>) {
+    if buffer.is_empty() {
+        return;
     }
 
-    let digits = line.chars().take_while(char::is_ascii_digit).count();
-    if digits > 0 {
-        if let Some(rest) = line[digits..].strip_prefix(". ") {
-            return Some(("ol", rest.trim()));
-        }
-    }
-
-    None
-}
-
-fn inline(text: &str) -> String {
-    segments(text)
-        .into_iter()
-        .map(|segment| match segment {
-            Segment::Text(part) => format_inline(&escape(&part)),
-            Segment::Citation(page) => {
+    for segment in segments(buffer) {
+        match segment {
+            Segment::Text(part) => events.push(Event::Text(part.into())),
+            Segment::Citation(page) => events.push(Event::InlineHtml(
                 format!("<a href=\"#\" class=\"citation\" data-page=\"{page}\">p.{page}</a>")
+                    .into(),
+            )),
+        }
+    }
+
+    buffer.clear();
+}
+
+/// Keeps links with a safe scheme, and refuses the rest by dropping the destination.
+fn sanitise(tag: Tag<'_>) -> Tag<'_> {
+    match tag {
+        Tag::Link {
+            link_type,
+            dest_url,
+            title,
+            id,
+        } => {
+            if is_safe_url(&dest_url) {
+                Tag::Link {
+                    link_type,
+                    dest_url,
+                    title,
+                    id,
+                }
+            } else {
+                Tag::Link {
+                    link_type,
+                    dest_url: "".into(),
+                    title,
+                    id,
+                }
             }
-        })
-        .collect()
-}
-
-fn format_inline(text: &str) -> String {
-    let text = wrap_pairs(text, "`", "<code>", "</code>");
-    let text = wrap_pairs(&text, "**", "<strong>", "</strong>");
-    wrap_pairs(&text, "*", "<em>", "</em>")
-}
-
-fn wrap_pairs(text: &str, delimiter: &str, open: &str, close: &str) -> String {
-    let parts: Vec<&str> = text.split(delimiter).collect();
-    let mut out = String::with_capacity(text.len());
-    for (index, part) in parts.iter().enumerate() {
-        if index % 2 == 1 {
-            out.push_str(open);
-            out.push_str(part);
-            out.push_str(close);
-        } else {
-            out.push_str(part);
         }
+        other => other,
     }
-    out
 }
 
-fn escape(text: &str) -> String {
-    let mut out = String::with_capacity(text.len());
-    for character in text.chars() {
-        match character {
-            '&' => out.push_str("&amp;"),
-            '<' => out.push_str("&lt;"),
-            '>' => out.push_str("&gt;"),
-            '"' => out.push_str("&quot;"),
-            '\'' => out.push_str("&#39;"),
-            other => out.push(other),
-        }
-    }
-    out
+fn is_safe_url(url: &str) -> bool {
+    let lower = url.trim().to_ascii_lowercase();
+    lower.starts_with("http://") || lower.starts_with("https://") || lower.starts_with("mailto:")
 }
 
 #[cfg(test)]
@@ -190,50 +119,66 @@ mod tests {
     use super::*;
 
     #[test]
-    fn escapes_html_before_adding_markup() {
+    fn escapes_raw_html() {
         let html = to_html("<script>alert(1)</script>");
-        assert!(html.contains("&lt;script&gt;"));
+        assert!(html.contains("&lt;script&gt;"), "got: {html}");
         assert!(!html.contains("<script>"));
     }
 
     #[test]
-    fn renders_bold_italic_and_code() {
-        let html = to_html("**粗** 和 *斜* 和 `code`");
+    fn renders_emphasis_and_code() {
+        let html = to_html("**粗** 和 *斜* 和 `code` 和 ~~删~~");
         assert!(html.contains("<strong>粗</strong>"));
         assert!(html.contains("<em>斜</em>"));
         assert!(html.contains("<code>code</code>"));
+        assert!(html.contains("<del>删</del>"));
     }
 
     #[test]
-    fn renders_headings_and_paragraphs() {
-        let html = to_html("## 标题\n\n第一段\n第二行");
-        assert!(html.starts_with("<h2>标题</h2>"));
-        assert!(html.contains("<p>第一段<br>第二行</p>"));
+    fn renders_headings_lists_and_tables() {
+        let html = to_html("## 标题\n\n- 甲\n- 乙\n\n| a | b |\n|---|---|\n| 1 | 2 |");
+        assert!(html.contains("<h2>标题</h2>"));
+        assert!(html.contains("<ul>"));
+        assert!(html.contains("<table>"));
+        assert!(html.contains("<td>1</td>"));
     }
 
     #[test]
-    fn renders_unordered_and_ordered_lists() {
-        let html = to_html("- 甲\n- 乙\n\n1. 丙");
-        assert!(html.contains("<ul><li>甲</li><li>乙</li></ul>"));
-        assert!(html.contains("<ol><li>丙</li></ol>"));
+    fn renders_task_lists() {
+        let html = to_html("- [x] 做完\n- [ ] 没做");
+        assert!(html.contains("type=\"checkbox\""));
     }
 
     #[test]
-    fn renders_fenced_code_without_formatting_it() {
-        let html = to_html("```\nlet x = **1**;\n```");
-        assert!(html.contains("<pre><code>let x = **1**;"));
+    fn keeps_code_blocks_verbatim() {
+        let html = to_html("```rust\nlet x = **1**;\n```");
+        assert!(html.contains("let x = **1**;"));
         assert!(!html.contains("<strong>"));
     }
 
     #[test]
-    fn citations_become_links_the_interface_can_intercept() {
+    fn citations_become_interceptable_links() {
         let html = to_html("如前所述[p.31]，成立。");
-        assert!(html.contains("data-page=\"31\""));
+        assert!(html.contains("data-page=\"31\""), "got: {html}");
         assert!(html.contains(">p.31</a>"));
     }
 
     #[test]
+    fn citations_inside_code_stay_text() {
+        let html = to_html("`[p.31]`");
+        assert!(!html.contains("data-page"));
+        assert!(html.contains("[p.31]"));
+    }
+
+    #[test]
+    fn links_keep_only_safe_schemes() {
+        let html = to_html("[a](https://example.com) [b](javascript:alert(1))");
+        assert!(html.contains("href=\"https://example.com\""));
+        assert!(!html.contains("javascript:"));
+    }
+
+    #[test]
     fn a_plain_sentence_is_one_paragraph() {
-        assert_eq!(to_html("没有格式。"), "<p>没有格式。</p>");
+        assert_eq!(to_html("没有格式。"), "<p>没有格式。</p>\n");
     }
 }

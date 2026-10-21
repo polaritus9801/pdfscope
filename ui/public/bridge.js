@@ -30,7 +30,7 @@ window.Bridge = {
     return api.core.invoke("test_settings", { settings });
   },
 
-  async ask(question, references, regions, context, onEvent) {
+  async ask(question, references, regions, context, history, onEvent) {
     if (!available) throw new Error("提问只在桌面版可用");
     return new Promise(async (resolve, reject) => {
       const unlisten = await api.event.listen("ask:event", (event) => {
@@ -41,7 +41,7 @@ window.Bridge = {
         }
       });
       try {
-        await api.core.invoke("ask", { question, references, regions, context });
+        await api.core.invoke("ask", { question, references, regions, context, history });
       } catch (error) {
         unlisten();
         reject(error);

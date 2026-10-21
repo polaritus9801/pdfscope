@@ -8,6 +8,13 @@ minor releases may contain breaking changes; they are always called out.
 
 ## [Unreleased]
 
+### Changed
+
+- Markdown now uses `pulldown-cmark`: tables, strikethrough and task lists join headings, lists,
+  emphasis and code. Raw HTML stays escaped and citations still become interceptable links.
+- The panel keeps the conversation: finished exchanges stay on screen and the last four are sent with
+  the next question so pronouns resolve.
+
 ### Added
 
 - Hovering a history reference tints its rectangle when you are on that page and marks its position on

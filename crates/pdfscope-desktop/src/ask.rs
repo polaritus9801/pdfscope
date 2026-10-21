@@ -30,6 +30,15 @@ pub(crate) struct RegionInput {
     pub image: String,
 }
 
+/// One earlier exchange, for resolving references like "this" and "it".
+#[derive(Debug, Clone, Deserialize)]
+pub(crate) struct HistoryTurn {
+    /// What the reader asked.
+    pub question: String,
+    /// What the model answered.
+    pub answer: String,
+}
+
 /// Extracted text for one page, used for ranges and for the current-page default.
 #[derive(Debug, Clone, Deserialize)]
 pub(crate) struct PageContext {
@@ -99,6 +108,7 @@ pub(crate) fn build_request(
     references: &[AskReference],
     regions: &[RegionInput],
     context: &[PageContext],
+    history: &[HistoryTurn],
 ) -> Result<ChatRequest, String> {
     if regions.len() > MAX_IMAGES {
         return Err(format!(
@@ -108,6 +118,17 @@ pub(crate) fn build_request(
     }
 
     let mut prompt = String::new();
+
+    if !history.is_empty() {
+        prompt.push_str("之前的对话（只用于理解指代，不要重复引用里面的页码）：\n");
+        for turn in history {
+            prompt.push_str(&format!(
+                "问：{}\n答：{}\n\n",
+                turn.question.trim(),
+                turn.answer.trim()
+            ));
+        }
+    }
 
     if references.is_empty() && regions.is_empty() && context.is_empty() {
         prompt.push_str("（读者没有提供摘录或截图。请基于一般知识回答，不要编造页码。）\n\n");
@@ -165,6 +186,7 @@ pub(crate) async fn ask(
     references: Vec<AskReference>,
     regions: Vec<RegionInput>,
     context: Vec<PageContext>,
+    history: Vec<HistoryTurn>,
     control: tauri::State<'_, AskControl>,
 ) -> Result<(), String> {
     if question.trim().is_empty() {
@@ -187,7 +209,16 @@ pub(crate) async fn ask(
     )
     .map_err(|error| error.to_string())?;
 
-    let request = build_request(&question, &references, &regions, &context)?;
+    // Four turns is enough to resolve pronouns without spending the context on history.
+    let history: Vec<HistoryTurn> = history
+        .into_iter()
+        .rev()
+        .take(4)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect();
+    let request = build_request(&question, &references, &regions, &context, &history)?;
     let stop = control.stop.clone();
     stop.store(false, Ordering::SeqCst);
 
@@ -268,6 +299,7 @@ mod tests {
             ],
             &[],
             &[],
+            &[],
         )
         .unwrap();
 
@@ -280,7 +312,7 @@ mod tests {
 
     #[test]
     fn no_excerpts_says_so_instead_of_pretending() {
-        let request = build_request("介绍一下背景", &[], &[], &[]).unwrap();
+        let request = build_request("介绍一下背景", &[], &[], &[], &[]).unwrap();
         let prompt = &request.messages[0].content;
         assert!(prompt.contains("没有提供摘录"));
         assert!(prompt.contains("不要编造页码"));
@@ -295,6 +327,7 @@ mod tests {
                 page: 12,
                 image: "data:image/png;base64,AAAA".to_owned(),
             }],
+            &[],
             &[],
         )
         .unwrap();
@@ -320,6 +353,7 @@ mod tests {
                     text: "   ".to_owned(),
                 },
             ],
+            &[],
         )
         .unwrap();
 
@@ -336,7 +370,7 @@ mod tests {
                 image: "data:image/png;base64,AAAA".to_owned(),
             })
             .collect();
-        assert!(build_request("q", &[], &regions, &[]).is_err());
+        assert!(build_request("q", &[], &regions, &[], &[]).is_err());
     }
 
     #[test]
@@ -348,6 +382,7 @@ mod tests {
                 page: 1,
                 image: "not-a-data-url".to_owned(),
             }],
+            &[],
             &[],
         );
         assert!(result.is_err());
@@ -361,6 +396,7 @@ mod tests {
                 page: 1,
                 quote: "  引文  ".to_owned(),
             }],
+            &[],
             &[],
             &[],
         )
