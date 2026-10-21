@@ -36,6 +36,9 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Fixed
 
+- Rotated PDF pages now select the text under the pointer: the text layer gets PDF.js's
+  `data-main-rotation` transforms, and a stale selection bar clears when the selection collapses or
+  the page re-renders.
 - Dragging the panel divider no longer flashes a text selection on either side: the drag suppresses
   selection and clears the current one.
 

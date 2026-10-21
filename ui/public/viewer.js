@@ -27,6 +27,7 @@ async function paintTextLayer(page, viewport, scale) {
   const container = textLayerContainer();
   if (!container) return;
 
+  clearReportedSelection();
   await container.replaceChildren();
   container.style.width = `${viewport.width}px`;
   container.style.height = `${viewport.height}px`;
@@ -132,12 +133,23 @@ function normalisedSelectionRect() {
 }
 
 let settleTimer = null;
+let hadSelection = false;
+
+function clearReportedSelection() {
+  if (!hadSelection) return;
+  hadSelection = false;
+  window.__pdfscopeCleared?.();
+}
 
 function reportSelection() {
   clearTimeout(settleTimer);
   settleTimer = setTimeout(() => {
     const payload = normalisedSelectionRect();
-    if (!payload) return;
+    if (!payload) {
+      clearReportedSelection();
+      return;
+    }
+    hadSelection = true;
     window.__pdfscopeSelection?.(payload);
   }, 120);
 }
@@ -343,6 +355,7 @@ window.PDFScope = {
   },
 
   clearSelection() {
+    hadSelection = false;
     window.getSelection()?.removeAllRanges();
     window.__pdfscopeCleared?.();
   },
