@@ -289,7 +289,7 @@ try {
   check(initial.rendered.includes(1), "page 1 has a canvas");
   check(initial.rendered.length <= 4, "the initial render window is bounded", JSON.stringify(initial.rendered));
   check(initial.height1 !== initial.height20, "a landscape page keeps its own height");
-  check(initial.gap === "18px", "pages are separated by a fixed gap", initial.gap);
+  check(initial.gap === "16px", "pages are separated by the spacing token", initial.gap);
   await shot("reader-01-continuous.png");
 
   // At 50 %, two pages are visible at once: the column, not a single-page canvas.

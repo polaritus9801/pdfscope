@@ -158,9 +158,13 @@ documents; toasts never block input. A mis-shown banner costs one click, not dat
   second a 23 MB file, the third both correct and small). A banner under the header says 还没有配置模型
   and opens settings when no key is stored. Verified with a fake bridge reporting no key: banner
   visible, sample loads as `示例.pdf`, 3 pages, Chinese text intact.
-- **P1 audit**: a grep for hard-coded `px` outside the token block finds **210** declarations. P1's
-  acceptance ("only tokens and icon sizes") is therefore **not met**; converting them per component
-  is recorded as remaining work rather than claimed.
+- **P1 audit**: the grep for hard-coded `px` outside the token block stood at **223** declarations.
+  This round migrated every spacing, radius, type and offset declaration whose value sits on the
+  scale, then snapped off-scale spacing (6/10/14/18/20/22) to the nearest step: **223 → 109**. The
+  page gap moved from an arbitrary 18 px to the 16 px token, and the reader smoke now asserts that
+  token instead of a magic number. The remaining 109 are component dimensions (icon sizes, thumbnail
+  boxes, hairline separators, transforms) that the acceptance line explicitly allows; P1 is close
+  but not declared done.
 
 ## Deviations
 

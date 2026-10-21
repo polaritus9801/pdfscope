@@ -109,7 +109,7 @@ body {
   background: var(--surface-muted);
   color: var(--ink);
   font-family: -apple-system, "Segoe UI", "Noto Sans SC", sans-serif;
-  font-size: 13px;
+  font-size: var(--text-md);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
@@ -137,7 +137,7 @@ body {
 .bar-right {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   min-width: 0;
 }
 
@@ -153,7 +153,7 @@ body {
 .brand {
   font-weight: 600;
   letter-spacing: 0.01em;
-  margin-right: 8px;
+  margin-right: var(--space-2);
 }
 
 .file-name {
@@ -170,7 +170,7 @@ body {
   justify-content: center;
   min-width: 30px;
   height: 30px;
-  padding: 0 10px;
+  padding: 0 var(--space-3);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--surface);
@@ -197,7 +197,7 @@ body {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--accent-ink);
-  padding: 0 14px;
+  padding: 0 var(--space-4);
 }
 
 .button-primary:hover:not(:disabled) {
@@ -216,7 +216,7 @@ body {
 .page-field {
   width: 48px;
   height: 30px;
-  padding: 0 6px;
+  padding: 0 var(--space-2);
   text-align: center;
   font: inherit;
   color: var(--ink);
@@ -250,7 +250,7 @@ body {
   overflow: auto;
   /* We own scroll anchoring during zoom; the browser must not adjust it as the scaler resizes. */
   overflow-anchor: none;
-  padding: 24px;
+  padding: var(--space-5);
 }
 
 /* The column is laid out once at the base width. Zoom transforms the whole column; the scaler
@@ -266,7 +266,7 @@ body {
   transform-origin: 0 0;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: var(--space-4);
 }
 
 .pages.zooming {
@@ -284,7 +284,7 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: var(--space-1);
   pointer-events: none;
 }
 
@@ -362,9 +362,9 @@ body {
 
 .error {
   position: absolute;
-  bottom: 16px;
+  bottom: var(--space-4);
   margin: 0;
-  padding: 8px 12px;
+  padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
   background: var(--surface);
   border: 1px solid var(--danger);
@@ -448,14 +448,14 @@ body {
 .textLayer.empty::after {
   content: "扫描页 · 暂不支持选择";
   position: absolute;
-  right: 8px;
-  bottom: 8px;
-  padding: 2px 8px;
+  right: var(--space-2);
+  bottom: var(--space-2);
+  padding: 2px var(--space-2);
   border-radius: var(--radius-full);
   background: var(--surface);
   border: 1px solid var(--border);
   color: var(--ink-faint);
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 
 /* The anchor is counter-scaled against the column transform, so the bar keeps its type size at
@@ -476,8 +476,8 @@ body {
   transform: translate(-50%, calc(-100% - 8px));
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 6px 4px 10px;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-3);
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -506,8 +506,8 @@ body {
 .tray {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 16px;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   overflow-x: auto;
@@ -521,7 +521,7 @@ body {
 .chips {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
   min-width: 0;
 }
 
@@ -530,7 +530,7 @@ body {
   align-items: center;
   gap: 2px;
   height: 26px;
-  padding: 0 4px 0 10px;
+  padding: 0 var(--space-1) 0 var(--space-3);
   border: 1px solid var(--border);
   border-radius: var(--radius-full);
   background: var(--accent-soft);
@@ -549,7 +549,7 @@ body {
   color: var(--ink-faint);
   cursor: pointer;
   font: inherit;
-  padding: 0 4px;
+  padding: 0 var(--space-1);
   border-radius: var(--radius-full);
 }
 
@@ -599,7 +599,7 @@ body {
 .panel-body {
   flex: 1;
   overflow: auto;
-  padding: 12px;
+  padding: var(--space-3);
 }
 
 .panel-hint {
@@ -618,22 +618,22 @@ body {
 }
 
 .thinking {
-  margin: 0 0 8px;
-  font-size: 12px;
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
   color: var(--ink-faint);
 }
 
 .composer {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px 12px;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-3);
   border-top: 1px solid var(--border);
 }
 
 .ask {
   height: 72px;
-  padding: 8px;
+  padding: var(--space-2);
   max-height: 150px;
   overflow-y: auto;
   resize: none;
@@ -653,7 +653,7 @@ body {
 .composer-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .status {
@@ -662,7 +662,7 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12px;
+  font-size: var(--text-sm);
   color: var(--ink-faint);
 }
 
@@ -681,9 +681,9 @@ body {
 .sheet-card {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--space-3);
   width: 320px;
-  padding: 16px;
+  padding: var(--space-4);
   background: var(--surface);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-float);
@@ -691,21 +691,21 @@ body {
 
 .sheet-title {
   margin: 0;
-  font-size: 15px;
+  font-size: var(--text-lg);
 }
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  font-size: 12px;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
   color: var(--ink-muted);
 }
 
 .field input,
 .field select {
   height: 30px;
-  padding: 0 8px;
+  padding: 0 var(--space-2);
   font: inherit;
   color: var(--ink);
   background: var(--surface-sunken);
@@ -716,8 +716,8 @@ body {
 .sheet-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
-  margin-top: 4px;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
 }
 
 .sheet-error {
@@ -727,10 +727,10 @@ body {
 
 .citation {
   display: inline;
-  padding: 0 4px;
+  padding: 0 var(--space-1);
   margin: 0 1px;
   font: inherit;
-  font-size: 12px;
+  font-size: var(--text-sm);
   line-height: 1.2;
   color: var(--accent);
   background: var(--accent-soft);
@@ -778,7 +778,7 @@ body {
 }
 
 .chip-region {
-  padding-left: 4px;
+  padding-left: var(--space-1);
 }
 
 .chip-thumb {
@@ -791,14 +791,14 @@ body {
 
 .range-row {
   display: flex;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 .range-input {
   flex: 1;
   min-width: 0;
   height: 30px;
-  padding: 0 8px;
+  padding: 0 var(--space-2);
   font: inherit;
   color: var(--ink);
   background: var(--surface-sunken);
@@ -808,7 +808,7 @@ body {
 
 .range-summary {
   margin: -2px 0 0;
-  font-size: 12px;
+  font-size: var(--text-sm);
   color: var(--ink-muted);
 }
 
@@ -820,7 +820,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding-bottom: 6px;
+  padding-bottom: var(--space-2);
   border-bottom: 1px solid var(--border);
 }
 
@@ -828,7 +828,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 12px;
+  font-size: var(--text-sm);
   color: var(--ink-muted);
 }
 
@@ -837,7 +837,7 @@ body {
   background: transparent;
   padding: 0;
   font: inherit;
-  font-size: 12px;
+  font-size: var(--text-sm);
   color: var(--accent);
   cursor: pointer;
 }
@@ -846,8 +846,8 @@ body {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 6px;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-sm);
   cursor: pointer;
 }
@@ -862,22 +862,22 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 
 .pill {
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--ink-muted);
   white-space: nowrap;
 }
 
 .history-preview {
   position: absolute;
-  left: 8px;
-  bottom: calc(100% + 4px);
+  left: var(--space-2);
+  bottom: calc(100% + var(--space-1));
   max-width: 280px;
-  padding: 6px 8px;
-  font-size: 12px;
+  padding: var(--space-2) var(--space-2);
+  font-size: var(--text-sm);
   line-height: 1.5;
   color: var(--ink);
   background: var(--surface);
@@ -917,7 +917,7 @@ body {
   left: 0;
   width: 100%;
   height: 8px;
-  margin-top: -4px;
+  margin-top: -var(--space-1);
   background: var(--accent-strong);
   border-radius: 3px;
 }
@@ -941,11 +941,11 @@ body {
 /* #6: floating tool rail */
 .float-tools {
   position: absolute;
-  top: 16px;
-  left: 16px;
+  top: var(--space-4);
+  left: var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-2);
   z-index: 8;
 }
 
@@ -979,8 +979,8 @@ body {
 .ref-row {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
-  padding: 6px 8px;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-2);
   border-radius: var(--radius-sm);
   background: var(--accent-soft);
   border: 1px solid var(--border);
@@ -998,10 +998,10 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--accent);
   background: var(--surface);
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
 }
 
 .ref-thumb {
@@ -1020,13 +1020,13 @@ body {
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  font-size: 12px;
+  font-size: var(--text-sm);
   line-height: 1.5;
 }
 
 .ref-page {
   flex: none;
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--ink-muted);
 }
 
@@ -1134,8 +1134,8 @@ body {
 
 /* Reasoning, collapsed once the answer starts */
 .think {
-  margin: 0 0 10px;
-  font-size: 12px;
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-sm);
   color: var(--ink-muted);
 }
 
@@ -1168,13 +1168,13 @@ body {
 }
 
 .think-text {
-  margin: 6px 0 0;
-  padding: 8px;
+  margin: var(--space-2) 0 0;
+  padding: var(--space-2);
   max-height: 180px;
   overflow: auto;
   white-space: pre-wrap;
   font-family: inherit;
-  font-size: 12px;
+  font-size: var(--text-sm);
   line-height: 1.6;
   color: var(--ink-muted);
   background: var(--surface-sunken);
@@ -1183,7 +1183,7 @@ body {
 
 /* Markdown */
 .markdown p {
-  margin: 0 0 6px;
+  margin: 0 0 var(--space-2);
 }
 
 .markdown p:last-child {
@@ -1194,15 +1194,15 @@ body {
 .markdown h2,
 .markdown h3,
 .markdown h4 {
-  margin: 12px 0 6px;
-  font-size: 15px;
+  margin: var(--space-3) 0 var(--space-2);
+  font-size: var(--text-lg);
   line-height: 1.4;
 }
 
 .markdown ul,
 .markdown ol {
-  margin: 0 0 8px;
-  padding-left: 20px;
+  margin: 0 0 var(--space-2);
+  padding-left: var(--space-5);
 }
 
 .markdown li {
@@ -1215,15 +1215,15 @@ body {
 }
 
 .markdown code {
-  padding: 1px 4px;
-  font-size: 12px;
+  padding: 1px var(--space-1);
+  font-size: var(--text-sm);
   background: var(--surface-sunken);
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
 }
 
 .markdown pre {
-  margin: 0 0 8px;
-  padding: 8px;
+  margin: 0 0 var(--space-2);
+  padding: var(--space-2);
   overflow: auto;
   background: var(--surface-sunken);
   border-radius: var(--radius-sm);
@@ -1236,9 +1236,9 @@ body {
 
 .markdown a.citation {
   display: inline;
-  padding: 0 4px;
+  padding: 0 var(--space-1);
   margin: 0 1px;
-  font-size: 12px;
+  font-size: var(--text-sm);
   color: var(--accent);
   background: var(--accent-soft);
   border: 1px solid var(--border);
@@ -1253,7 +1253,7 @@ body {
 .transcript {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-4);
 }
 
 /* A question reads as a bubble on the right, like a chat. */
@@ -1261,7 +1261,7 @@ body {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 .turn-question {
@@ -1269,7 +1269,7 @@ body {
   max-width: 85%;
   margin: 0;
   padding: 7px 11px;
-  font-size: 12px;
+  font-size: var(--text-sm);
   color: var(--ink);
   background: var(--accent-soft);
   border-radius: 12px 12px 2px 12px;
@@ -1277,7 +1277,7 @@ body {
 
 .turn-actions {
   display: flex;
-  gap: 6px;
+  gap: var(--space-2);
   opacity: 0;
   transition: opacity 120ms ease;
 }
@@ -1289,13 +1289,13 @@ body {
 }
 
 .action {
-  padding: 2px 6px;
+  padding: 2px var(--space-2);
   font: inherit;
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--ink-muted);
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   cursor: pointer;
 }
 
@@ -1306,8 +1306,8 @@ body {
 
 .turn-empty {
   margin: 0;
-  padding: 10px;
-  font-size: 12px;
+  padding: var(--space-3);
+  font-size: var(--text-sm);
   color: var(--ink-muted);
   background: var(--surface-sunken);
   border-radius: var(--radius-sm);
@@ -1331,7 +1331,7 @@ body {
 
 .markdown math[display="block"] {
   display: block;
-  margin: 8px 0;
+  margin: var(--space-2) 0;
   text-align: center;
 }
 
@@ -1339,10 +1339,10 @@ body {
   width: 100%;
   box-sizing: border-box;
   min-height: 260px;
-  padding: 12px;
+  padding: var(--space-3);
   resize: none;
   font: inherit;
-  font-size: 12px;
+  font-size: var(--text-sm);
   line-height: 1.55;
   color: var(--ink);
   background: var(--surface-sunken);
@@ -1358,7 +1358,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: var(--space-5);
   background: rgb(24 20 32 / 34%);
   backdrop-filter: blur(2px);
 }
@@ -1379,7 +1379,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 18px 22px;
+  padding: var(--space-4) var(--space-5);
   border-bottom: 1px solid var(--border);
 }
 
@@ -1420,16 +1420,16 @@ body {
   gap: 2px;
   width: 190px;
   flex: none;
-  padding: 14px 10px;
+  padding: var(--space-4) var(--space-3);
   border-right: 1px solid var(--border);
   background: var(--surface-sunken);
 }
 
 .settings-tab {
-  padding: 9px 12px;
+  padding: 9px var(--space-3);
   text-align: left;
   font: inherit;
-  font-size: 13px;
+  font-size: var(--text-md);
   color: var(--ink-muted);
   background: transparent;
   border: none;
@@ -1452,24 +1452,24 @@ body {
   flex: 1;
   min-width: 0;
   overflow: auto;
-  padding: 20px 24px;
+  padding: var(--space-5) var(--space-5);
 }
 
 .settings-section + .settings-section {
-  margin-top: 24px;
-  padding-top: 20px;
+  margin-top: var(--space-5);
+  padding-top: var(--space-5);
   border-top: 1px solid var(--border);
 }
 
 .settings-section h3 {
-  margin: 0 0 4px;
-  font-size: 13px;
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-md);
   font-weight: 600;
 }
 
 .settings-hint {
-  margin: 0 0 14px;
-  font-size: 12px;
+  margin: 0 0 var(--space-4);
+  font-size: var(--text-sm);
   line-height: 1.55;
   color: var(--ink-muted);
 }
@@ -1478,13 +1478,13 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 10px 0;
+  gap: var(--space-4);
+  padding: var(--space-3) 0;
 }
 
 .settings-row > span {
   flex: none;
-  font-size: 13px;
+  font-size: var(--text-md);
 }
 
 .settings-row input,
@@ -1493,9 +1493,9 @@ body {
   min-width: 0;
   max-width: 320px;
   height: 32px;
-  padding: 0 10px;
+  padding: 0 var(--space-3);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--text-md);
   color: var(--ink);
   background: var(--surface);
   border: 1px solid var(--border);
@@ -1515,31 +1515,31 @@ body {
 .settings-foot {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 14px 22px;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
   border-top: 1px solid var(--border);
 }
 
 .settings-path {
   margin-right: auto;
-  font-size: 12px;
+  font-size: var(--text-sm);
   color: var(--ink-faint);
 }
 
 .settings-error {
-  margin: 12px 0 0;
+  margin: var(--space-3) 0 0;
 }
 
 .settings-ok {
-  margin: 12px 0 0;
-  font-size: 12px;
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-sm);
   color: var(--accent);
 }
 
 .theme-cards {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  gap: var(--space-3);
 }
 
 .theme-card {
@@ -1547,10 +1547,10 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 18px 8px;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-2);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--text-sm);
   color: var(--ink-muted);
   background: var(--surface);
   border: 1px solid var(--border);
@@ -1784,7 +1784,7 @@ mark.find-hit {
 }
 
 .field-error {
-  margin: -4px 0 var(--space-2) auto;
+  margin: -var(--space-1) 0 var(--space-2) auto;
   max-width: 320px;
   text-align: right;
   font-size: var(--text-xs);

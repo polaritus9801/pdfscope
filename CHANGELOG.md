@@ -10,6 +10,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Changed
 
+- Spacing, radii, type sizes and offsets now come from the token scale; off-scale spacing snapped to
+  the nearest step (223 → 109 hard-coded declarations).
+
+
 - The AI panel reads like a chat: questions are bubbles, answers carry 复制 and the last one
   重新生成, and an empty reply offers the same retry instead of going quiet.
 - The prompt field spans the settings column, is 260 px tall and cannot be dragged smaller.
