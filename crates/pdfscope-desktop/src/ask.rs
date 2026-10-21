@@ -88,17 +88,6 @@ pub(crate) enum AskEvent {
     },
 }
 
-const SYSTEM_PROMPT: &str = "\
-你是一名读者身边的助手，正在陪他读一本 PDF。\
-你可以自由回答，但必须分清三类内容：\
-1. 书里说了什么：只依据读者提供的摘录和页面，用 [p.页码] 标注来源。\
-2. 一般知识：解释术语、补充背景、举例、与别的作者或理论对比，都可以答，但不要给它们编页码，\
-   必要时用一句话说明这是书外知识。\
-3. 不确定：直说不确定，不要假装书里写过。\
-读者问的即使超出这本书的范围也没关系，照常回答；只是别把书外内容说成书里的。\
-用读者提问的语言回答；他没有指定语言时用中文。\
-先给结论，再给依据，简明扼要。";
-
 /// The most images one request may carry.
 pub(crate) const MAX_IMAGES: usize = 6;
 /// The most base64 one image may carry (about 3 MB of PNG).
@@ -111,6 +100,7 @@ pub(crate) fn build_request(
     regions: &[RegionInput],
     context: &[PageContext],
     history: &[HistoryTurn],
+    system: &str,
 ) -> Result<ChatRequest, String> {
     if regions.len() > MAX_IMAGES {
         return Err(format!(
@@ -173,7 +163,7 @@ pub(crate) fn build_request(
     }
 
     Ok(ChatRequest {
-        system: Some(SYSTEM_PROMPT.to_owned()),
+        system: Some(system.to_owned()),
         messages: vec![Message::user_with_images(prompt, images)],
         max_tokens: 2048,
         temperature: None,
@@ -220,7 +210,14 @@ pub(crate) async fn ask(
         .into_iter()
         .rev()
         .collect();
-    let request = build_request(&question, &references, &regions, &context, &history)?;
+    let request = build_request(
+        &question,
+        &references,
+        &regions,
+        &context,
+        &history,
+        &settings.system_prompt,
+    )?;
     let stop = control.stop.clone();
     stop.store(false, Ordering::SeqCst);
 
@@ -302,6 +299,7 @@ mod tests {
             &[],
             &[],
             &[],
+            crate::settings::DEFAULT_SYSTEM_PROMPT,
         )
         .unwrap();
 
@@ -316,7 +314,15 @@ mod tests {
 
     #[test]
     fn no_excerpts_says_so_instead_of_pretending() {
-        let request = build_request("介绍一下背景", &[], &[], &[], &[]).unwrap();
+        let request = build_request(
+            "介绍一下背景",
+            &[],
+            &[],
+            &[],
+            &[],
+            crate::settings::DEFAULT_SYSTEM_PROMPT,
+        )
+        .unwrap();
         let prompt = &request.messages[0].content;
         assert!(prompt.contains("没有提供摘录"));
         assert!(prompt.contains("不要编造页码"));
@@ -333,6 +339,7 @@ mod tests {
             }],
             &[],
             &[],
+            crate::settings::DEFAULT_SYSTEM_PROMPT,
         )
         .unwrap();
 
@@ -358,6 +365,7 @@ mod tests {
                 },
             ],
             &[],
+            crate::settings::DEFAULT_SYSTEM_PROMPT,
         )
         .unwrap();
 
@@ -374,7 +382,17 @@ mod tests {
                 image: "data:image/png;base64,AAAA".to_owned(),
             })
             .collect();
-        assert!(build_request("q", &[], &regions, &[], &[]).is_err());
+        assert!(
+            build_request(
+                "q",
+                &[],
+                &regions,
+                &[],
+                &[],
+                crate::settings::DEFAULT_SYSTEM_PROMPT
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -388,6 +406,7 @@ mod tests {
             }],
             &[],
             &[],
+            crate::settings::DEFAULT_SYSTEM_PROMPT,
         );
         assert!(result.is_err());
     }
@@ -403,6 +422,7 @@ mod tests {
             &[],
             &[],
             &[],
+            crate::settings::DEFAULT_SYSTEM_PROMPT,
         )
         .unwrap();
         let prompt = &request.messages[0].content;

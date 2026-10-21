@@ -51,6 +51,15 @@ panel that could not be collapsed.
   reopened as `思考 0.0 秒`.
 - `Enter` sends; `Shift`, `⌘`, `Ctrl` or `Alt` + `Enter` inserts a newline.
 
+## Fifth pass — settings that belong to the reader
+
+- Settings moved behind a gear at the far right of the top bar; the panel no longer carries its own
+  entry, and the theme cycle button is gone.
+- The sheet now holds the model, endpoint, key, **theme** and **system prompt**; saving applies the
+  theme immediately and the next question uses the prompt.
+- The prompt and theme are stored in `settings.json` with defaults, so an older file still loads;
+  the prompt has a fallback if it is emptied.
+
 ## Non-goals
 
 - Continuous scrolling, single/double page modes and page-by-page navigation are **not** in this

@@ -11,6 +11,18 @@ use pdfscope_ai::{ChatRequest, Message, Protocol, ProviderConfig, StreamEvent};
 use serde::{Deserialize, Serialize};
 use tauri::Manager;
 
+/// The default instructions sent with every question. Editable in settings.
+pub(crate) const DEFAULT_SYSTEM_PROMPT: &str = "\
+你是一名读者身边的助手，正在陪他读一本 PDF。\
+你可以自由回答，但必须分清三类内容：\
+1. 书里说了什么：只依据读者提供的摘录和页面，用 [p.页码] 标注来源。\
+2. 一般知识：解释术语、补充背景、举例、与别的作者或理论对比，都可以答，但不要给它们编页码，\
+   必要时用一句话说明这是书外知识。\
+3. 不确定：直说不确定，不要假装书里写过。\
+读者问的即使超出这本书的范围也没关系，照常回答；只是别把书外内容说成书里的。\
+用读者提问的语言回答；他没有指定语言时用中文。\
+先给结论，再给依据，简明扼要。";
+
 /// The key lives in its own file, readable only by this user, next to the settings.
 ///
 /// The keychain was the first choice, but a prompt on every launch is a worse trade for a local
@@ -29,6 +41,20 @@ pub(crate) struct Settings {
     pub(crate) base_url: String,
     /// Model identifier.
     pub(crate) model: String,
+    /// Instructions sent with every question.
+    #[serde(default = "default_prompt")]
+    pub(crate) system_prompt: String,
+    /// `system`, `light` or `dark`.
+    #[serde(default = "default_theme")]
+    pub(crate) theme: String,
+}
+
+fn default_prompt() -> String {
+    DEFAULT_SYSTEM_PROMPT.to_owned()
+}
+
+fn default_theme() -> String {
+    "system".to_owned()
 }
 
 impl Default for Settings {
@@ -38,6 +64,8 @@ impl Default for Settings {
             protocol: "openai".to_owned(),
             base_url: "https://api.xiaomimimo.com/v1".to_owned(),
             model: "mimo-v2.6-flash".to_owned(),
+            system_prompt: default_prompt(),
+            theme: default_theme(),
         }
     }
 }
@@ -53,6 +81,12 @@ pub(crate) struct SettingsInput {
     pub(crate) base_url: String,
     /// Model identifier.
     pub(crate) model: String,
+    /// Instructions sent with every question.
+    #[serde(default)]
+    pub(crate) system_prompt: Option<String>,
+    /// `system`, `light` or `dark`.
+    #[serde(default)]
+    pub(crate) theme: Option<String>,
     /// A new key, when the user typed one. `None` keeps the stored key.
     pub(crate) api_key: Option<String>,
 }
@@ -68,6 +102,10 @@ pub(crate) struct SettingsView {
     pub(crate) base_url: String,
     /// Model identifier.
     pub(crate) model: String,
+    /// Instructions sent with every question.
+    pub(crate) system_prompt: String,
+    /// `system`, `light` or `dark`.
+    pub(crate) theme: String,
     /// Whether a key is stored. The key itself never crosses this boundary.
     pub(crate) has_key: bool,
 }
@@ -133,6 +171,8 @@ pub(crate) fn load_settings(app: tauri::AppHandle) -> Result<SettingsView, Strin
         protocol: settings.protocol,
         base_url: settings.base_url,
         model: settings.model,
+        system_prompt: settings.system_prompt,
+        theme: settings.theme,
         has_key: has_key(&app),
     })
 }
@@ -158,6 +198,11 @@ pub(crate) fn save_settings(app: tauri::AppHandle, settings: SettingsInput) -> R
         protocol: settings.protocol,
         base_url: settings.base_url.trim_end_matches('/').to_owned(),
         model: settings.model,
+        system_prompt: settings
+            .system_prompt
+            .filter(|prompt| !prompt.trim().is_empty())
+            .unwrap_or_else(default_prompt),
+        theme: settings.theme.unwrap_or_else(default_theme),
     };
 
     let path = settings_path(&app)?;

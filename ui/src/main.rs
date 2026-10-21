@@ -147,39 +147,6 @@ pub(crate) fn truncate(text: &str, maximum: usize) -> String {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Theme {
-    System,
-    Light,
-    Dark,
-}
-
-impl Theme {
-    fn next(self) -> Self {
-        match self {
-            Self::System => Self::Light,
-            Self::Light => Self::Dark,
-            Self::Dark => Self::System,
-        }
-    }
-
-    fn attribute(self) -> &'static str {
-        match self {
-            Self::System => "system",
-            Self::Light => "light",
-            Self::Dark => "dark",
-        }
-    }
-
-    fn label(self) -> &'static str {
-        match self {
-            Self::System => "跟随系统",
-            Self::Light => "浅色",
-            Self::Dark => "深色",
-        }
-    }
-}
-
 /// One page shell. Rust owns the shell and its overlays; the renderer fills `.page-layer` with a
 /// canvas and a text layer only while this page is inside the render window.
 #[component]
@@ -293,7 +260,7 @@ fn App() -> impl IntoView {
     let ready = RwSignal::new(false);
     let file_name = RwSignal::new(String::new());
     let error = RwSignal::new(Option::<String>::None);
-    let theme = RwSignal::new(Theme::System);
+    let settings_open = RwSignal::new(false);
     let selection = RwSignal::new(Option::<Selection>::None);
     let passages = RwSignal::new(Vec::<Passage>::new());
     let regions = RwSignal::new(Vec::<Region>::new());
@@ -580,16 +547,6 @@ fn App() -> impl IntoView {
         });
     });
 
-    // Keep the document's theme attribute in step with the signal.
-    Effect::new(move |_| {
-        if let Some(root) = web_sys::window()
-            .and_then(|window| window.document())
-            .and_then(|document| document.document_element())
-        {
-            let _ = root.set_attribute("data-theme", theme.get().attribute());
-        }
-    });
-
     view! {
         <div class="app" id="app-root" tabindex="0" on:keydown=on_key>
             <header class="bar">
@@ -664,9 +621,13 @@ fn App() -> impl IntoView {
                     </button>
                     <button
                         class="button"
-                        on:click=move |_| theme.set(theme.get().next())
+                        title="设置"
+                        on:click=move |_| settings_open.set(true)
                     >
-                        {move || theme.get().label()}
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="3" />
+                            <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" />
+                        </svg>
                     </button>
                 </div>
             </header>
@@ -797,6 +758,7 @@ fn App() -> impl IntoView {
                 pages=pages
                 hovered=hovered
                 clear_selection=clear_selection
+                open=settings_open
             />
             </div>
         </div>

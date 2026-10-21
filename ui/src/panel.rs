@@ -70,6 +70,16 @@ const PRESET_LABELS: &[&str] = &[
     "Ollama",
 ];
 
+/// Applies the chosen theme to the document root.
+fn apply_theme(theme: &str) {
+    if let Some(root) = web_sys::window()
+        .and_then(|window| window.document())
+        .and_then(|document| document.document_element())
+    {
+        let _ = root.set_attribute("data-theme", theme);
+    }
+}
+
 /// Fetches a page's text from the renderer.
 async fn fetch_page_text(number: u32) -> String {
     let Some(promise) = crate::call("pageText", &[JsValue::from(number)]) else {
@@ -105,6 +115,7 @@ pub fn AiPanel(
     pages: RwSignal<u32>,
     hovered: RwSignal<Option<(u32, (f64, f64, f64, f64))>>,
     clear_selection: Callback<()>,
+    open: RwSignal<bool>,
 ) -> impl IntoView {
     let configured = RwSignal::new(false);
     let model = RwSignal::new("未配置".to_owned());
@@ -117,7 +128,6 @@ pub fn AiPanel(
     let status = RwSignal::new(String::new());
     let streaming = RwSignal::new(false);
     let question = RwSignal::new(String::new());
-    let open = RwSignal::new(false);
     let failed = RwSignal::new(false);
     let ranges = RwSignal::new(Vec::<pdfscope_core::PageSpan>::new());
     let range_input = RwSignal::new(String::new());
@@ -149,6 +159,8 @@ pub fn AiPanel(
     let form_base = RwSignal::new("https://api.xiaomimimo.com/v1".to_owned());
     let form_model = RwSignal::new("mimo-v2.6-flash".to_owned());
     let form_key = RwSignal::new(String::new());
+    let form_prompt = RwSignal::new(String::new());
+    let form_theme = RwSignal::new("system".to_owned());
     let form_error = RwSignal::new(Option::<String>::None);
 
     // Load the stored configuration once.
@@ -171,6 +183,13 @@ pub fn AiPanel(
                 }
                 if let Some(stored) = text_of(&value, "base_url") {
                     form_base.set(stored);
+                }
+                if let Some(stored) = text_of(&value, "system_prompt") {
+                    form_prompt.set(stored);
+                }
+                if let Some(stored) = text_of(&value, "theme") {
+                    apply_theme(&stored);
+                    form_theme.set(stored);
                 }
             });
         }
@@ -467,6 +486,17 @@ pub fn AiPanel(
             &JsValue::from_str(&form_model.get()),
         );
 
+        let _ = js_sys::Reflect::set(
+            &payload,
+            &JsValue::from_str("system_prompt"),
+            &JsValue::from_str(&form_prompt.get()),
+        );
+        let _ = js_sys::Reflect::set(
+            &payload,
+            &JsValue::from_str("theme"),
+            &JsValue::from_str(&form_theme.get()),
+        );
+
         let key = form_key.get();
         if !key.trim().is_empty() {
             let _ = js_sys::Reflect::set(
@@ -490,6 +520,7 @@ pub fn AiPanel(
                         open.set(false);
                         configured.set(true);
                         model.set(form_model.get());
+                        apply_theme(&form_theme.get());
                         form_key.set(String::new());
                     }
                     Err(error) => {
@@ -597,9 +628,7 @@ pub fn AiPanel(
                 </button>
                 <span class="panel-title">"AI"</span>
                 <span class="panel-model">{move || model.get()}</span>
-                <button class="button" on:click=move |_| open.set(true)>
-                    "设置"
-                </button>
+
             </div>
 
             <button
@@ -985,6 +1014,24 @@ pub fn AiPanel(
                                 prop:value=move || form_model.get()
                                 on:input=move |event| form_model.set(event_target_value(&event))
                             />
+                        </label>
+
+                        <label class="field">
+                            <span>"主题"</span>
+                            <select on:change=move |event| form_theme.set(event_target_value(&event))>
+                                <option value="system" selected=move || form_theme.get() == "system">"跟随系统"</option>
+                                <option value="light" selected=move || form_theme.get() == "light">"浅色"</option>
+                                <option value="dark" selected=move || form_theme.get() == "dark">"深色"</option>
+                            </select>
+                        </label>
+
+                        <label class="field">
+                            <span>"系统提示词"</span>
+                            <textarea
+                                class="prompt-field"
+                                prop:value=move || form_prompt.get()
+                                on:input=move |event| form_prompt.set(event_target_value(&event))
+                            ></textarea>
                         </label>
 
                         <label class="field">

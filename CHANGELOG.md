@@ -10,6 +10,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Changed
 
+- Settings live behind a gear at the far right of the top bar and now include the theme and the
+  system prompt; the panel's own settings button and the theme cycle button are gone.
+
+
 - The system prompt distinguishes the book's content from general knowledge instead of refusing
   anything outside the excerpts: background, comparisons and follow-up questions are answered, with
   page citations reserved for what the book actually says.

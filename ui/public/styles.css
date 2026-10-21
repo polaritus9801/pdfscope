@@ -1188,3 +1188,16 @@ body {
   margin: 8px 0;
   text-align: center;
 }
+
+.prompt-field {
+  min-height: 110px;
+  padding: 8px;
+  resize: vertical;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--ink);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
