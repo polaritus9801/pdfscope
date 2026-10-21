@@ -1,9 +1,9 @@
 # 0020 — From usable to consumer-grade
 
-- **Status:** draft
+- **Status:** accepted
 - **Author:** z1mLi
 - **Date:** 2026-10-22
-- **Approved by:** —
+- **Approved by:** z1mLi ("批准，实施", 2026-10-22)
 
 ## Goal
 
@@ -89,8 +89,9 @@ documents; toasts never block input. A mis-shown banner costs one click, not dat
 
 ## Design review
 
-- Reviewed with: — (pending)
-- Decisions: —
+- Reviewed with: z1mLi on 2026-10-22 — spec approved; the P1/P2 controls were not objected to.
+- Decisions: proceed with `⌘K` (platform-mapped), onboarding inside the empty state, toasts for
+  completed actions. Sample document and multi-thread questions remain open.
 
 ## Test plan
 

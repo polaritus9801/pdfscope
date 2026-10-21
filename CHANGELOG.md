@@ -37,6 +37,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Design tokens for spacing, radii, elevation, type and motion; the settings dialog and the shared
+  control vocabulary now read from them, and `prefers-reduced-motion` disables motion entirely.
+
+
 - **继续生成**: an answer cut off mid-stream can be continued from where it stopped, appended to the
   same turn instead of starting a new question.
 

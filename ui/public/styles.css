@@ -25,10 +25,33 @@
   --accent-ink: #ffffff;
   --danger: #b23a4e;
 
+  /* Spacing, radii, elevation and type: the only values components may use. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  --radius-xs: 4px;
   --radius-sm: 6px;
   --radius-md: 10px;
-  --shadow-panel: 0 1px 2px rgb(20 16 26 / 6%), 0 8px 24px rgb(20 16 26 / 8%);
+  --radius-lg: 16px;
+
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-md: 13px;
+  --text-lg: 15px;
+  --text-xl: 22px;
+
+  --shadow-1: 0 1px 2px rgb(20 16 26 / 6%);
+  --shadow-2: 0 4px 12px rgb(20 16 26 / 8%);
+  --shadow-3: 0 24px 64px rgb(20 16 26 / 24%);
+  --shadow-panel: var(--shadow-1), 0 8px 24px rgb(20 16 26 / 8%);
+
   --duration-fast: 120ms;
+  --duration: 150ms;
   --ease: cubic-bezier(0.2, 0, 0, 1);
 }
 
@@ -1275,8 +1298,8 @@ body {
   max-height: min(760px, 100%);
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 16px;
-  box-shadow: 0 24px 64px rgb(24 20 32 / 24%);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-3);
   overflow: hidden;
 }
 
@@ -1472,4 +1495,41 @@ body {
   color: var(--accent);
   border-color: var(--accent);
   background: var(--accent-soft);
+}
+
+/* Motion is one system too: the same duration and curve, and none of it when the reader says so. */
+.button,
+.tool,
+.action,
+.panel-toggle,
+.settings-tab,
+.theme-card,
+.settings-dialog,
+.settings-overlay {
+  transition:
+    background-color var(--duration) var(--ease),
+    border-color var(--duration) var(--ease),
+    color var(--duration) var(--ease),
+    opacity var(--duration) var(--ease),
+    transform var(--duration) var(--ease);
+}
+
+.settings-dialog {
+  animation: dialog-in var(--duration) var(--ease);
+}
+
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.99);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
 }
