@@ -37,6 +37,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Reading mode (`⌥⌘F`): the document only, with `Esc` or a chip to return.
+- `docs/performance.md`, with the first measurement and its caveats.
+
+
 - Settings gained 阅读, 快捷键 and 关于 tabs; answer font size and the remember-position switch apply
   immediately and persist.
 

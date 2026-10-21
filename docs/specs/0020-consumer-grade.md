@@ -149,7 +149,13 @@ documents; toasts never block input. A mis-shown banner costs one click, not dat
   position), 模型, 提示词, 快捷键 (a cheat sheet), 关于 (version and where data lives). Font size
   applies immediately through `--answer-size`; the remember-position switch reaches the viewer via
   `setRememberPosition`. Two unit tests cover old-file defaults and a round trip.
-- **P7** not started.
+- **P7** started: reading mode (`⌥⌘F`, exit with `Esc` or the chip) hides the header, panel, tool rail
+  and toasts, leaving the document and progress bar. Verified: `.app.reading` true, header
+  `display: none`, Esc returns. First-page timing recorded in `docs/performance.md` (79 ms on a
+  six-page fixture). Window geometry memory is **not** done.
+- **P1 audit**: a grep for hard-coded `px` outside the token block finds **210** declarations. P1's
+  acceptance ("only tokens and icon sizes") is therefore **not met**; converting them per component
+  is recorded as remaining work rather than claimed.
 
 ## Deviations
 

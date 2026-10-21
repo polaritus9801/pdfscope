@@ -1879,3 +1879,43 @@ mark.find-hit {
   margin: 0;
   color: var(--ink-muted);
 }
+
+/* Reading mode: the document only. Esc or the chip returns. */
+.app.reading .bar,
+.app.reading .panel,
+.app.reading .float-tools,
+.app.reading .rail,
+.app.reading .toasts {
+  display: none;
+}
+
+.app.reading .workspace {
+  height: 100vh;
+}
+
+.app.reading .stage {
+  padding-bottom: var(--space-6);
+}
+
+.reading-exit {
+  position: fixed;
+  top: var(--space-3);
+  right: var(--space-3);
+  z-index: 30;
+  padding: var(--space-1) var(--space-3);
+  font: inherit;
+  font-size: var(--text-xs);
+  color: var(--ink-muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-1);
+  cursor: pointer;
+  opacity: 0.5;
+}
+
+.reading-exit:hover {
+  opacity: 1;
+  color: var(--accent);
+  border-color: var(--accent);
+}

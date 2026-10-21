@@ -261,6 +261,7 @@ fn App() -> impl IntoView {
     let file_name = RwSignal::new(String::new());
     let error = RwSignal::new(Option::<String>::None);
     let settings_open = RwSignal::new(false);
+    let reading = RwSignal::new(false);
     let toasts = RwSignal::new(Vec::<(f64, String)>::new());
 
     // A toast is the app's smallest unit of feedback: one line, three seconds, at most three.
@@ -499,7 +500,10 @@ fn App() -> impl IntoView {
             return;
         }
 
-        if (event.meta_key() || event.ctrl_key()) && event.key().eq_ignore_ascii_case("f") {
+        if (event.meta_key() || event.ctrl_key())
+            && !event.alt_key()
+            && event.key().eq_ignore_ascii_case("f")
+        {
             event.prevent_default();
             find_open.set(true);
             if let Some(input) = web_sys::window()
@@ -509,6 +513,20 @@ fn App() -> impl IntoView {
             {
                 let _ = input.focus();
             }
+            return;
+        }
+
+        if (event.meta_key() || event.ctrl_key())
+            && event.alt_key()
+            && event.key().eq_ignore_ascii_case("f")
+        {
+            event.prevent_default();
+            reading.update(|on| *on = !*on);
+            return;
+        }
+
+        if event.key() == "Escape" && reading.get() {
+            reading.set(false);
             return;
         }
 
@@ -681,7 +699,13 @@ fn App() -> impl IntoView {
     });
 
     view! {
-        <div class="app" id="app-root" tabindex="0" on:keydown=on_key>
+        <div
+            class="app"
+            class:reading=move || reading.get()
+            id="app-root"
+            tabindex="0"
+            on:keydown=on_key
+        >
             <header class="bar">
                 <div class="bar-left">
                     <span class="brand">"PDFScope"</span>
@@ -1099,6 +1123,16 @@ fn App() -> impl IntoView {
                     </span>
                 </div>
             </main>
+
+            <Show when=move || reading.get()>
+                <button
+                    class="reading-exit"
+                    title="退出阅读模式（Esc）"
+                    on:click=move |_| reading.set(false)
+                >
+                    "退出阅读模式"
+                </button>
+            </Show>
 
             <div class="toasts">
                 {move || {
