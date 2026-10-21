@@ -14,7 +14,7 @@ it applies to maintainers as much as to outside contributors. The short version:
 ## Setup
 
 ```sh
-git clone https://github.com/OWNER/verso.git
+git clone https://github.com/polaritus9801/verso.git
 cd verso
 just setup     # configures git hooks, prints the toolchain versions
 just check     # fmt + clippy + tests + docs

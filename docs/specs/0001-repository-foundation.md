@@ -1,9 +1,9 @@
 # 0001 — Repository foundation
 
 - **Status:** accepted
-- **Author:** polar
+- **Author:** z1mLi
 - **Date:** 2026-10-21
-- **Approved by:** polar (direct request: "把这个基建任务做好，给这个项目打一个非常好的地基")
+- **Approved by:** z1mLi (direct request: "把这个基建任务做好，给这个项目打一个非常好的地基")
 
 ## Goal
 

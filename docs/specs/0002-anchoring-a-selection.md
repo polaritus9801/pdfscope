@@ -1,7 +1,7 @@
 # 0002 — Anchoring a selection to a page
 
 - **Status:** draft
-- **Author:** polar
+- **Author:** z1mLi
 - **Date:** 2026-10-21
 - **Approved by:** —
 

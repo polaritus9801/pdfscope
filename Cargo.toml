@@ -22,8 +22,8 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
 license = "MIT"
-authors = ["polar"]
-# `repository` is intentionally unset until the public URL exists. Set it before publishing.
+authors = ["z1mLi"]
+repository = "https://github.com/polaritus9801/verso"
 
 [workspace.dependencies]
 # Internal

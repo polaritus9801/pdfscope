@@ -4,7 +4,7 @@
 
 **Read PDFs with AI. Page by page, with citations that actually point to the page.**
 
-[![CI](https://github.com/OWNER/verso/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/verso/actions/workflows/ci.yml)
+[![CI](https://github.com/polaritus9801/verso/actions/workflows/ci.yml/badge.svg)](https://github.com/polaritus9801/verso/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-black.svg)](LICENSE)
 [![MSRV](https://img.shields.io/badge/MSRV-1.85-black.svg)](rust-toolchain.toml)
 
@@ -55,7 +55,7 @@ The reasoning, including the options rejected, is in [`docs/ARCHITECTURE.md`](do
 ## Build
 
 ```sh
-git clone https://github.com/OWNER/verso.git
+git clone https://github.com/polaritus9801/verso.git
 cd verso
 just setup   # installs git hooks, checks toolchain
 just check   # fmt + clippy + tests
