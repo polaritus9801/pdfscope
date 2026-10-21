@@ -7,151 +7,118 @@
 
 ## Goal
 
-PDFScope works. This spec makes it feel like a product someone would pay for: the first minute is
-self-explanatory, every state is designed, the interface has a consistent visual language, and the
-common actions are one keystroke away instead of three clicks.
-
-The desktop app is the subject. No accounts, no cloud, no web service — that is a later product, and
-this spec deliberately does not prepare the architecture for it.
-
-## What "mature" means here
-
-Five dimensions, all testable:
-
-1. **Nothing is undesigned.** Every state has a designed appearance: empty, loading, streaming,
-   error, offline, no key, unsupported file, long filename, one-page document, 800-page document.
-2. **The first minute teaches itself.** A new user can open a PDF, select text, ask a question and
-   find the citation without reading documentation.
-3. **The keyboard is complete.** Every frequent action has a shortcut, shortcuts are discoverable,
-   and focus is always visible.
-4. **The visual system is one system.** Spacing, type, radius, elevation and colour come from tokens;
-   no component invents its own.
-5. **It never feels slow or stuck.** Input responds in under 100 ms; long operations say what they
-   are doing; nothing spins without a reason.
-
-## Audit — where we are
-
-| Area | Today | Target |
-|---|---|---|
-| First run | Empty stage, one button, no explanation | Three-step onboarding inside the empty state; a sample PDF action |
-| Empty states | One line of text | Title, explanation, primary action, shortcut hint |
-| Visual tokens | Incremental; some spacing hard-coded | One token set; a documented scale |
-| Typography | System serif-ish defaults per component | One type scale, reading-optimised for the answer column |
-| Motion | Only zoom easing | 120–180 ms transitions for panel, dialog, toast; reduced-motion respected |
-| Keyboard | A handful of shortcuts, no discovery | Complete map + `⌘K` command palette + cheat sheet in settings |
-| Settings | One dialog, five fields | Grouped preferences incl. appearance, reading, AI, shortcuts, about |
-| Feedback | Status line only | Toasts for completed actions; inline errors where they happen |
-| AI panel | Good | Thread management: rename, clear, copy-all, regenerate, continue |
-| Reading | Continuous, zoom, rotation | Progress bar, outline, page thumbnails, remember position |
-| Window | Fixed minimum | Sensible min size, remembers geometry, full-screen reading mode |
-| Onboarding | None | Interactive, dismissible, one-time |
-
-## Phases
-
-Each phase ends with screenshots at three sizes (`1280×800`, `1512×982`, `900×700`) in light and dark,
-a keyboard-only pass, and `just check`.
-
-### P1 — Design system and shell
-
-- A token file becomes the single source: spacing scale (4/8/12/16/24/32/48), radius (4/8/12/16),
-  three elevations, a type scale (11/12/13/15/17/22), semantic colours that both themes satisfy.
-- Header, panel, dialog and buttons rebuilt on those tokens; no hard-coded pixel values outside the
-  token block.
-- A `Card`, `Button`, `Field`, `EmptyState`, `Toast`, `Tooltip` vocabulary in CSS, used everywhere.
-- Motion: 150 ms ease-out for panels and dialogs; `prefers-reduced-motion` disables all of it.
-- Acceptance: a grep for `px` in component rules finds only tokens and icon sizes.
-
-### P2 — First run
-
-- The empty state becomes a three-step card: open a file (with `⌘O`), select text, ask a question.
-  It disappears after the first successful question and never returns.
-- A "试试示例" action opens a bundled sample page and pre-fills a question.
-- Opening the app with no key shows a non-blocking banner: "还没有配置模型" with a settings action.
-- Acceptance: delete the settings file, launch, and a first-time user can ask a question in under a
-  minute without external instructions.
-
-### P3 — Reading surface
-
-- Progress bar at the bottom of the reader, draggable, showing `page / total`.
-- Outline (PDF table of contents) in a collapsible left rail, with thumbnails in the same rail.
-- Reading position remembered per document (page, zoom, mode) and restored on reopen.
-- `⌘F` find in document with hit count and next/previous.
-- Acceptance: reopen a 300-page book and land on the same page; 17 hits found in under a second.
-
-### P4 — AI panel as a product surface
-
-- Threads: clear current thread, copy the whole thread, rename? (single thread is fine for v1).
-- Actions on every answer: copy, regenerate, continue (already), plus "在文档中定位" for the first
-  citation.
-- Empty/loading/error states with illustrations-free, typographic treatment.
-- The composer grows with content up to 6 lines, then scrolls; drag-and-drop a selection onto it.
-- Acceptance: every action available by mouse is available by keyboard.
-
-### P5 — Settings and preferences
-
-- Tabs: 通用 (theme, language, font size), 阅读 (default zoom, page mode, remembered positions),
-  模型 (provider, endpoint, model, key, output budget, reasoning effort), 提示词, 快捷键, 关于.
-- Every preference persists and applies immediately; a "恢复默认" per section.
-- Acceptance: change any setting, quit, relaunch — it holds.
-
-### P6 — Feedback and resilience
-
-- Toast system: saved, copied, exported, failed; max 3 stacked; auto-dismiss 3 s; hover pauses.
-- Inline errors sit next to the control that caused them.
-- Offline and provider-down states explain what to do, not just what failed.
-- Acceptance: pull the network, ask a question — the app says the connection is down and offers retry.
-
-### P7 — Window and performance
-
-- Minimum window 960×640; geometry and maximised state remembered.
-- Reading mode (`⌥⌘F`) hides the header and panel.
-- Budgets: first page visible under 1 s for a 10 MB PDF; typing latency under 50 ms; no layout shift
-  when the answer streams.
-- Acceptance: measured with the built app, recorded in `docs/performance.md`.
-
-## Interaction design — new controls in P1 and P2
-
-| Control | Label | Location | Enabled when | Pointer | Keyboard | Touch | Result | Cancel / error |
-|---|---|---|---|---|---|---|---|---|
-| Command palette | `⌘K` | overlay, centred | always | click item | type to filter, `↵` runs, `esc` closes | tap | runs the chosen action | `esc`; empty query lists recent actions |
-| Palette item | action name | palette list | matches query | click | `↑↓` move, `↵` run | tap | palette closes, action runs | — |
-| Onboarding step | 1·2·3 | empty state card | no document open | click step | `tab` focus, `↵` advances | tap | highlights the corresponding control | dismiss `×`, remembered |
-| Sample document | 试试示例 | empty state card | no document open | click | `↵` | tap | opens the bundled sample, focuses the composer | fails → toast "示例打不开" |
-| Missing-key banner | 还没有配置模型 | under the header | no key stored | click | `tab` to action | tap | opens settings on the model tab | dismiss for this session |
-| Toast | message | bottom centre above the rail | on event | hover pauses | — | tap dismisses | disappears after 3 s | max 3 stacked |
-
-**Alternatives considered.** A separate onboarding wizard: rejected — it delays the actual task and is
-skipped by most users. A permanent help panel: rejected — it competes with the document for space.
-
-**Cost of being wrong.** All onboarding is dismissible and resettable from settings; nothing blocks
-the primary flow.
+The app is usable; it should feel like a product someone would pay for. After this work: the first
+minute teaches itself, every state is designed, the keyboard covers the frequent actions, and the
+visual system is one system rather than per-component choices. This spec covers the desktop app
+only; accounts, cloud and the eventual web service are explicitly out of scope.
 
 ## Non-goals
 
-- Accounts, sync, collaboration, sharing links, payments.
+- Accounts, sync, collaboration, sharing links, payments, telemetry.
 - Mobile or web deployment.
-- Annotations, editing, OCR.
-- A plugin system.
+- Annotations, editing, OCR, plugins.
+- Re-architecting the reader or the provider layer; those work and are not the subject.
 
-## Risks
+## Behaviour
 
-- **Visual churn vs. stability.** Rebuilding the shell can regress the four paths that already work
-  (selection, capture, tints, citations). Every phase re-runs `scripts/ui-smoke/reader.mjs`.
-- **Token migration half-done.** If some components keep hard-coded values the interface drifts.
-  P1 ends with the grep check, not with a feeling.
-- **Scope.** Seven phases is months of work at this pace. Each phase is shippable alone; the order is
-  chosen so the product improves even if we stop after P2.
+- **First run.** With no settings file, the empty reader explains three steps (open, select, ask),
+  offers a sample document, and shows a banner when no key is stored. The onboarding is dismissible
+  and stays dismissed.
+- **Every state is designed.** Empty, loading, streaming, stopped, empty answer, offline, no key,
+  unreadable file, one-page document, long filename. Each has deliberate copy and layout.
+- **Keyboard.** `⌘K` opens a command palette listing every action with its shortcut; `⌘/` shows the
+  cheat sheet; focus is always visible; every mouse action has a keyboard path.
+- **Feedback.** Saving, copying, exporting and failures produce a toast (max 3, auto-dismiss 3 s,
+  hover pauses). Validation errors appear next to the field.
+- **Reading.** The reader shows progress, remembers position per document, offers an outline and
+  `⌘F` find. A 300-page book reopens on the same page.
+- **Resilience.** A dropped stream is retried before the first token and continues after it (already
+  true); the offline state explains what to do instead of printing a transport error.
+
+Unhappy paths are part of the contract: no text layer, unreadable file, provider unavailable,
+cancelled mid-stream, empty selection.
+
+## Data model
+
+Additive fields in `settings.json`, all with defaults so older files load:
+
+```
+font_size: u16        // 12–18, default 14
+language: "zh" | "en" // default "zh"
+default_zoom: string  // fit-width | fit-page | percent
+page_mode: string     // continuous | single | spread
+onboarding_done: bool
+reading_positions: { [doc_hash]: { page, zoom, mode } }  // max 50 entries, LRU
+```
+
+`reading_positions` is a new store table rather than settings JSON if it exceeds one entry per
+document; the migration is additive and the rollback is dropping the table.
+
+## Interface
+
+- Settings JSON: the fields above; `load_settings` / `save_settings` return them.
+- New Tauri command: `reading_position(doc_hash)` / `save_reading_position(hash, page, zoom, mode)`.
+- New callbacks on `window.PDFScope`: `outline()`, `find(query)`, `findNext()`, `progress()`.
+- Shortcuts: `⌘K`, `⌘/`, `⌘F`, `⌥⌘F`, `⌘O`, `⌘,`, `⌘↵`.
+
+## Interaction design
+
+| Control | Label | Location | Enabled when | Pointer | Keyboard | Touch | Result | Cancel / error |
+|---|---|---|---|---|---|---|---|---|
+| Command palette | `⌘K` | centred overlay | always | click item | type, `↑↓`, `↵`, `esc` | tap | runs the action | `esc`; empty query lists recent |
+| Onboarding card | 1·2·3 | empty reader | no document | click step | `tab`, `↵` | tap | highlights the matching control | `×` dismisses, remembered |
+| Sample document | 试试示例 | onboarding card | no document | click | `↵` | tap | opens bundled sample, focuses composer | failure → toast |
+| Missing-key banner | 还没有配置模型 | under header | no key | click action | `tab` | tap | settings opens on 模型 | dismiss for session |
+| Toast | message | bottom centre | on event | hover pauses | — | tap dismisses | disappears after 3 s | max 3 stacked |
+| Progress bar | p / n | reader bottom | document open | drag to seek | `[` `]` | drag | scrolls to position | release keeps position |
+
+**Alternatives considered.**
+
+- Chosen: onboarding inside the empty state, `⌘K` palette, toasts.
+- Rejected: a separate multi-step wizard — delays the task and is skipped; a permanent help panel —
+  competes with the document; a status-only feedback line — invisible for completed actions.
+
+**Discoverability.** The palette is advertised in the header (`⌘K` chip), onboarding names each step,
+shortcuts appear in tooltips, and settings has a cheat sheet.
+
+**States.** Palette: closed / filtering / no matches. Onboarding: hidden / step 1–3 / dismissed.
+Toast: entering / visible / leaving. Reader: no document / loading / ready / error.
+
+**Cost of being wrong.** Onboarding is dismissible and resettable; the palette never mutates
+documents; toasts never block input. A mis-shown banner costs one click, not data.
+
+## Design review
+
+- Reviewed with: — (pending)
+- Decisions: —
 
 ## Test plan
 
-- Screenshot matrix per phase: three sizes × two themes, stored under `docs/images/`.
-- Keyboard-only pass: open, select, ask, copy, settings, close — no pointer.
-- `scripts/ui-smoke/reader.mjs` and `scripts/ui-smoke/run.mjs` stay green.
-- `just check` plus the acceptance line of each phase.
+- Unit: settings round-trip with new fields and an old file; reading-position LRU; palette filter.
+- Integration: `scripts/ui-smoke/reader.mjs` stays green after each phase.
+- End-to-end: first-run walkthrough (delete settings → open sample → select → ask → citation);
+  keyboard-only walkthrough (open, select, ask, copy, settings, close); screenshot matrix, three
+  sizes × two themes.
+
+## Risks
+
+- **Regression of the four working paths** (selection, capture, tints, citations) while the shell
+  changes. Mitigation: the reader smoke test runs every phase.
+- **Half-migrated tokens** produce drift. Mitigation: P1 ends with a grep check, not an opinion.
+- **Scope**: seven phases. Mitigation: each phase ships alone, ordered so P1–P2 already improve the
+  product.
+
+## Assumptions
+
+- The target is Chinese-first with an English toggle later; copy is written in Chinese.
+- Bundling a sample PDF (≈200 KB) is acceptable for the app size.
+- The system font stack is kept; a reading serif is a later experiment.
+- Per-document positions can be stored in SQLite without a migration of existing data.
+
+## Deviations
 
 ## Open questions
 
-1. Language: is the product Chinese-first, or bilingual with an English toggle? (P5 depends on it.)
-2. Typography: keep the system stack, or ship a reading serif for answers?
-3. Does "成熟 To C" include a subscription-ready paywall later, or is pricing entirely out of scope
-   for the desktop app?
+1. Is `⌘K` acceptable on Windows/Linux builds, or should it be `Ctrl+K` with platform mapping?
+2. Should the sample document ship in the binary or download on demand?
+3. Is a single AI thread enough for v1, or does "成熟" require multiple threads?
