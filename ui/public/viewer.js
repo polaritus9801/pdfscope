@@ -980,12 +980,23 @@ function normalisedSelectionRect() {
 }
 
 let settleSelectionTimer = null;
+let hadSelection = false;
+
+function clearReportedSelection() {
+  if (!hadSelection) return;
+  hadSelection = false;
+  window.__pdfscopeCleared?.();
+}
 
 function reportSelection() {
   clearTimeout(settleSelectionTimer);
   settleSelectionTimer = setTimeout(() => {
     const payload = normalisedSelectionRect();
-    if (!payload) return;
+    if (!payload) {
+      clearReportedSelection();
+      return;
+    }
+    hadSelection = true;
     window.__pdfscopeSelection?.(payload);
   }, 120);
 }
@@ -1265,6 +1276,7 @@ window.PDFScope = {
   },
 
   clearSelection() {
+    hadSelection = false;
     window.getSelection()?.removeAllRanges();
     window.__pdfscopeCleared?.();
   },

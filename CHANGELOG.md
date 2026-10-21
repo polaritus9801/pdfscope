@@ -45,6 +45,9 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Fixed
 
+- Rotated PDF pages now select the text under the pointer: the text layer gets PDF.js's
+  `data-main-rotation` transforms, and a stale selection bar clears when the selection collapses or
+  the page re-renders.
 - Zoom no longer flashes, jumps or leaves the text blank: the column is transformed as one layer,
   the text layer stays mounted, and the old canvas remains until the resting bitmap is ready.
 - Arrow keys in the question box no longer turn pages; the keyboard shortcuts now ignore both inputs

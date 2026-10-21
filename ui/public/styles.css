@@ -339,6 +339,21 @@ body {
   background: rgb(203 184 236 / 45%);
 }
 
+/* PDF.js rotates the whole layer for pages whose /Rotate is 90/180/270. The text layer is laid
+   out in unrotated page coordinates and carries `data-main-rotation`; without this transform it
+   sits portrait over a landscape canvas, so selection rects are vertical. */
+[data-main-rotation="90"] {
+  transform: rotate(90deg) translateY(-100%);
+}
+
+[data-main-rotation="180"] {
+  transform: rotate(180deg) translate(-100%, -100%);
+}
+
+[data-main-rotation="270"] {
+  transform: rotate(270deg) translateX(-100%);
+}
+
 .textLayer.empty::after {
   content: "扫描页 · 暂不支持选择";
   position: absolute;
