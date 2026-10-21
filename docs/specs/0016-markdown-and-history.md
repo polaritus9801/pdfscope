@@ -54,6 +54,11 @@ because KaTeX skips `pre`/`code`.
 
 ## Deviations
 
+- A request that fails before any content is retried twice automatically (0.5 s, then 1 s). Once text
+  has arrived a retry would duplicate it, so that case is handed to 继续生成 instead. Stop is honoured
+  between attempts.
+
+
 - A stream that dies after text has arrived reports `连接中断，已保留生成的内容（…）` instead of a raw
   transport error: the partial answer is kept, and the wording says so. The cause is the connection,
   not the output budget — long streams simply have more time to be cut.

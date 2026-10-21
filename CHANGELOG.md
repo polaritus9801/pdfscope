@@ -73,6 +73,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Fixed
 
+- Transient failures before the first token are retried twice automatically (0.5 s, then 1 s); a
+  stream cut after text arrived is left to 继续生成, because re-requesting would duplicate it.
+
+
 - A dropped connection mid-answer now reports `连接中断，已保留生成的内容` instead of a bare transport
   error, and keeps the text that already arrived.
 

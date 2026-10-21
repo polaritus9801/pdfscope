@@ -228,64 +228,91 @@ pub(crate) async fn ask(
             let _ = emitter.emit("ask:event", event);
         };
 
-        let mut events = match pdfscope_ai::stream(&config, &request).await {
-            Ok(events) => events,
-            Err(error) => {
-                send(AskEvent::Error {
-                    message: error.to_string(),
-                });
-                return;
-            }
-        };
-
-        // Track whether anything reached the reader: a stream that dies after text has arrived is a
-        // truncated answer, not a failed request, and the message should say so.
+        // Nothing has been shown yet, so a transient failure can be retried without the reader
+        // seeing a duplicate. Once text has arrived a retry would repeat itself; that case is left
+        // to 继续生成, which appends instead of re-requesting.
+        const ATTEMPTS: u32 = 3;
         let mut received = false;
+        let mut attempt = 0;
 
-        while let Some(event) = events.next().await {
-            if stop.load(Ordering::SeqCst) {
-                send(AskEvent::Stopped);
-                return;
-            }
+        'retry: loop {
+            attempt += 1;
 
-            match event {
-                Ok(StreamEvent::Reasoning(text)) => {
-                    received = true;
-                    send(AskEvent::Reasoning { text });
-                }
-                Ok(StreamEvent::Text(text)) => {
-                    received = true;
-                    send(AskEvent::Text { text });
-                }
-                Ok(StreamEvent::Usage(usage)) => send(AskEvent::Usage {
-                    prompt: usage.prompt_tokens,
-                    completion: usage.completion_tokens,
-                    cached: usage.cached_tokens,
-                }),
-                Ok(StreamEvent::Done) => {
-                    send(AskEvent::Done);
-                    return;
-                }
+            let mut events = match pdfscope_ai::stream(&config, &request).await {
+                Ok(events) => events,
                 Err(error) => {
-                    send(AskEvent::Error {
-                        message: if received {
-                            format!("连接中断，已保留生成的内容（{error}）")
-                        } else {
-                            error.to_string()
-                        },
-                    });
+                    if received || attempt >= ATTEMPTS {
+                        send(AskEvent::Error {
+                            message: error.to_string(),
+                        });
+                        return;
+                    }
+                    tokio::time::sleep(std::time::Duration::from_millis(500 * u64::from(attempt)))
+                        .await;
+                    continue 'retry;
+                }
+            };
+
+            while let Some(event) = events.next().await {
+                if stop.load(Ordering::SeqCst) {
+                    send(AskEvent::Stopped);
                     return;
                 }
-            }
-        }
 
-        send(AskEvent::Error {
-            message: if received {
-                "连接中断，已保留生成的内容".to_owned()
-            } else {
-                "回答在中途结束了".to_owned()
-            },
-        });
+                match event {
+                    Ok(StreamEvent::Reasoning(text)) => {
+                        received = true;
+                        send(AskEvent::Reasoning { text });
+                    }
+                    Ok(StreamEvent::Text(text)) => {
+                        received = true;
+                        send(AskEvent::Text { text });
+                    }
+                    Ok(StreamEvent::Usage(usage)) => send(AskEvent::Usage {
+                        prompt: usage.prompt_tokens,
+                        completion: usage.completion_tokens,
+                        cached: usage.cached_tokens,
+                    }),
+                    Ok(StreamEvent::Done) => {
+                        send(AskEvent::Done);
+                        return;
+                    }
+                    Err(error) => {
+                        if received || attempt >= ATTEMPTS {
+                            send(AskEvent::Error {
+                                message: if received {
+                                    format!("连接中断，已保留生成的内容（{error}）")
+                                } else {
+                                    error.to_string()
+                                },
+                            });
+                            return;
+                        }
+                        tokio::time::sleep(std::time::Duration::from_millis(
+                            500 * u64::from(attempt),
+                        ))
+                        .await;
+                        continue 'retry;
+                    }
+                }
+            }
+
+            // The stream ended without a Done event.
+            if !received && attempt < ATTEMPTS {
+                tokio::time::sleep(std::time::Duration::from_millis(500 * u64::from(attempt)))
+                    .await;
+                continue 'retry;
+            }
+
+            send(AskEvent::Error {
+                message: if received {
+                    "连接中断，已保留生成的内容".to_owned()
+                } else {
+                    "回答在中途结束了".to_owned()
+                },
+            });
+            return;
+        }
     });
 
     Ok(())
