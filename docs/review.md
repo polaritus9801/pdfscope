@@ -14,9 +14,27 @@
 | Viewer module | 10 KB |
 | Vendored PDF.js | 1.7 MB |
 | Desktop binary (debug) | 32 MB |
+| Desktop binary (release) | 17 MB |
 
 The release desktop binary was not built; a Tauri release build with LTO takes long enough to be its
 own task. The debug figure is recorded only so a later release figure has something to compare to.
+
+## UI smoke test
+
+`scripts/ui-smoke` drives the built UI in headless Chrome against a fake `window.__TAURI__`, so the
+real components run: settings load, question entry, send, streaming, citation rendering, status line.
+It caught one bug (a stale reasoning counter) that no amount of compilation would have found.
+
+Latest run:
+
+```
+model label: mimo-v2.6-flash
+answer: "这一段讨论的是公共领域的规范有效性。p.31 它把合法性建立在交往前提上。"
+status: "输入 812 · 输出 41 · 缓存 512 · ≈ 29 tok/s"
+```
+
+The citation renders as a control only when the page exists; with no document open, `p.31` stays
+plain text, which is the intended behaviour.
 
 ## What is verified
 
@@ -45,6 +63,7 @@ own task. The debug figure is recorded only so a later release figure has someth
 | F7 | Settings cannot test the connection before saving | medium | fixed |
 | F8 | Up to 20 page texts are fetched sequentially at send time | low | acceptable for now; parallelising changes ordering semantics |
 | F9 | The streaming answer is not announced by screen readers | medium | fixed: `aria-live="polite"` on the answer |
+| F11 | The reasoning counter stayed on screen after the answer finished | medium | fixed (found by the smoke test) |
 | F10 | No desktop session has exercised any path | high | needs a human |
 
 ## Acceptance list

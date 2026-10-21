@@ -329,11 +329,13 @@ pub fn AiPanel(
                     }
                     "stopped" => {
                         flush_pending();
+                        thinking.set(0);
                         streaming.set(false);
                         status.set("已停止".to_owned());
                     }
                     "done" => {
                         flush_pending();
+                        thinking.set(0);
                         streaming.set(false);
                         let elapsed = js_sys::Date::now() - started;
                         if elapsed > 0.0 {
@@ -344,6 +346,7 @@ pub fn AiPanel(
                     }
                     "error" => {
                         flush_pending();
+                        thinking.set(0);
                         streaming.set(false);
                         failed.set(true);
                         status.set(

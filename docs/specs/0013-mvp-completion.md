@@ -115,3 +115,5 @@ request is refused above the cap rather than truncated.
   page's own shortcuts.
 - The coalescing buffer is flushed before `done`, `stopped` or `error`, so the last fragment never
   arrives after the status line has already settled.
+- The reasoning counter is cleared on every terminal event; a browser smoke test caught it staying
+  on screen after the answer finished.
