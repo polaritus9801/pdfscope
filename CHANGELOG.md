@@ -19,6 +19,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- LaTeX maths renders as MathML: `$…$` inline and `$$…$$` as a centred block, with code fences left
+  alone and invalid input falling back to its source.
+
+
 - Smooth zoom: trackpad pinch (WKWebView `gesture*` and Chromium `ctrl`+wheel), eased `ctrl`/`⌘`+wheel,
   and animated `+`/`−`/`0`. The page is anchored under the pointer (or the reading line for
   buttons), text stays visible throughout, the sharp canvas is swapped in after the hand stops, and

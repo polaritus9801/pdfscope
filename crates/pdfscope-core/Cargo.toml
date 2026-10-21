@@ -12,6 +12,7 @@ serde.workspace = true
 thiserror.workspace = true
 sha2.workspace = true
 pulldown-cmark.workspace = true
+latex2mathml.workspace = true
 
 [dev-dependencies]
 serde_json.workspace = true

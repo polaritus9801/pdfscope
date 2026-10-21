@@ -41,6 +41,14 @@ lists). Two things are ours:
 - Manual: ask three questions and confirm the earlier answers remain, and that a follow-up resolves
   "这一段" to the previous turn.
 
+## Math
+
+`$…$` and `$$…$$` are extracted before parsing, rendered with `latex2mathml`, and substituted back
+through a private-use placeholder; fenced code is left alone and invalid LaTeX falls back to its
+source. Inline math typesets correctly. Display math is centred but its internal layout depends on
+the browser's MathML implementation, and constructs like `\max \sum` can place the operator awkwardly
+— if that proves unacceptable, KaTeX is the fallback.
+
 ## Deviations
 
 - Models write `1.` on its own line, then a blank line, then the item's text. CommonMark reads that

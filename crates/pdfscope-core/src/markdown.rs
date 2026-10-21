@@ -10,7 +10,8 @@ use crate::citation::{Segment, segments};
 
 /// Renders Markdown to HTML. The input is untrusted; raw HTML in it is escaped, never emitted.
 pub fn to_html(input: &str) -> String {
-    let input = normalise(input);
+    let (input, maths) = extract_math(input);
+    let input = normalise(&input);
     let mut options = Options::empty();
     options.insert(Options::ENABLE_TABLES);
     options.insert(Options::ENABLE_STRIKETHROUGH);
@@ -60,7 +61,111 @@ pub fn to_html(input: &str) -> String {
 
     let mut output = String::new();
     html::push_html(&mut output, events.into_iter());
+
+    for (index, mathml) in maths.iter().enumerate() {
+        output = output.replace(&placeholder(index), mathml);
+    }
+
     output
+}
+
+fn placeholder(index: usize) -> String {
+    format!("\u{E000}{index}\u{E001}")
+}
+
+/// Replaces `$…$` and `$$…$$` with rendered MathML, leaving fenced code alone.
+///
+/// Math is extracted before Markdown parsing because the parser would otherwise split it across
+/// events and escape its operators. A private-use placeholder survives parsing untouched and is
+/// substituted afterwards.
+fn extract_math(input: &str) -> (String, Vec<String>) {
+    let mut out = String::with_capacity(input.len());
+    let mut rendered = Vec::new();
+    let mut fence = false;
+
+    for line in input.lines() {
+        if line.trim_start().starts_with("```") {
+            fence = !fence;
+            out.push_str(line);
+            out.push('\n');
+            continue;
+        }
+
+        if fence {
+            out.push_str(line);
+            out.push('\n');
+            continue;
+        }
+
+        out.push_str(&scan_line(line, &mut rendered));
+        out.push('\n');
+    }
+
+    (out, rendered)
+}
+
+fn scan_line(line: &str, rendered: &mut Vec<String>) -> String {
+    let bytes = line.as_bytes();
+    let mut out = String::with_capacity(line.len());
+    let mut index = 0;
+
+    while index < bytes.len() {
+        if bytes[index] == b'\\' && bytes.get(index + 1) == Some(&b'$') {
+            out.push('$');
+            index += 2;
+            continue;
+        }
+
+        if bytes[index] == b'$' {
+            let display = bytes.get(index + 1) == Some(&b'$');
+            let width = if display { 2 } else { 1 };
+            let start = index + width;
+
+            let end = find_close(bytes, start, display);
+            if let Some(end) = end {
+                let latex = &line[start..end];
+                let style = if display {
+                    latex2mathml::DisplayStyle::Block
+                } else {
+                    latex2mathml::DisplayStyle::Inline
+                };
+
+                match latex2mathml::latex_to_mathml(latex, style) {
+                    Ok(mathml) => {
+                        rendered.push(mathml);
+                        out.push_str(&placeholder(rendered.len() - 1));
+                    }
+                    Err(_) => out.push_str(&line[index..end + width]),
+                }
+
+                index = end + width;
+                continue;
+            }
+        }
+
+        let character = line[index..].chars().next().unwrap_or(' ');
+        out.push(character);
+        index += character.len_utf8();
+    }
+
+    out
+}
+
+fn find_close(bytes: &[u8], from: usize, display: bool) -> Option<usize> {
+    let mut index = from;
+    while index < bytes.len() {
+        if bytes[index] == b'$' {
+            if display {
+                if bytes.get(index + 1) == Some(&b'$') {
+                    return Some(index);
+                }
+            } else {
+                return Some(index);
+            }
+        }
+        index += 1;
+    }
+    None
 }
 
 fn flush<'a>(buffer: &mut String, events: &mut Vec<Event<'a>>) {
@@ -249,6 +354,31 @@ mod tests {
         let html = to_html("-\n\n  项目");
         assert!(html.contains("项目"));
         assert!(!html.contains("<li><p></p>"));
+    }
+
+    #[test]
+    fn inline_math_becomes_mathml() {
+        let html = to_html("当 $x_i \\in \\{0,1\\}$ 时");
+        assert!(html.contains("<math"), "got: {html}");
+        assert!(!html.contains("$x_i"));
+    }
+
+    #[test]
+    fn display_math_is_block_mathml() {
+        let html = to_html("$$\\max \\sum_{i=1}^{12} x_i$$");
+        assert!(html.contains("display=\"block\""), "got: {html}");
+    }
+
+    #[test]
+    fn math_inside_fenced_code_stays_text() {
+        let html = to_html("```\n$x$\n```");
+        assert!(!html.contains("<math"));
+    }
+
+    #[test]
+    fn invalid_latex_falls_back_to_the_source() {
+        let html = to_html("$\\frac{$");
+        assert!(!html.contains("<math"));
     }
 
     #[test]

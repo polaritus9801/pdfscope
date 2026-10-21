@@ -72,6 +72,7 @@ sha2 = "0.10"
 
 # Markdown
 pulldown-cmark = { version = "0.13", default-features = false, features = ["html"] }
+latex2mathml = "0.2"
 
 # Testing
 tempfile = "3"

@@ -1980,6 +1980,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "latex2mathml"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "678cf5bdb3ba63a264e6e0c9eee36538ca1d2da0afa4dd801c1f96309e710765"
+
+[[package]]
 name = "lazy_static"
 version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2570,6 +2576,7 @@ dependencies = [
 name = "pdfscope-core"
 version = "0.1.0"
 dependencies = [
+ "latex2mathml",
  "pulldown-cmark",
  "serde",
  "serde_json",
