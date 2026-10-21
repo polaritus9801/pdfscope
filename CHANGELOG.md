@@ -10,6 +10,8 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Reference history: a send moves the tray into a history list; hovering a row reveals the quote after
+  600 ms, a plain click redeems it back into the tray, and shift-click jumps to its page.
 - Page context: a typed range (`31-45, 60`) or, when the tray is empty, the current page, is fetched
   page by page and sent with `[第 N 页]` labels. A scan is labelled as having no extractable text.
 - Stop and retry: while streaming the send button becomes `停止`; a failure turns it into `重试`.

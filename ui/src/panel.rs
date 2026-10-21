@@ -8,7 +8,7 @@ use wasm_bindgen_futures::JsFuture;
 
 use pdfscope_core::{Segment, parse_ranges, segments};
 
-use crate::{Passage, Region};
+use crate::{Passage, Region, truncate};
 
 /// Calls one function on `window.Bridge`.
 fn bridge(name: &str, args: &[JsValue]) -> Option<JsValue> {
@@ -81,6 +81,13 @@ async fn fetch_page_text(number: u32) -> String {
     }
 }
 
+/// A reference that was used and moved to history.
+#[derive(Clone, PartialEq)]
+enum Stored {
+    Passage(Passage),
+    Region(Region),
+}
+
 #[component]
 pub fn AiPanel(
     passages: RwSignal<Vec<Passage>>,
@@ -100,6 +107,8 @@ pub fn AiPanel(
     let ranges = RwSignal::new(Vec::<pdfscope_core::PageSpan>::new());
     let range_input = RwSignal::new(String::new());
     let range_error = RwSignal::new(Option::<String>::None);
+    let history = RwSignal::new(Vec::<Stored>::new());
+    let show_all = RwSignal::new(false);
 
     let jump = move |target: u32| {
         let total = pages.get();
@@ -150,6 +159,15 @@ pub fn AiPanel(
         Err(error) => range_error.set(Some(error.to_string())),
     };
 
+    let redeem = move |index: usize| {
+        if let Some(entry) = history.get().get(index).cloned() {
+            match entry {
+                Stored::Passage(passage) => passages.update(|list| list.push(passage)),
+                Stored::Region(region) => regions.update(|list| list.push(region)),
+            }
+        }
+    };
+
     let send = move |_| {
         if streaming.get() {
             return;
@@ -171,6 +189,15 @@ pub fn AiPanel(
 
         let passages_now = passages.get();
         let regions_now = regions.get();
+
+        if !passages_now.is_empty() || !regions_now.is_empty() {
+            history.update(|list| {
+                list.extend(passages_now.iter().cloned().map(Stored::Passage));
+                list.extend(regions_now.iter().cloned().map(Stored::Region));
+            });
+            passages.set(Vec::new());
+            regions.set(Vec::new());
+        }
         let ranges_now = ranges.get();
         let current_page = page.get();
 
@@ -416,6 +443,70 @@ pub fn AiPanel(
             </div>
 
             <div class="composer">
+                {move || {
+                    let all = history.get();
+                    if all.is_empty() {
+                        return ().into_any();
+                    }
+                    let start = if show_all.get() { 0 } else { all.len().saturating_sub(3) };
+                    let entries: Vec<(usize, Stored)> = all
+                        .iter()
+                        .cloned()
+                        .enumerate()
+                        .skip(start)
+                        .collect();
+                    view! {
+                        <div class="history">
+                            <div class="history-head">
+                                <span>"历史引用"</span>
+                                <button
+                                    class="link"
+                                    on:click=move |_| show_all.update(|open| *open = !*open)
+                                >
+                                    {move || if show_all.get() { "收起" } else { "全部" }}
+                                </button>
+                            </div>
+                            {entries
+                                .into_iter()
+                                .map(|(index, entry)| {
+                                    let (label, preview, page_number) = match &entry {
+                                        Stored::Passage(passage) => (
+                                            format!("p.{} · {}", passage.page, truncate(&passage.quote, 14)),
+                                            passage.quote.clone(),
+                                            passage.page,
+                                        ),
+                                        Stored::Region(region) => (
+                                            format!("p.{} · 截图", region.page),
+                                            "（截图）".to_owned(),
+                                            region.page,
+                                        ),
+                                    };
+                                    view! {
+                                        <div
+                                            class="history-row"
+                                            on:click=move |event: web_sys::MouseEvent| {
+                                                if event.shift_key() {
+                                                    let total = pages.get();
+                                                    if total > 0 {
+                                                        page.set(page_number.clamp(1, total));
+                                                    }
+                                                    let _ = crate::call("flash", &[]);
+                                                } else {
+                                                    redeem(index);
+                                                }
+                                            }
+                                        >
+                                            <span class="history-label">{label}</span>
+                                            <span class="history-preview">{preview}</span>
+                                            <span class="pill">{format!("p.{page_number} →")}</span>
+                                        </div>
+                                    }
+                                })
+                                .collect_view()}
+                        </div>
+                    }
+                        .into_any()
+                }}
                 <div class="range-row">
                     <input
                         class="range-input"

@@ -1,6 +1,6 @@
 # 0003 — References: what one question is about
 
-- **Status:** accepted
+- **Status:** implemented
 - **Author:** z1mLi
 - **Date:** 2026-10-21
 - **Approved by:** z1mLi ("继续做")
@@ -189,7 +189,13 @@ window, Send is disabled with a specific message rather than a generic failure.
 
 ## Deviations
 
-*(empty)*
+- History keeps passages and regions only; page-range and answer references join when their slices
+  land.
+- Hovering a row shows a delayed preview (600 ms, CSS) and a `p.N →` jump control. The in-page tint and
+  the scrollbar marker from the design are **not** implemented yet: a passage does not store its
+  rectangle, and the rail needs a layout pass of its own.
+- Shift+click jumps and flashes the page; a plain click redeems into the tray.
+- History lives in memory for the session, as designed.
 
 ## Open questions
 

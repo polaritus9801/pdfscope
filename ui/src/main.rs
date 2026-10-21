@@ -92,7 +92,7 @@ fn parse_selection(value: &JsValue) -> Option<Selection> {
 }
 
 /// Shortens a quote for a chip or a bar without cutting a multi-byte character.
-fn truncate(text: &str, maximum: usize) -> String {
+pub(crate) fn truncate(text: &str, maximum: usize) -> String {
     let mut characters = text.chars();
     let prefix: String = characters.by_ref().take(maximum).collect();
     if characters.next().is_some() {
