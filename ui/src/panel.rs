@@ -109,6 +109,9 @@ pub fn AiPanel(
     let range_error = RwSignal::new(Option::<String>::None);
     let history = RwSignal::new(Vec::<Stored>::new());
     let show_all = RwSignal::new(false);
+    let notice = RwSignal::new(Option::<String>::None);
+    let pending = RwSignal::new(String::new());
+    let scheduled = RwSignal::new(false);
 
     let jump = move |target: u32| {
         let total = pages.get();
@@ -204,7 +207,15 @@ pub fn AiPanel(
         spawn_local(async move {
             // Page text is fetched here, not in Rust: the renderer owns the document.
             let mut context: Vec<(u32, String)> = Vec::new();
+            let requested: u32 = ranges_now.iter().map(|span| span.pages()).sum();
+
             if !ranges_now.is_empty() {
+                if requested > 20 {
+                    notice.set(Some(format!("范围共 {requested} 页，这次只取了前 20 页")));
+                } else {
+                    notice.set(None);
+                }
+
                 'outer: for span in &ranges_now {
                     for number in span.start..=span.end {
                         if context.len() >= 20 {
@@ -276,7 +287,28 @@ pub fn AiPanel(
                     }
                     "text" => {
                         if let Some(delta) = text_of(&event, "text") {
-                            answer.update(|buffer| buffer.push_str(&delta));
+                            // Coalesce tokens into one reactive update per frame: the answer
+                            // re-parses citations on every change, so per-token updates are O(n²).
+                            pending.update(|buffer| buffer.push_str(&delta));
+                            if !scheduled.get() {
+                                scheduled.set(true);
+                                let flush = Closure::once(move || {
+                                    scheduled.set(false);
+                                    let text = pending.get();
+                                    pending.set(String::new());
+                                    if !text.is_empty() {
+                                        answer.update(|buffer| buffer.push_str(&text));
+                                    }
+                                });
+                                if let Some(window) = web_sys::window() {
+                                    let _ = window
+                                        .set_timeout_with_callback_and_timeout_and_arguments_0(
+                                            flush.as_ref().unchecked_ref(),
+                                            50,
+                                        );
+                                }
+                                flush.forget();
+                            }
                         }
                     }
                     "usage" => {
@@ -527,6 +559,11 @@ pub fn AiPanel(
                         })
                 }}
                 {move || {
+                    notice
+                        .get()
+                        .map(|message| view! { <p class="range-summary range-error">{message}</p> })
+                }}
+                {move || {
                     if ranges.get().is_empty() {
                         ().into_any()
                     } else {
@@ -550,6 +587,14 @@ pub fn AiPanel(
                     placeholder="问点什么…"
                     prop:value=move || question.get()
                     on:input=move |event| question.set(event_target_value(&event))
+                    on:keydown=move |event: web_sys::KeyboardEvent| {
+                        if event.key() == "Enter" && (event.meta_key() || event.ctrl_key()) {
+                            event.prevent_default();
+                            send(());
+                        } else if event.key() == "Escape" && streaming.get() {
+                            let _ = bridge("stop", &[]);
+                        }
+                    }
                 ></textarea>
                 <div class="composer-row">
                     <span class="status">{move || status.get()}</span>

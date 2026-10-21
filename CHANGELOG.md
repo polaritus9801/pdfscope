@@ -8,6 +8,13 @@ minor releases may contain breaking changes; they are always called out.
 
 ## [Unreleased]
 
+### Changed
+
+- Streaming updates are coalesced to one per 50 ms; the answer re-parses citations on every change, so
+  per-token updates made long answers progressively slower.
+- A page range longer than 20 pages is reported instead of being silently truncated.
+- `⌘↵` sends and `Esc` stops, from the composer.
+
 ### Added
 
 - Reference history: a send moves the tray into a history list; hovering a row reveals the quote after

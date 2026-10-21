@@ -104,9 +104,12 @@ request is refused above the cap rather than truncated.
 - The image caps are enforced in the desktop command, not in `pdfscope-ai`, because the limits are a
   product decision rather than a protocol one.
 - Page text is fetched by the renderer and handed to Rust as plain strings; Rust never parses a PDF.
-- A range is capped at 20 pages per request, and each page is sent whole. A longer range is silently
-  truncated by the fetch loop, which is wrong — it should be reported, and is recorded here as a
-  known limitation to fix in the review pass.
+- A range is capped at 20 pages per request; a longer range now says so instead of truncating
+  silently. The notice sits above the composer and is cleared on the next send.
 - Retry reuses the send button (its label becomes `重试`) instead of a separate control.
 - Stop is a shared flag checked between stream events; the in-flight HTTP request is not aborted, so a
   provider may still bill for a few more tokens.
+- Answer tokens are coalesced into one reactive update per 50 ms. The answer re-parses citations on
+  every change, so per-token updates were quadratic in the answer length.
+- `⌘↵` sends and `Esc` stops, handled on the composer rather than globally so they never fight the
+  page's own shortcuts.
