@@ -1161,10 +1161,61 @@ body {
   gap: 16px;
 }
 
+/* A question reads as a bubble on the right, like a chat. */
+.turn {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+
 .turn-question {
-  margin: 0 0 6px;
+  align-self: flex-end;
+  max-width: 85%;
+  margin: 0;
+  padding: 7px 11px;
   font-size: 12px;
-  color: var(--ink-faint);
+  color: var(--ink);
+  background: var(--accent-soft);
+  border-radius: 12px 12px 2px 12px;
+}
+
+.turn-actions {
+  display: flex;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.turn:hover .turn-actions,
+.turn.current .turn-actions,
+.turn:last-child .turn-actions {
+  opacity: 1;
+}
+
+.action {
+  padding: 2px 6px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--ink-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.action:hover {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.turn-empty {
+  margin: 0;
+  padding: 10px;
+  font-size: 12px;
+  color: var(--ink-muted);
+  background: var(--surface-sunken);
+  border-radius: var(--radius-sm);
 }
 
 .turn.current .turn-question {
@@ -1190,9 +1241,11 @@ body {
 }
 
 .prompt-field {
-  min-height: 110px;
-  padding: 8px;
-  resize: vertical;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 260px;
+  padding: 12px;
+  resize: none;
   font: inherit;
   font-size: 12px;
   line-height: 1.55;

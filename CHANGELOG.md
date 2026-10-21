@@ -10,6 +10,11 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Changed
 
+- The AI panel reads like a chat: questions are bubbles, answers carry 复制 and the last one
+  重新生成, and an empty reply offers the same retry instead of going quiet.
+- The prompt field spans the settings column, is 260 px tall and cannot be dragged smaller.
+
+
 - Settings are a full dialog with a category rail (general, model, prompt) instead of a card inside
   the AI panel.
 

@@ -70,6 +70,27 @@ const PRESET_LABELS: &[&str] = &[
     "Ollama",
 ];
 
+/// Copies text through the WebView's clipboard API.
+fn copy_to_clipboard(text: &str) {
+    let Some(window) = web_sys::window() else {
+        return;
+    };
+    let window: JsValue = window.into();
+    let Ok(navigator) = js_sys::Reflect::get(&window, &JsValue::from_str("navigator")) else {
+        return;
+    };
+    let Ok(clipboard) = js_sys::Reflect::get(&navigator, &JsValue::from_str("clipboard")) else {
+        return;
+    };
+    let Ok(write) = js_sys::Reflect::get(&clipboard, &JsValue::from_str("writeText")) else {
+        return;
+    };
+    let Ok(write) = write.dyn_into::<js_sys::Function>() else {
+        return;
+    };
+    let _ = write.call1(&clipboard, &JsValue::from_str(text));
+}
+
 /// Applies the chosen theme to the document root.
 fn apply_theme(theme: &str) {
     if let Some(root) = web_sys::window()
@@ -241,11 +262,10 @@ pub fn AiPanel(
         reasoning.set(String::new());
     };
 
-    let send = move |_| {
+    let send_text = move |asked: String| {
         if streaming.get() {
             return;
         }
-        let asked = question.get();
         if asked.trim().is_empty() {
             return;
         }
@@ -494,6 +514,8 @@ pub fn AiPanel(
         });
     };
 
+    let send = move |_| send_text(question.get());
+
     let build_payload = move || {
         let payload = js_sys::Object::new();
         let _ = js_sys::Reflect::set(
@@ -700,10 +722,12 @@ pub fn AiPanel(
                                 }
                             >
                                 {move || {
-                                    turns
-                                        .get()
+                                    let all = turns.get();
+                                    let last = all.len().saturating_sub(1);
+                                    all
                                         .into_iter()
-                                        .map(|turn| {
+                                        .enumerate()
+                                        .map(|(index, turn)| {
                                             let detail = if turn.reasoning.is_empty() {
                                                 ().into_any()
                                             } else {
@@ -717,14 +741,52 @@ pub fn AiPanel(
                                                 }
                                                     .into_any()
                                             };
-                                            view! {
-                                                <div class="turn">
-                                                    <p class="turn-question">{turn.question.clone()}</p>
-                                                    {detail}
+
+                                            let body = if turn.answer.trim().is_empty() {
+                                                view! {
+                                                    <p class="turn-empty">
+                                                        "模型只返回了思考过程，没有正文。"
+                                                    </p>
+                                                }
+                                                    .into_any()
+                                            } else {
+                                                view! {
                                                     <div
                                                         class="answer-text markdown"
                                                         inner_html=pdfscope_core::to_html(&turn.answer)
                                                     ></div>
+                                                }
+                                                    .into_any()
+                                            };
+
+                                            let copied = turn.answer.clone();
+                                            let retry = turn.question.clone();
+                                            let regenerate = (index == last)
+                                                .then(|| {
+                                                    view! {
+                                                        <button
+                                                            class="action"
+                                                            on:click=move |_| send_text(retry.clone())
+                                                        >
+                                                            "重新生成"
+                                                        </button>
+                                                    }
+                                                });
+
+                                            view! {
+                                                <div class="turn">
+                                                    <p class="turn-question">{turn.question.clone()}</p>
+                                                    {detail}
+                                                    {body}
+                                                    <div class="turn-actions">
+                                                        <button
+                                                            class="action"
+                                                            on:click=move |_| copy_to_clipboard(&copied)
+                                                        >
+                                                            "复制"
+                                                        </button>
+                                                        {regenerate}
+                                                    </div>
                                                 </div>
                                             }
                                         })
@@ -771,6 +833,14 @@ pub fn AiPanel(
                                                 aria-live="polite"
                                                 inner_html=move || pdfscope_core::to_html(&answer.get())
                                             ></div>
+                                            <div class="turn-actions">
+                                                <button
+                                                    class="action"
+                                                    on:click=move |_| copy_to_clipboard(&answer.get())
+                                                >
+                                                    "复制"
+                                                </button>
+                                            </div>
                                         </div>
                                     }
                                         .into_any()

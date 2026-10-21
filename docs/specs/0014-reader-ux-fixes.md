@@ -67,6 +67,13 @@ and dividers, and a footer with the save controls. The key moved under 模型, w
 theme is three cards; the inputs share the dialog's styling. `docs/images/settings-dialog.png` records
 the result.
 
+## Seventh pass — the panel reads like a chat
+
+- The question is a bubble on the right; the answer is plain text, as in mainstream assistants.
+- Each answer carries 复制 and the last one carries 重新生成; an empty answer shows
+  `模型只返回了思考过程，没有正文` with the same retry control.
+- The prompt field is full width, 260 px tall and not manually resizable.
+
 ## Non-goals
 
 - Continuous scrolling, single/double page modes and page-by-page navigation are **not** in this
