@@ -721,8 +721,47 @@ fn App() -> impl IntoView {
                 </div>
 
                 <div class="empty" class:hidden=move || ready.get()>
-                    <p class="empty-title">"打开一本 PDF"</p>
-                    <p class="empty-hint">"⌘O 也可以"</p>
+                    <div class="welcome">
+                        <p class="welcome-eyebrow">"PDFScope"</p>
+                        <h1 class="welcome-title">"边读边问，答案带页码"</h1>
+                        <ol class="welcome-steps">
+                            <li>
+                                <span class="step-index">"1"</span>
+                                <div>
+                                    <b>"打开一本 PDF"</b>
+                                    <small>"⌘O，或把文件拖进来"</small>
+                                </div>
+                            </li>
+                            <li>
+                                <span class="step-index">"2"</span>
+                                <div>
+                                    <b>"选中一段文字"</b>
+                                    <small>"也可以用左上角的「框」框住图表"</small>
+                                </div>
+                            </li>
+                            <li>
+                                <span class="step-index">"3"</span>
+                                <div>
+                                    <b>"在右侧提问"</b>
+                                    <small>"答案里的 p.31 可以点，会带你回原文"</small>
+                                </div>
+                            </li>
+                        </ol>
+                        <button
+                            class="button button-primary welcome-action"
+                            on:click=move |_| {
+                                if let Some(input) = web_sys::window()
+                                    .and_then(|window| window.document())
+                                    .and_then(|document| document.get_element_by_id("file-input"))
+                                    .and_then(|element| element.dyn_into::<HtmlInputElement>().ok())
+                                {
+                                    input.click();
+                                }
+                            }
+                        >
+                            "打开 PDF"
+                        </button>
+                    </div>
                 </div>
 
                 {move || {

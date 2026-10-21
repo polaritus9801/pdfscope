@@ -116,6 +116,16 @@ documents; toasts never block input. A mis-shown banner costs one click, not dat
 - The system font stack is kept; a reading serif is a later experiment.
 - Per-document positions can be stored in SQLite without a migration of existing data.
 
+## Progress
+
+- **P1** in progress: spacing/type/radius/elevation/motion tokens exist; the shell and settings dialog
+  use them. The grep check is not yet clean.
+- **P2** first run: the empty reader is a three-step card with a single primary action. Building it
+  found five tokens referenced but never defined (`accent-soft`, `accent-strong`, `radius-full`,
+  `shadow-float`), which had made hover and selected states transparent across the shell; all are
+  defined for light, dark and system-dark.
+- **P3–P7** not started.
+
 ## Deviations
 
 ## Open questions

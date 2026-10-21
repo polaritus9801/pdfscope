@@ -21,6 +21,8 @@
   --ink-muted: #6b6378;
   --ink-faint: #9a93a6;
   --accent: var(--lilac-700);
+  --accent-soft: #efe9f9;
+  --accent-strong: var(--lilac-500);
   --accent-hover: var(--lilac-800);
   --accent-ink: #ffffff;
   --danger: #b23a4e;
@@ -38,6 +40,7 @@
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 16px;
+  --radius-full: 999px;
 
   --text-xs: 11px;
   --text-sm: 12px;
@@ -48,6 +51,7 @@
   --shadow-1: 0 1px 2px rgb(20 16 26 / 6%);
   --shadow-2: 0 4px 12px rgb(20 16 26 / 8%);
   --shadow-3: 0 24px 64px rgb(20 16 26 / 24%);
+  --shadow-float: var(--shadow-2);
   --shadow-panel: var(--shadow-1), 0 8px 24px rgb(20 16 26 / 8%);
 
   --duration-fast: 120ms;
@@ -65,6 +69,8 @@
   --ink-muted: #a79fb5;
   --ink-faint: #6e6679;
   --accent: var(--lilac-400);
+  --accent-soft: #241b34;
+  --accent-strong: var(--lilac-300);
   --accent-hover: var(--lilac-300);
   --accent-ink: #14101a;
   --danger: #e4778b;
@@ -81,6 +87,8 @@
     --ink-muted: #a79fb5;
     --ink-faint: #6e6679;
     --accent: var(--lilac-400);
+    --accent-soft: #241b34;
+    --accent-strong: var(--lilac-300);
     --accent-hover: var(--lilac-300);
     --accent-ink: #14101a;
     --danger: #e4778b;
@@ -117,9 +125,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--space-4);
   height: 52px;
-  padding: 0 16px;
+  padding: 0 var(--space-4);
   background: var(--surface);
   border-bottom: 1px solid var(--border);
 }
@@ -280,16 +288,76 @@ body {
   pointer-events: none;
 }
 
-.empty-title {
-  margin: 0;
-  font-size: 17px;
+/* First run: three steps, each naming a control the reader can see. */
+.welcome {
+  pointer-events: auto;
+  width: min(440px, 100%);
+  padding: var(--space-6);
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-2);
+}
+
+.welcome-eyebrow {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.welcome-title {
+  margin: 0 0 var(--space-5);
+  font-size: var(--text-xl);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.welcome-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-5);
+  padding: 0;
+  list-style: none;
+}
+
+.welcome-steps li {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+}
+
+.step-index {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  font-size: var(--text-xs);
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 50%;
+}
+
+.welcome-steps b {
+  display: block;
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+
+.welcome-steps small {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--text-sm);
   color: var(--ink-muted);
 }
 
-.empty-hint {
-  margin: 0;
-  font-size: 12px;
-  color: var(--ink-faint);
+.welcome-action {
+  width: 100%;
 }
 
 .error {
@@ -510,8 +578,8 @@ body {
 .panel-head {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
   border-bottom: 1px solid var(--border);
 }
 
@@ -541,6 +609,8 @@ body {
 
 .answer-text {
   margin: 0;
+  font-size: var(--text-md);
+  line-height: 1.7;
   /* Was pre-wrap for plain text; with HTML output it turned the newlines between
      block tags into visible blank lines. */
   white-space: normal;
