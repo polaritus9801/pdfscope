@@ -129,6 +129,10 @@ request is built from exactly the tray, and the panel header states the model be
   typo into a mystery.
 - The answer carries `aria-live="polite"` and the composer has an `aria-label`, so a screen reader
   announces the stream instead of silently filling the panel.
+- **The key moved out of the keychain** into its own file with `0600` permissions, after the first
+  real session: a prompt on every launch is a worse trade for a local reading tool than a file only
+  the user can read. The threat this gives up — another process running as the same user — is not one
+  the keychain removed either.
 
 ## Open questions
 

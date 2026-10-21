@@ -976,7 +976,7 @@ pub fn AiPanel(
                             <span>"API Key"</span>
                             <input
                                 type="password"
-                                placeholder="保存在系统钥匙串"
+                                placeholder="保存在本机（仅自己可读）"
                                 prop:value=move || form_key.get()
                                 on:input=move |event| form_key.set(event_target_value(&event))
                             />

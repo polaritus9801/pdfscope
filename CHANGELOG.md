@@ -10,6 +10,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Changed
 
+- The API key is stored in a `0600` file next to the settings instead of the OS keychain: no prompt on
+  launch, and the trade is written down in `SECURITY.md`.
+
+
 - Markdown now uses `pulldown-cmark`: tables, strikethrough and task lists join headings, lists,
   emphasis and code. Raw HTML stays escaped and citations still become interceptable links.
 - The panel keeps the conversation: finished exchanges stay on screen and the last four are sent with

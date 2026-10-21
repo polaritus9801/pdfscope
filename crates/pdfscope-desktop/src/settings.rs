@@ -11,8 +11,12 @@ use pdfscope_ai::{ChatRequest, Message, Protocol, ProviderConfig, StreamEvent};
 use serde::{Deserialize, Serialize};
 use tauri::Manager;
 
-const KEYCHAIN_SERVICE: &str = "app.pdfscope.desktop";
-const KEYCHAIN_ACCOUNT: &str = "api-key";
+/// The key lives in its own file, readable only by this user, next to the settings.
+///
+/// The keychain was the first choice, but a prompt on every launch is a worse trade for a local
+/// reading tool than a file with 0600 permissions: the threat it defends against — another process
+/// reading your files — is not one the keychain removes for the same user either.
+const KEY_FILE: &str = "api-key";
 
 /// What is stored on disk.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -87,11 +91,37 @@ fn read_settings(app: &tauri::AppHandle) -> Settings {
         .unwrap_or_default()
 }
 
-fn has_key() -> bool {
-    keyring::Entry::new(KEYCHAIN_SERVICE, KEYCHAIN_ACCOUNT)
-        .ok()
-        .and_then(|entry| entry.get_password().ok())
-        .is_some_and(|key| !key.trim().is_empty())
+fn key_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let directory = app
+        .path()
+        .app_config_dir()
+        .map_err(|error| format!("无法定位配置目录：{error}"))?;
+    std::fs::create_dir_all(&directory).map_err(|error| format!("无法创建配置目录：{error}"))?;
+    Ok(directory.join(KEY_FILE))
+}
+
+fn read_key(app: &tauri::AppHandle) -> Option<String> {
+    let path = key_path(app).ok()?;
+    let key = std::fs::read_to_string(path).ok()?;
+    let key = key.trim().to_owned();
+    (!key.is_empty()).then_some(key)
+}
+
+fn write_key(app: &tauri::AppHandle, key: &str) -> Result<(), String> {
+    let path = key_path(app)?;
+    std::fs::write(&path, key).map_err(|error| format!("无法写入 API Key：{error}"))?;
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
+    }
+
+    Ok(())
+}
+
+fn has_key(app: &tauri::AppHandle) -> bool {
+    read_key(app).is_some()
 }
 
 /// Reads the stored configuration for the webview.
@@ -103,7 +133,7 @@ pub(crate) fn load_settings(app: tauri::AppHandle) -> Result<SettingsView, Strin
         protocol: settings.protocol,
         base_url: settings.base_url,
         model: settings.model,
-        has_key: has_key(),
+        has_key: has_key(&app),
     })
 }
 
@@ -119,11 +149,7 @@ pub(crate) fn save_settings(app: tauri::AppHandle, settings: SettingsInput) -> R
 
     if let Some(key) = settings.api_key.as_deref().map(str::trim) {
         if !key.is_empty() {
-            let entry = keyring::Entry::new(KEYCHAIN_SERVICE, KEYCHAIN_ACCOUNT)
-                .map_err(|error| format!("无法访问钥匙串：{error}"))?;
-            entry
-                .set_password(key)
-                .map_err(|error| format!("无法写入钥匙串：{error}"))?;
+            write_key(&app, key)?;
         }
     }
 
@@ -143,7 +169,10 @@ pub(crate) fn save_settings(app: tauri::AppHandle, settings: SettingsInput) -> R
 
 /// Sends one tiny request so the reader can find out whether the settings work before saving them.
 #[tauri::command]
-pub(crate) async fn test_settings(settings: SettingsInput) -> Result<String, String> {
+pub(crate) async fn test_settings(
+    app: tauri::AppHandle,
+    settings: SettingsInput,
+) -> Result<String, String> {
     let key = match settings
         .api_key
         .as_deref()
@@ -152,11 +181,7 @@ pub(crate) async fn test_settings(settings: SettingsInput) -> Result<String, Str
     {
         Some(key) => pdfscope_ai::Secret::new(key),
         None => {
-            let entry = keyring::Entry::new(KEYCHAIN_SERVICE, KEYCHAIN_ACCOUNT)
-                .map_err(|error| format!("无法访问钥匙串：{error}"))?;
-            let stored = entry
-                .get_password()
-                .map_err(|_| "还没有保存 API Key".to_owned())?;
+            let stored = read_key(&app).ok_or_else(|| "还没有保存 API Key".to_owned())?;
             pdfscope_ai::Secret::new(stored)
         }
     };
@@ -201,10 +226,6 @@ pub(crate) async fn test_settings(settings: SettingsInput) -> Result<String, Str
 /// Reads the configuration and the key, for the request layer.
 pub(crate) fn provider(app: &tauri::AppHandle) -> Result<(Settings, pdfscope_ai::Secret), String> {
     let settings = read_settings(app);
-    let entry = keyring::Entry::new(KEYCHAIN_SERVICE, KEYCHAIN_ACCOUNT)
-        .map_err(|error| format!("无法访问钥匙串：{error}"))?;
-    let key = entry
-        .get_password()
-        .map_err(|_| "还没有保存 API Key".to_owned())?;
+    let key = read_key(app).ok_or_else(|| "还没有保存 API Key".to_owned())?;
     Ok((settings, pdfscope_ai::Secret::new(key)))
 }
