@@ -5,6 +5,10 @@
 # so "works on my machine" has one fewer place to hide.
 
 set shell := ["bash", "-euo", "pipefail", "-c"]
+
+# rustup was installed without touching the shell profile, so make `cargo` and `trunk` reachable
+# from every recipe regardless of how the terminal was configured.
+export PATH := env_var("HOME") + "/.cargo/bin:" + env_var_or_default("PATH", "/usr/local/bin:/usr/bin:/bin")
 set dotenv-load := false
 
 _default: help

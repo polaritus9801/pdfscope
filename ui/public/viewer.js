@@ -1,10 +1,8 @@
 // The PDF.js boundary.
 //
-// Everything about rendering lives here, behind three functions on `window.PDFScope`. The Rust side
-// owns application state and calls them; it never imports PDF.js and never touches a canvas.
-//
-// This is a boundary, not a convenience: replacing the renderer later means rewriting this file and
-// nothing else.
+// Rendering and text selection live here, behind a small surface: `window.PDFScope` for calls into
+// the renderer, and `window.__pdfscopeSelection` for the one thing the renderer reports back. The
+// Rust side owns application state and never imports PDF.js or touches a canvas.
 
 import * as pdfjs from "./pdfjs/pdf.min.mjs";
 
@@ -20,25 +18,53 @@ function canvas() {
   return document.getElementById("page-canvas");
 }
 
+function textLayerContainer() {
+  return document.getElementById("text-layer");
+}
+
+/// Positions the text layer over the canvas and fills it with selectable glyphs.
+async function paintTextLayer(page, viewport, scale) {
+  const container = textLayerContainer();
+  if (!container) return;
+
+  await container.replaceChildren();
+  container.style.width = `${viewport.width}px`;
+  container.style.height = `${viewport.height}px`;
+  container.style.setProperty("--scale-factor", String(scale));
+
+  const layer = new pdfjs.TextLayer({
+    textContentSource: page.streamTextContent(),
+    container,
+    viewport,
+  });
+
+  await layer.render();
+
+  const hasText = container.querySelector("span") !== null;
+  container.classList.toggle("empty", !hasText);
+  container.dataset.page = String(currentPage);
+}
+
 async function paint() {
   if (!document_) return;
-  const canvas = document.getElementById("page-canvas");
-  if (!canvas) return;
+
+  const target = canvas();
+  if (!target) return;
 
   const page = await document_.getPage(currentPage);
   const base = page.getViewport({ scale: 1 });
 
   // Fit width, measured on the host rather than the window so the scrollbar is excluded.
-  const host = canvas.parentElement;
+  const host = target.parentElement.parentElement;
   const available = Math.max(host.clientWidth - 48, 200);
   const scale = (available / base.width) * (currentZoom / 100);
   const viewport = page.getViewport({ scale });
 
   const ratio = window.devicePixelRatio || 1;
-  canvas.width = Math.floor(viewport.width * ratio);
-  canvas.height = Math.floor(viewport.height * ratio);
-  canvas.style.width = `${Math.floor(viewport.width)}px`;
-  canvas.style.height = `${Math.floor(viewport.height)}px`;
+  target.width = Math.floor(viewport.width * ratio);
+  target.height = Math.floor(viewport.height * ratio);
+  target.style.width = `${Math.floor(viewport.width)}px`;
+  target.style.height = `${Math.floor(viewport.height)}px`;
 
   if (renderTask) {
     try {
@@ -49,7 +75,7 @@ async function paint() {
   }
 
   renderTask = page.render({
-    canvasContext: canvas.getContext("2d"),
+    canvasContext: target.getContext("2d"),
     viewport,
     transform: ratio === 1 ? null : [ratio, 0, 0, ratio, 0, 0],
   });
@@ -61,7 +87,64 @@ async function paint() {
   } finally {
     renderTask = null;
   }
+
+  await paintTextLayer(page, viewport, scale);
 }
+
+/// Union of the selection's client rects, in coordinates normalised to the rendered page.
+function normalisedSelectionRect() {
+  const selection = window.getSelection();
+  if (!selection || selection.isCollapsed || selection.rangeCount === 0) return null;
+
+  const target = canvas();
+  if (!target) return null;
+  const box = target.getBoundingClientRect();
+  if (box.width === 0 || box.height === 0) return null;
+
+  const range = selection.getRangeAt(0);
+  const layer = textLayerContainer();
+  if (!layer || !layer.contains(range.commonAncestorContainer)) return null;
+
+  let left = Infinity;
+  let top = Infinity;
+  let right = -Infinity;
+  let bottom = -Infinity;
+  for (const rect of range.getClientRects()) {
+    if (rect.width === 0 || rect.height === 0) continue;
+    left = Math.min(left, rect.left);
+    top = Math.min(top, rect.top);
+    right = Math.max(right, rect.right);
+    bottom = Math.max(bottom, rect.bottom);
+  }
+  if (!Number.isFinite(left)) return null;
+
+  const clamp = (value) => Math.min(Math.max(value, 0), 1);
+  const x = clamp((left - box.left) / box.width);
+  const y = clamp((top - box.top) / box.height);
+  const width = clamp((right - left) / box.width);
+  const height = clamp((bottom - top) / box.height);
+  if (width <= 0 || height <= 0) return null;
+
+  const text = selection.toString().replace(/\s+/g, " ").trim();
+  if (!text) return null;
+
+  return { page: currentPage, x, y, width, height, text };
+}
+
+let settleTimer = null;
+
+function reportSelection() {
+  clearTimeout(settleTimer);
+  settleTimer = setTimeout(() => {
+    const payload = normalisedSelectionRect();
+    if (!payload) return;
+    window.__pdfscopeSelection?.(payload);
+  }, 120);
+}
+
+document.addEventListener("selectionchange", reportSelection);
+document.addEventListener("mouseup", reportSelection);
+document.addEventListener("keyup", reportSelection);
 
 let resizeTimer = null;
 window.addEventListener("resize", () => {
@@ -95,5 +178,13 @@ window.PDFScope = {
     const page = await document_.getPage(pageNumber);
     const content = await page.getTextContent();
     return content.items.map((item) => item.str).join(" ");
+  },
+
+  clearSelection() {
+    window.getSelection()?.removeAllRanges();
+  },
+
+  async copy(text) {
+    await navigator.clipboard.writeText(text);
   },
 };

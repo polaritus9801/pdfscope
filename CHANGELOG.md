@@ -10,6 +10,9 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Text layer and selection: text on a page is selectable, the selection is reported as a page plus a
+  normalised rectangle plus the quote, and `加入引用` turns it into a chip in the reference tray.
+  Scanned pages say so instead of silently selecting nothing.
 - Desktop shell: a Tauri window that opens a PDF through the system file picker, renders pages with
   PDF.js at fit width, and navigates and zooms with the keyboard or the toolbar. The page stays white
   in dark mode. PDF.js is vendored and reached through a three-function contract, so the Rust side

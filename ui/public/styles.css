@@ -272,3 +272,146 @@ body {
     transition: none !important;
   }
 }
+
+/* ── Page, text layer and selection ─────────────────────────────────────────────────────────── */
+
+.page {
+  position: relative;
+  display: inline-block;
+  box-shadow: var(--shadow-panel);
+  border-radius: 2px;
+}
+
+#page-canvas {
+  box-shadow: none;
+  border-radius: 2px;
+}
+
+/* Trimmed from pdfjs-dist 4.10.38 web/pdf_viewer.css. The positions PDF.js writes on each span
+   are only meaningful with these rules; they are vendored rather than linked so the app works
+   offline. */
+.textLayer {
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  line-height: 1;
+  text-align: initial;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  caret-color: CanvasText;
+  z-index: 1;
+}
+
+.textLayer :is(span, br) {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+}
+
+.textLayer :is(span, br)::selection {
+  background: rgb(203 184 236 / 45%);
+}
+
+.textLayer.empty::after {
+  content: "扫描页 · 暂不支持选择";
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--ink-faint);
+  font-size: 12px;
+}
+
+.selection-bar {
+  position: absolute;
+  transform: translate(-50%, calc(-100% - 8px));
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 4px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-float);
+  white-space: nowrap;
+  z-index: 5;
+}
+
+.selection-page {
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.selection-quote {
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--ink);
+}
+
+.selection-action {
+  height: 26px;
+}
+
+/* ── Reference tray ────────────────────────────────────────────────────────────────────────── */
+
+.tray {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+}
+
+.tray-label {
+  color: var(--ink-muted);
+  white-space: nowrap;
+}
+
+.chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 26px;
+  padding: 0 4px 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--accent-soft);
+  white-space: nowrap;
+}
+
+.chip-label {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chip-remove {
+  border: none;
+  background: transparent;
+  color: var(--ink-faint);
+  cursor: pointer;
+  font: inherit;
+  padding: 0 4px;
+  border-radius: var(--radius-full);
+}
+
+.chip-remove:hover {
+  color: var(--danger);
+}
+
