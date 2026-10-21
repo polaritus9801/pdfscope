@@ -35,10 +35,19 @@ PDFScope is built around the opposite assumption — the page is the unit of wor
 
 ## Status
 
-Early, and honest about it. The repository has a complete foundation — workspace boundaries, CI,
-decision records, an agent workflow — plus the first working slice: a desktop window that opens a
-PDF, renders it, and navigates. See [`docs/specs/`](docs/specs/) for what exists and what is next,
-and [`docs/adr/`](docs/adr/) for what has been decided and why.
+The MVP loop is implemented and unit-tested; it has not yet been walked in a desktop window.
+What works, in code:
+
+- open a PDF, navigate, zoom, light and dark themes;
+- select text, capture a region, or type a page range;
+- configure one provider (OpenAI-compatible or Anthropic), with the key in the OS keychain and a
+  connection test before saving;
+- ask, with the reference tray as the only context, and stream the answer with reasoning kept separate;
+- click a citation to jump back to its page;
+- stop an answer, retry a failed one, and redeem earlier references from history.
+
+The walkthrough that turns "implemented" into "verified" is in [`docs/acceptance.md`](docs/acceptance.md).
+The audit that produced the current findings is in [`docs/review.md`](docs/review.md).
 
 ![The shell with no document open](docs/images/shell-empty.png)
 
