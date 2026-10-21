@@ -119,6 +119,8 @@ pub(crate) struct Turn {
     answer: String,
     reasoning: String,
     seconds: f64,
+    /// The stream was cut off, so the answer can be continued.
+    interrupted: bool,
 }
 
 /// A reference that was used and moved to history.
@@ -143,6 +145,8 @@ pub fn AiPanel(
     let answer = RwSignal::new(String::new());
     let turns = RwSignal::new(Vec::<Turn>::new());
     let current_question = RwSignal::new(String::new());
+    let interrupted = RwSignal::new(false);
+    let continue_target = RwSignal::new(None::<usize>);
     let reasoning = RwSignal::new(String::new());
     let think_started = RwSignal::new(0.0_f64);
     let think_seconds = RwSignal::new(0.0_f64);
@@ -256,11 +260,28 @@ pub fn AiPanel(
             return;
         }
 
+        if let Some(index) = continue_target.get() {
+            let addition = answer.get();
+            let cut = interrupted.get();
+            turns.update(|list| {
+                if let Some(turn) = list.get_mut(index) {
+                    turn.answer.push_str(&addition);
+                    turn.interrupted = cut;
+                }
+            });
+            continue_target.set(None);
+            current_question.set(String::new());
+            answer.set(String::new());
+            reasoning.set(String::new());
+            return;
+        }
+
         let finished = Turn {
             question: current_question.get(),
             answer: answer.get(),
             reasoning: reasoning.get(),
             seconds: think_seconds.get().max(0.1),
+            interrupted: interrupted.get(),
         };
         turns.update(|list| list.push(finished));
         current_question.set(String::new());
@@ -280,6 +301,9 @@ pub fn AiPanel(
             return;
         }
 
+        if continue_target.get().is_none() {
+            interrupted.set(false);
+        }
         current_question.set(asked.clone());
         question.set(String::new());
         answer.set(String::new());
@@ -495,6 +519,7 @@ pub fn AiPanel(
                         flush_pending();
                         streaming.set(false);
                         settle_seconds();
+                        interrupted.set(!answer.get().trim().is_empty());
                         archive();
                         failed.set(true);
                         status.set(
@@ -521,6 +546,15 @@ pub fn AiPanel(
     };
 
     let send = move |_| send_text(question.get());
+
+    let continue_last = move || {
+        let all = turns.get();
+        let Some(last) = all.len().checked_sub(1) else {
+            return;
+        };
+        continue_target.set(Some(last));
+        send_text("请从断开处继续写下去，不要重复已经写过的内容。".to_owned());
+    };
 
     let build_payload = move || -> Option<js_sys::Object> {
         let payload = js_sys::Object::new();
@@ -792,6 +826,17 @@ pub fn AiPanel(
                                                         </button>
                                                     }
                                                 });
+                                            let continued = (index == last && turn.interrupted)
+                                                .then(|| {
+                                                    view! {
+                                                        <button
+                                                            class="action"
+                                                            on:click=move |_| continue_last()
+                                                        >
+                                                            "继续生成"
+                                                        </button>
+                                                    }
+                                                });
 
                                             view! {
                                                 <div class="turn">
@@ -806,6 +851,7 @@ pub fn AiPanel(
                                                             "复制"
                                                         </button>
                                                         {regenerate}
+                                                        {continued}
                                                     </div>
                                                 </div>
                                             }
@@ -846,7 +892,15 @@ pub fn AiPanel(
                                     };
                                     view! {
                                         <div class="turn current">
-                                            <p class="turn-question">{current_question.get()}</p>
+                                            <p class="turn-question">
+                                                {move || {
+                                                    if continue_target.get().is_some() {
+                                                        "继续生成…".to_owned()
+                                                    } else {
+                                                        current_question.get()
+                                                    }
+                                                }}
+                                            </p>
                                             {detail}
                                             <div
                                                 class="answer-text markdown"

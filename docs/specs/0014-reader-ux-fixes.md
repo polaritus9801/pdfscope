@@ -81,6 +81,13 @@ the result.
 - The empty-answer case is the reason this exists: a long reasoning budget can consume the reply
   entirely.
 
+## Ninth pass — continue a cut answer
+
+When a stream is cut after text has arrived, the turn is marked interrupted and gains **继续生成**
+next to 重新生成. Continuing sends a short instruction; the partial answer is already in the history,
+so the model picks up from it, and the new text is **appended to the same turn** rather than becoming
+a second question. If the continuation is cut too, the control stays; when it finishes, it goes away.
+
 ## Non-goals
 
 - Continuous scrolling, single/double page modes and page-by-page navigation are **not** in this

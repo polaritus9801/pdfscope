@@ -37,6 +37,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- **继续生成**: an answer cut off mid-stream can be continued from where it stopped, appended to the
+  same turn instead of starting a new question.
+
+
 - A **最大输出** setting: a token ceiling, or empty for no limit. OpenAI-compatible requests omit
   `max_tokens` when unset; Anthropic, which requires it, receives 8192.
 
