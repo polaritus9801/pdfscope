@@ -222,6 +222,10 @@ as Preview does; the paper is the document, not the interface.
 
 ## Deviations
 
+- Page modes (single / spread) are **not** in this spec's delivered scope. The CSS-only attempt is
+  recorded above as reverted; the layout model they need is specified separately in
+  [`0021-page-modes.md`](0021-page-modes.md), which is draft and awaits approval.
+
 - **Page modes were attempted and reverted.** A single-page mode implemented as a CSS toggle
   (`display: none` on non-current pages) switched correctly and left one page visible, but the page
   did not return to the top of the viewport: the continuous layout's scroll position and metrics are
