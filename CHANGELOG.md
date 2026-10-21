@@ -45,6 +45,9 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- The window remembers its size, position and maximised state across launches.
+
+
 - 试试示例 on the welcome card: a bundled three-page PDF, opened through the normal file path.
 - A banner under the header when no API key is stored, with a shortcut into settings.
 

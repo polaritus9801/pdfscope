@@ -152,7 +152,10 @@ documents; toasts never block input. A mis-shown banner costs one click, not dat
 - **P7** started: reading mode (`⌥⌘F`, exit with `Esc` or the chip) hides the header, panel, tool rail
   and toasts, leaving the document and progress bar. Verified: `.app.reading` true, header
   `display: none`, Esc returns. First-page timing recorded in `docs/performance.md` (79 ms on a
-  six-page fixture). Window geometry memory is **not** done.
+  six-page fixture). Window geometry is remembered: `settings.json` gains a `window` block
+  (width, height, x, y, maximised); the shell restores it in `setup` and records it on
+  `CloseRequested`. A unit test covers the round trip. **Manual verification in a real window is
+  still required** — the agent has no GUI session.
 - **P2 sample and banner**: the welcome card gains 试试示例, which loads a bundled 3-page PDF through
   the same path as the file picker (67 KB, subset CJK font — the first attempt rendered boxes, the
   second a 23 MB file, the third both correct and small). A banner under the header says 还没有配置模型

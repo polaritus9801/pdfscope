@@ -10,6 +10,7 @@ mod ask;
 mod settings;
 
 use anyhow::Context;
+use tauri::Manager;
 use tracing_subscriber::EnvFilter;
 
 fn main() -> anyhow::Result<()> {
@@ -17,6 +18,40 @@ fn main() -> anyhow::Result<()> {
 
     tauri::Builder::default()
         .manage(ask::AskControl::default())
+        .setup(|app| {
+            if let Some(window) = app.get_webview_window("main") {
+                if let Some(state) = settings::remembered_window(app.handle()) {
+                    let _ = window.set_size(tauri::PhysicalSize::new(state.width, state.height));
+                    let _ = window.set_position(tauri::PhysicalPosition::new(state.x, state.y));
+                    if state.maximized {
+                        let _ = window.maximize();
+                    }
+                }
+            }
+            Ok(())
+        })
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { .. } = event {
+                let Ok(size) = window.outer_size() else {
+                    return;
+                };
+                let Ok(position) = window.outer_position() else {
+                    return;
+                };
+                let maximized = window.is_maximized().unwrap_or(false);
+
+                let _ = settings::remember_window(
+                    window.app_handle(),
+                    settings::WindowState {
+                        width: size.width,
+                        height: size.height,
+                        x: position.x,
+                        y: position.y,
+                        maximized,
+                    },
+                );
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             settings::load_settings,
             settings::save_settings,

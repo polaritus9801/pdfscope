@@ -23,6 +23,21 @@ pub(crate) const DEFAULT_SYSTEM_PROMPT: &str = "\
 用读者提问的语言回答；他没有指定语言时用中文。\
 先给结论，再给依据，简明扼要。";
 
+/// Where and how big the window was.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct WindowState {
+    /// Outer width in physical pixels.
+    pub(crate) width: u32,
+    /// Outer height in physical pixels.
+    pub(crate) height: u32,
+    /// Left edge in physical pixels.
+    pub(crate) x: i32,
+    /// Top edge in physical pixels.
+    pub(crate) y: i32,
+    /// Whether the window was maximised.
+    pub(crate) maximized: bool,
+}
+
 /// The key lives in its own file, readable only by this user, next to the settings.
 ///
 /// The keychain was the first choice, but a prompt on every launch is a worse trade for a local
@@ -56,6 +71,9 @@ pub(crate) struct Settings {
     /// Whether to reopen a document where it was left.
     #[serde(default = "default_true")]
     pub(crate) remember_position: bool,
+    /// Last window geometry, when the shell has recorded one.
+    #[serde(default)]
+    pub(crate) window: Option<WindowState>,
 }
 
 fn default_font_size() -> u16 {
@@ -86,6 +104,7 @@ impl Default for Settings {
             max_tokens: None,
             font_size: default_font_size(),
             remember_position: true,
+            window: None,
         }
     }
 }
@@ -143,6 +162,22 @@ pub(crate) struct SettingsView {
     pub(crate) remember_position: bool,
     /// Whether a key is stored. The key itself never crosses this boundary.
     pub(crate) has_key: bool,
+}
+
+/// Reads the last recorded window geometry, if any.
+pub(crate) fn remembered_window(app: &tauri::AppHandle) -> Option<WindowState> {
+    read_settings(app).window
+}
+
+/// Records the window geometry, leaving every other preference untouched.
+pub(crate) fn remember_window(app: &tauri::AppHandle, window: WindowState) -> Result<(), String> {
+    let mut settings = read_settings(app);
+    settings.window = Some(window);
+    let path = settings_path(app)?;
+    let json = serde_json::to_string_pretty(&settings)
+        .map_err(|error| format!("无法序列化设置：{error}"))?;
+    std::fs::write(path, json).map_err(|error| format!("无法写入设置：{error}"))?;
+    Ok(())
 }
 
 fn settings_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -231,6 +266,7 @@ pub(crate) fn save_settings(app: tauri::AppHandle, settings: SettingsInput) -> R
         }
     }
 
+    let stored_window = read_settings(&app).window;
     let stored = Settings {
         preset: settings.preset,
         protocol: settings.protocol,
@@ -244,6 +280,7 @@ pub(crate) fn save_settings(app: tauri::AppHandle, settings: SettingsInput) -> R
         max_tokens: settings.max_tokens,
         font_size: settings.font_size.unwrap_or_else(default_font_size),
         remember_position: settings.remember_position.unwrap_or(true),
+        window: stored_window,
     };
 
     let path = settings_path(&app)?;
@@ -328,6 +365,34 @@ mod tests {
         assert_eq!(settings.font_size, 14);
         assert!(settings.remember_position);
         assert_eq!(settings.max_tokens, None);
+    }
+
+    #[test]
+    fn window_geometry_survives_a_round_trip() {
+        let settings = Settings {
+            window: Some(WindowState {
+                width: 1280,
+                height: 800,
+                x: 40,
+                y: 60,
+                maximized: true,
+            }),
+            ..Settings::default()
+        };
+
+        let json = serde_json::to_string(&settings).unwrap();
+        let back: Settings = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(
+            back.window,
+            Some(WindowState {
+                width: 1280,
+                height: 800,
+                x: 40,
+                y: 60,
+                maximized: true,
+            })
+        );
     }
 
     #[test]
