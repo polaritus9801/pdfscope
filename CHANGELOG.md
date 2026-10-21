@@ -10,6 +10,8 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Clickable citations: `[p.31]` in an answer becomes a button that jumps to page 31 and flashes the
+  page frame. Parsing lives in `pdfscope-core`, so the accepted dialects are unit-tested.
 - Ask: a settings sheet (preset, endpoint, model, key), the key stored in the OS keychain, and a
   streamed answer panel with a reasoning counter and token usage. The request is built from exactly
   the reference tray; nothing else is sent.

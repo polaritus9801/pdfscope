@@ -6,6 +6,8 @@ use wasm_bindgen::closure::Closure;
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 
+use pdfscope_core::{Segment, segments};
+
 use crate::Passage;
 
 /// Calls one function on `window.Bridge`.
@@ -69,7 +71,11 @@ const PRESET_LABELS: &[&str] = &[
 ];
 
 #[component]
-pub fn AiPanel(passages: RwSignal<Vec<Passage>>) -> impl IntoView {
+pub fn AiPanel(
+    passages: RwSignal<Vec<Passage>>,
+    page: RwSignal<u32>,
+    pages: RwSignal<u32>,
+) -> impl IntoView {
     let configured = RwSignal::new(false);
     let model = RwSignal::new("未配置".to_owned());
     let answer = RwSignal::new(String::new());
@@ -78,6 +84,15 @@ pub fn AiPanel(passages: RwSignal<Vec<Passage>>) -> impl IntoView {
     let streaming = RwSignal::new(false);
     let question = RwSignal::new(String::new());
     let open = RwSignal::new(false);
+
+    let jump = move |target: u32| {
+        let total = pages.get();
+        if total == 0 {
+            return;
+        }
+        page.set(target.clamp(1, total));
+        let _ = crate::call("flash", &[]);
+    };
 
     let form_preset = RwSignal::new("MiMo".to_owned());
     let form_protocol = RwSignal::new("openai".to_owned());
@@ -277,7 +292,35 @@ pub fn AiPanel(passages: RwSignal<Vec<Passage>>) -> impl IntoView {
                                         ().into_any()
                                     }
                                 }}
-                                <p class="answer-text">{move || answer.get()}</p>
+                                <p class="answer-text">
+                                    {move || {
+                                        segments(&answer.get())
+                                            .into_iter()
+                                            .map(|segment| match segment {
+                                                Segment::Text(text) => {
+                                                    view! { <span>{text}</span> }.into_any()
+                                                }
+                                                Segment::Citation(number) => {
+                                                    let known = number >= 1 && number <= pages.get();
+                                                    if known {
+                                                        view! {
+                                                            <button
+                                                                class="citation"
+                                                                on:click=move |_| jump(number)
+                                                            >
+                                                                {format!("p.{number}")}
+                                                            </button>
+                                                        }
+                                                            .into_any()
+                                                    } else {
+                                                        view! { <span>{format!("p.{number}")}</span> }
+                                                            .into_any()
+                                                    }
+                                                }
+                                            })
+                                            .collect_view()
+                                    }}
+                                </p>
                             </div>
                         }
                             .into_any()

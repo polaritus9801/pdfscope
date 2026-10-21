@@ -14,7 +14,7 @@ use web_sys::HtmlInputElement;
 mod panel;
 
 /// Calls one of the functions the renderer exposes.
-fn call(name: &str, args: &[JsValue]) -> Option<JsValue> {
+pub(crate) fn call(name: &str, args: &[JsValue]) -> Option<JsValue> {
     let window = web_sys::window()?;
     let scope = js_sys::Reflect::get(&window, &JsValue::from_str("PDFScope")).ok()?;
     let function = js_sys::Reflect::get(&scope, &JsValue::from_str(name)).ok()?;
@@ -435,7 +435,7 @@ fn App() -> impl IntoView {
 
             <div class="workspace">
             <main class="stage">
-                <div class="page" class:hidden=move || !ready.get()>
+                <div class="page" id="page" class:hidden=move || !ready.get()>
                     <canvas id="page-canvas"></canvas>
                     <div id="text-layer" class="textLayer"></div>
 
@@ -485,7 +485,7 @@ fn App() -> impl IntoView {
                 }}
             </main>
 
-            <panel::AiPanel passages=passages />
+            <panel::AiPanel passages=passages page=page pages=pages />
             </div>
         </div>
     }

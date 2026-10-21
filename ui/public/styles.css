@@ -580,3 +580,39 @@ body {
   position: static;
   margin: 0;
 }
+
+.citation {
+  display: inline;
+  padding: 0 4px;
+  margin: 0 1px;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.2;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.citation:hover {
+  border-color: var(--border-strong);
+}
+
+.citation:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.page.flash {
+  animation: page-flash 800ms var(--ease);
+}
+
+@keyframes page-flash {
+  0% {
+    box-shadow: 0 0 0 0 rgb(203 184 236 / 70%);
+  }
+  100% {
+    box-shadow: 0 0 0 14px rgb(203 184 236 / 0%);
+  }
+}

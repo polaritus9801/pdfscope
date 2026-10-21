@@ -180,6 +180,15 @@ window.PDFScope = {
     return content.items.map((item) => item.str).join(" ");
   },
 
+  flash() {
+    const page = document.getElementById("page");
+    if (!page) return;
+    page.classList.remove("flash");
+    void page.offsetWidth;
+    page.classList.add("flash");
+    setTimeout(() => page.classList.remove("flash"), 800);
+  },
+
   clearSelection() {
     window.getSelection()?.removeAllRanges();
   },

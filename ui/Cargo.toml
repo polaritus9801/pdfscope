@@ -5,6 +5,7 @@ edition = "2024"
 publish = false
 
 [dependencies]
+pdfscope-core = { path = "../crates/pdfscope-core" }
 leptos = { version = "0.8", features = ["csr"] }
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
