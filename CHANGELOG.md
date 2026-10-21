@@ -10,6 +10,9 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Region capture: `框选` arms a marquee; the crop is re-rendered from the PDF at the scale needed for
+  its long side to reach 1600 px and encoded as PNG, so it is sharp regardless of zoom or display
+  density. The chip shows a thumbnail and can be removed. No OCR is involved.
 - Clickable citations: `[p.31]` in an answer becomes a button that jumps to page 31 and flashes the
   page frame. Parsing lives in `pdfscope-core`, so the accepted dialects are unit-tested.
 - Ask: a settings sheet (preset, endpoint, model, key), the key stored in the OS keychain, and a

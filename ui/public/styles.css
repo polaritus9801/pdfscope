@@ -616,3 +616,31 @@ body {
     box-shadow: 0 0 0 14px rgb(203 184 236 / 0%);
   }
 }
+
+.page.capturing {
+  cursor: crosshair;
+}
+
+.page.capturing .textLayer {
+  pointer-events: none;
+}
+
+.marquee {
+  position: absolute;
+  border: 1px dashed var(--accent);
+  background: rgb(203 184 236 / 20%);
+  pointer-events: none;
+  z-index: 6;
+}
+
+.chip-region {
+  padding-left: 4px;
+}
+
+.chip-thumb {
+  width: 40px;
+  height: 22px;
+  object-fit: cover;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+}

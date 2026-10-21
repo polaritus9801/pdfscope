@@ -41,6 +41,13 @@ struct Selection {
     text: String,
 }
 
+/// A rectangle the reader captured, as a PNG data URL.
+#[derive(Clone, PartialEq)]
+pub(crate) struct Region {
+    pub(crate) page: u32,
+    pub(crate) image: String,
+}
+
 /// A passage the reader added to the tray.
 #[derive(Clone, PartialEq)]
 pub(crate) struct Passage {
@@ -139,6 +146,7 @@ fn App() -> impl IntoView {
     let theme = RwSignal::new(Theme::System);
     let selection = RwSignal::new(Option::<Selection>::None);
     let passages = RwSignal::new(Vec::<Passage>::new());
+    let regions = RwSignal::new(Vec::<Region>::new());
 
     let go = move |delta: i64| {
         let total = pages.get();
@@ -168,6 +176,7 @@ fn App() -> impl IntoView {
         file_name.set(file.name());
         error.set(None);
         passages.set(Vec::new());
+        regions.set(Vec::new());
         selection.set(None);
 
         spawn_local(async move {
@@ -283,6 +292,30 @@ fn App() -> impl IntoView {
         callback.forget();
     });
 
+    // The renderer reports a captured region the same way it reports a selection.
+    Effect::new(move |_| {
+        let callback = Closure::<dyn Fn(JsValue)>::new(move |value: JsValue| {
+            let page = read_number(&value, "page").unwrap_or(0.0) as u32;
+            let image = read_string(&value, "image").unwrap_or_default();
+            if page == 0 {
+                return;
+            }
+            if image.starts_with("data:image/") {
+                regions.update(|list| list.push(Region { page, image }));
+            } else {
+                error.set(Some("这一块没截下来。".to_owned()));
+            }
+        });
+        if let Some(window) = web_sys::window() {
+            let _ = js_sys::Reflect::set(
+                &window,
+                &JsValue::from_str("__pdfscopeRegion"),
+                callback.as_ref(),
+            );
+        }
+        callback.forget();
+    });
+
     // A page change invalidates whatever was selected on the previous page.
     Effect::new(move |_| {
         let _ = page.get();
@@ -332,6 +365,15 @@ fn App() -> impl IntoView {
                         />
                     </label>
                     <span class="file-name">{move || file_name.get()}</span>
+                    <button
+                        class="button"
+                        prop:disabled=move || !ready.get()
+                        on:click=move |_| {
+                            let _ = call("beginCapture", &[]);
+                        }
+                    >
+                        "框选"
+                    </button>
                 </div>
 
                 <div class="bar-center">
@@ -392,11 +434,45 @@ fn App() -> impl IntoView {
                 </div>
             </header>
 
-            <section class="tray" class:hidden=move || passages.get().is_empty()>
+            <section
+                class="tray"
+                class:hidden=move || { passages.get().is_empty() && regions.get().is_empty() }
+            >
                 <span class="tray-label">
                     {move || format!("引用 {}", passages.get().len())}
                 </span>
                 <div class="chips">
+                    {move || {
+                        regions
+                            .get()
+                            .into_iter()
+                            .enumerate()
+                            .map(|(index, region)| {
+                                view! {
+                                    <span class="chip chip-region">
+                                        <img class="chip-thumb" src=region.image alt="" />
+                                        <span class="chip-label">
+                                            {format!("p.{}", region.page)}
+                                        </span>
+                                        <button
+                                            class="chip-remove"
+                                            title="移除"
+                                            on:click=move |_| {
+                                                regions
+                                                    .update(|list| {
+                                                        if index < list.len() {
+                                                            list.remove(index);
+                                                        }
+                                                    });
+                                            }
+                                        >
+                                            "✕"
+                                        </button>
+                                    </span>
+                                }
+                            })
+                            .collect_view()
+                    }}
                     {move || {
                         passages
                             .get()

@@ -155,6 +155,133 @@ window.addEventListener("resize", () => {
   }, 120);
 });
 
+// ── Region capture ─────────────────────────────────────────────────────────────────────────────
+
+let captureArmed = false;
+let marqueeStart = null;
+let marqueeElement = null;
+
+function pageElement() {
+  return document.getElementById("page");
+}
+
+function normalise(clientX, clientY) {
+  const target = canvas();
+  if (!target) return null;
+  const box = target.getBoundingClientRect();
+  if (box.width === 0 || box.height === 0) return null;
+  const clamp = (value) => Math.min(Math.max(value, 0), 1);
+  return {
+    x: clamp((clientX - box.left) / box.width),
+    y: clamp((clientY - box.top) / box.height),
+  };
+}
+
+function drawMarquee(from, to) {
+  if (!marqueeElement) {
+    marqueeElement = document.createElement("div");
+    marqueeElement.className = "marquee";
+    pageElement().appendChild(marqueeElement);
+  }
+  const target = canvas();
+  const box = target.getBoundingClientRect();
+  const page = pageElement().getBoundingClientRect();
+  const left = box.left - page.left + Math.min(from.x, to.x) * box.width;
+  const top = box.top - page.top + Math.min(from.y, to.y) * box.height;
+  marqueeElement.style.left = `${left}px`;
+  marqueeElement.style.top = `${top}px`;
+  marqueeElement.style.width = `${Math.abs(to.x - from.x) * box.width}px`;
+  marqueeElement.style.height = `${Math.abs(to.y - from.y) * box.height}px`;
+}
+
+function clearMarquee() {
+  marqueeElement?.remove();
+  marqueeElement = null;
+}
+
+/// Renders the page at a scale chosen for the crop, then cuts the rectangle out of it.
+async function renderRegion(pageNumber, rect) {
+  const page = await document_.getPage(pageNumber);
+  const base = page.getViewport({ scale: 1 });
+  const cropWidth = Math.max(rect.width * base.width, 1);
+  const scale = Math.min(4, Math.max(1, 1600 / cropWidth));
+  const viewport = page.getViewport({ scale });
+
+  const full = document.createElement("canvas");
+  full.width = Math.floor(viewport.width);
+  full.height = Math.floor(viewport.height);
+  await page.render({ canvasContext: full.getContext("2d"), viewport }).promise;
+
+  const sx = rect.x * full.width;
+  const sy = rect.y * full.height;
+  const sw = Math.max(rect.width * full.width, 1);
+  const sh = Math.max(rect.height * full.height, 1);
+
+  const cropped = document.createElement("canvas");
+  cropped.width = Math.round(sw);
+  cropped.height = Math.round(sh);
+  cropped.getContext("2d").drawImage(full, sx, sy, sw, sh, 0, 0, cropped.width, cropped.height);
+
+  return cropped.toDataURL("image/png");
+}
+
+function disarmCapture() {
+  captureArmed = false;
+  marqueeStart = null;
+  clearMarquee();
+  pageElement()?.classList.remove("capturing");
+}
+
+pageElement()?.addEventListener("pointerdown", (event) => {
+  if (!captureArmed) return;
+  marqueeStart = normalise(event.clientX, event.clientY);
+  if (marqueeStart) event.preventDefault();
+});
+
+pageElement()?.addEventListener("pointermove", (event) => {
+  if (!captureArmed || !marqueeStart) return;
+  const current = normalise(event.clientX, event.clientY);
+  if (current) drawMarquee(marqueeStart, current);
+});
+
+pageElement()?.addEventListener("pointerup", async (event) => {
+  if (!captureArmed || !marqueeStart) return;
+  const end = normalise(event.clientX, event.clientY);
+  const start = marqueeStart;
+  marqueeStart = null;
+  clearMarquee();
+
+  if (!end || !start) {
+    disarmCapture();
+    return;
+  }
+
+  const rect = {
+    x: Math.min(start.x, end.x),
+    y: Math.min(start.y, end.y),
+    width: Math.abs(end.x - start.x),
+    height: Math.abs(end.y - start.y),
+  };
+
+  if (rect.width * canvas().getBoundingClientRect().width < 4) {
+    disarmCapture();
+    return;
+  }
+
+  const page = currentPage;
+  disarmCapture();
+  try {
+    const image = await renderRegion(page, rect);
+    window.__pdfscopeRegion?.({ page, ...rect, image });
+  } catch {
+    window.__pdfscopeRegion?.({ page, ...rect, image: "" });
+  }
+});
+
+window.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && captureArmed) disarmCapture();
+});
+
 window.PDFScope = {
   /** @param {Uint8Array} bytes */
   async load(bytes) {
@@ -187,6 +314,13 @@ window.PDFScope = {
     void page.offsetWidth;
     page.classList.add("flash");
     setTimeout(() => page.classList.remove("flash"), 800);
+  },
+
+  beginCapture() {
+    if (!document_) return;
+    captureArmed = true;
+    pageElement()?.classList.add("capturing");
+    window.getSelection()?.removeAllRanges();
   },
 
   clearSelection() {
