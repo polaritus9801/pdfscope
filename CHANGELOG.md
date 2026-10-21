@@ -10,6 +10,9 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Ask: a settings sheet (preset, endpoint, model, key), the key stored in the OS keychain, and a
+  streamed answer panel with a reasoning counter and token usage. The request is built from exactly
+  the reference tray; nothing else is sent.
 - Model providers behind one interface: OpenAI-compatible endpoints (OpenAI, DeepSeek, MiMo,
   Moonshot, OpenRouter, Gemini's compatibility endpoint, Ollama) and Anthropic's native Messages API.
   Streaming normalises reasoning tokens, answer tokens and usage — including cache hits — into one

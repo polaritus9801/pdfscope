@@ -11,6 +11,8 @@ use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::HtmlInputElement;
 
+mod panel;
+
 /// Calls one of the functions the renderer exposes.
 fn call(name: &str, args: &[JsValue]) -> Option<JsValue> {
     let window = web_sys::window()?;
@@ -41,9 +43,9 @@ struct Selection {
 
 /// A passage the reader added to the tray.
 #[derive(Clone, PartialEq)]
-struct Passage {
-    page: u32,
-    quote: String,
+pub(crate) struct Passage {
+    pub(crate) page: u32,
+    pub(crate) quote: String,
 }
 
 fn read_number(value: &JsValue, key: &str) -> Option<f64> {
@@ -431,6 +433,7 @@ fn App() -> impl IntoView {
                 </div>
             </section>
 
+            <div class="workspace">
             <main class="stage">
                 <div class="page" class:hidden=move || !ready.get()>
                     <canvas id="page-canvas"></canvas>
@@ -481,6 +484,9 @@ fn App() -> impl IntoView {
                         })
                 }}
             </main>
+
+            <panel::AiPanel passages=passages />
+            </div>
         </div>
     }
 }

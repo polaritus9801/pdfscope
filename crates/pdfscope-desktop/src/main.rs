@@ -6,6 +6,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
+mod ask;
+mod settings;
+
 use anyhow::Context;
 use tracing_subscriber::EnvFilter;
 
@@ -13,6 +16,11 @@ fn main() -> anyhow::Result<()> {
     init_tracing();
 
     tauri::Builder::default()
+        .invoke_handler(tauri::generate_handler![
+            settings::load_settings,
+            settings::save_settings,
+            ask::ask
+        ])
         .run(tauri::generate_context!())
         .context("the desktop shell stopped unexpectedly")?;
 
