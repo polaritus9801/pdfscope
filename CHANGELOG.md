@@ -37,6 +37,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- `⌘F` find in document: match count across all pages, highlights on rendered pages, and `‹` / `›`
+  to step through the pages that contain a hit.
+
+
 - The document outline: a contents button in the header and a left panel listing the PDF's own
   table of contents, indented by depth; choosing an entry jumps to its page.
 

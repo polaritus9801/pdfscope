@@ -125,6 +125,51 @@ function rememberPage(page) {
   }
 }
 
+
+// ── Find in document ────────────────────────────────────────────────────────────────────────────
+let findQuery = "";
+
+function clearHighlights(root) {
+  for (const mark of root.querySelectorAll("mark.find-hit")) {
+    const parent = mark.parentNode;
+    if (!parent) continue;
+    parent.replaceChild(document.createTextNode(mark.textContent ?? ""), mark);
+    parent.normalize();
+  }
+}
+
+function highlightSpans(pageElement, query) {
+  if (!query) return;
+  const lowered = query.toLocaleLowerCase();
+  for (const span of pageElement.querySelectorAll(".textLayer span")) {
+    const text = span.textContent ?? "";
+    if (!text || !text.toLocaleLowerCase().includes(lowered)) continue;
+
+    const fragment = document.createDocumentFragment();
+    let cursor = 0;
+    const haystack = text.toLocaleLowerCase();
+    for (;;) {
+      const at = haystack.indexOf(lowered, cursor);
+      if (at < 0) break;
+      if (at > cursor) fragment.appendChild(document.createTextNode(text.slice(cursor, at)));
+      const mark = document.createElement("mark");
+      mark.className = "find-hit";
+      mark.textContent = text.slice(at, at + query.length);
+      fragment.appendChild(mark);
+      cursor = at + query.length;
+    }
+    if (cursor < text.length) fragment.appendChild(document.createTextNode(text.slice(cursor)));
+    span.replaceChildren(fragment);
+  }
+}
+
+function applyFindToRendered() {
+  for (const pageElement of document.querySelectorAll(".page[data-page]")) {
+    clearHighlights(pageElement);
+    if (findQuery) highlightSpans(pageElement, findQuery);
+  }
+}
+
 function clampedPage(number) {
   const total = document_.numPages;
   return clamp(Math.round(Number(number) || 1), 1, total);
@@ -708,6 +753,7 @@ async function mountPage(number, state) {
   }
 
   layer.replaceChildren(prepared.canvas, textLayer);
+  if (findQuery) highlightSpans(layer, findQuery);
   state.mounted = true;
   state.baseEpoch = epoch;
   state.canvasScale = canvasScale;
@@ -1211,6 +1257,48 @@ window.PDFScope = {
     restorePage = rememberedPage();
     reportZoom(true);
     return document_.numPages;
+  },
+
+  /// Counts matches for `query` across the document and highlights the rendered pages.
+  async find(query) {
+    const needle = String(query ?? "").trim();
+    findQuery = needle;
+
+    if (!needle || !document_) {
+      applyFindToRendered();
+      return { total: 0, pages: [] };
+    }
+
+    const lowered = needle.toLocaleLowerCase();
+    const pages = [];
+    let total = 0;
+
+    for (let number = 1; number <= document_.numPages; number += 1) {
+      const page = await document_.getPage(number);
+      const content = await page.getTextContent();
+      const text = content.items.map((item) => item.str ?? "").join(" ").toLocaleLowerCase();
+      let from = 0;
+      let hits = 0;
+      for (;;) {
+        const at = text.indexOf(lowered, from);
+        if (at < 0) break;
+        hits += 1;
+        from = at + lowered.length;
+      }
+      if (hits > 0) {
+        pages.push(number);
+        total += hits;
+      }
+    }
+
+    applyFindToRendered();
+    return { total, pages };
+  },
+
+  /// Removes every find highlight.
+  clearFind() {
+    findQuery = "";
+    applyFindToRendered();
   },
 
   /// The document's table of contents, flattened: `[{ title, page, depth }, …]`.

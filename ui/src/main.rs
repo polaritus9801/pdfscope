@@ -263,6 +263,50 @@ fn App() -> impl IntoView {
     let settings_open = RwSignal::new(false);
     let outline = RwSignal::new(Vec::<(String, u32, u8)>::new());
     let outline_open = RwSignal::new(false);
+    let find_open = RwSignal::new(false);
+    let find_text = RwSignal::new(String::new());
+    let find_total = RwSignal::new(0_u32);
+    let find_pages = RwSignal::new(Vec::<u32>::new());
+    let find_index = RwSignal::new(0_usize);
+
+    let run_find = move || {
+        let text = find_text.get();
+        if let Some(handle) = call("find", &[JsValue::from_str(&text)]) {
+            spawn_local(async move {
+                if let Ok(value) = settle(handle).await {
+                    let total = js_sys::Reflect::get(&value, &JsValue::from_str("total"))
+                        .ok()
+                        .and_then(|value| value.as_f64())
+                        .unwrap_or(0.0) as u32;
+                    let pages = js_sys::Reflect::get(&value, &JsValue::from_str("pages"))
+                        .ok()
+                        .map(|value| js_sys::Array::from(&value))
+                        .map(|array| {
+                            array
+                                .iter()
+                                .filter_map(|entry| entry.as_f64().map(|page| page as u32))
+                                .collect::<Vec<u32>>()
+                        })
+                        .unwrap_or_default();
+                    find_total.set(total);
+                    find_index.set(0);
+                    find_pages.set(pages);
+                }
+            });
+        }
+    };
+
+    let step_find = move |direction: i32| {
+        let pages = find_pages.get();
+        if pages.is_empty() {
+            return;
+        }
+        let count = pages.len() as i32;
+        let current = find_index.get() as i32;
+        let next = (current + direction).rem_euclid(count) as usize;
+        find_index.set(next);
+        page.set(pages[next]);
+    };
     let selection = RwSignal::new(Option::<Selection>::None);
     let passages = RwSignal::new(Vec::<Passage>::new());
     let regions = RwSignal::new(Vec::<Region>::new());
@@ -416,6 +460,25 @@ fn App() -> impl IntoView {
             .map(|element| matches!(element.tag_name().as_str(), "INPUT" | "TEXTAREA"))
             .unwrap_or(false);
         if typing {
+            return;
+        }
+
+        if (event.meta_key() || event.ctrl_key()) && event.key().eq_ignore_ascii_case("f") {
+            event.prevent_default();
+            find_open.set(true);
+            if let Some(input) = web_sys::window()
+                .and_then(|window| window.document())
+                .and_then(|document| document.get_element_by_id("find-input"))
+                .and_then(|element| element.dyn_into::<HtmlInputElement>().ok())
+            {
+                let _ = input.focus();
+            }
+            return;
+        }
+
+        if event.key() == "Escape" && find_open.get() {
+            find_open.set(false);
+            let _ = call("clearFind", &[]);
             return;
         }
 
@@ -679,6 +742,73 @@ fn App() -> impl IntoView {
 
 
             <div class="workspace">
+                {move || {
+                    if !find_open.get() {
+                        return ().into_any();
+                    }
+                    view! {
+                        <div class="find-bar">
+                            <input
+                                id="find-input"
+                                class="find-input"
+                                type="text"
+                                placeholder="查找… 回车"
+                                prop:value=move || find_text.get()
+                                on:input=move |event| find_text.set(event_target_value(&event))
+                                on:keydown=move |event: web_sys::KeyboardEvent| {
+                                    if event.key() == "Enter" {
+                                        event.prevent_default();
+                                        run_find();
+                                    }
+                                }
+                            />
+                            <span class="find-count">
+                                {move || {
+                                    if find_text.get().trim().is_empty() {
+                                        String::new()
+                                    } else if find_total.get() == 0 {
+                                        "没有匹配".to_owned()
+                                    } else {
+                                        format!(
+                                            "{} 处 · {}/{}",
+                                            find_total.get(),
+                                            find_index.get() + 1,
+                                            find_pages.get().len(),
+                                        )
+                                    }
+                                }}
+                            </span>
+                            <button
+                                class="icon-button"
+                                title="上一处"
+                                prop:disabled=move || find_pages.get().is_empty()
+                                on:click=move |_| step_find(-1)
+                            >
+                                "‹"
+                            </button>
+                            <button
+                                class="icon-button"
+                                title="下一处"
+                                prop:disabled=move || find_pages.get().is_empty()
+                                on:click=move |_| step_find(1)
+                            >
+                                "›"
+                            </button>
+                            <button
+                                class="icon-button"
+                                title="关闭"
+                                on:click=move |_| {
+                                    find_open.set(false);
+                                    let _ = call("clearFind", &[]);
+                                }
+                            >
+                                "✕"
+                            </button>
+                        </div>
+                    }
+                        .into_any()
+                }}
+
                 <Show when=move || outline_open.get()>
                     <aside class="outline">
                         <div class="outline-head">
