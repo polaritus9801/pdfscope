@@ -137,6 +137,9 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Fixed
 
+- On narrow windows the page no longer slides under the tool rail; the stage reserves room for it.
+
+
 - Transient failures before the first token are retried twice automatically (0.5 s, then 1 s) with a
   visible `正在重试（n/3）` line; a
   stream cut after text arrived is left to 继续生成, because re-requesting would duplicate it.

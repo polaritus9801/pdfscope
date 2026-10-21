@@ -255,7 +255,8 @@ body {
   overflow: auto;
   /* We own scroll anchoring during zoom; the browser must not adjust it as the scaler resizes. */
   overflow-anchor: none;
-  padding: var(--space-5);
+  /* Room for the tool rail, so a page never slides under it on a narrow window. */
+  padding: var(--space-5) var(--space-5) var(--space-5) 84px;  /* size */
 }
 
 /* The column is laid out once at the base width. Zoom transforms the whole column; the scaler
@@ -1971,4 +1972,8 @@ mark.find-hit {
   background: color-mix(in srgb, var(--danger) 8%, var(--surface));
   border: 1px solid color-mix(in srgb, var(--danger) 30%, var(--border));
   border-radius: var(--radius-md);
+}
+
+.app.reading .stage {
+  padding-left: var(--space-5);
 }

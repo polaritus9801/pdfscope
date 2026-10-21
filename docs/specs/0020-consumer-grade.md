@@ -191,6 +191,14 @@ documents; toasts never block input. A mis-shown banner costs one click, not dat
   header floats on a blurred surface.
 - Palette and fonts are unchanged; the change is layout, elevation and background only.
 
+## Screenshot matrix
+
+`docs/images/matrix/` holds twelve captures: welcome and reader, at 900×700, 1280×800 and 1512×982,
+in light and dark. The matrix did its job on the first run: at 900 px the page slid under the tool
+rail because the stage padding was 24 px and the rail is 48 px wide at x=16. The stage now reserves
+84 px on the left (and returns to 24 px in reading mode). Dark mode deliberately keeps the page white,
+as Preview does; the paper is the document, not the interface.
+
 ## Deviations
 
 ## Open questions
