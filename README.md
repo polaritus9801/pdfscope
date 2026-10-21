@@ -38,7 +38,8 @@ PDFScope is built around the opposite assumption — the page is the unit of wor
 The MVP loop is implemented and unit-tested; it has not yet been walked in a desktop window.
 What works, in code:
 
-- open a PDF, navigate, zoom, light and dark themes;
+- a continuous reader: every page in one column, only visible pages rendered, pinch and wheel zoom
+  anchored under the pointer, page field following the scroll, `⌘↑`/`⌘↓` to the ends;
 - select text, capture a region, or type a page range;
 - configure one provider (OpenAI-compatible or Anthropic), with the key in the OS keychain and a
   connection test before saving;

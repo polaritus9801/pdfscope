@@ -5,6 +5,20 @@
 - **Date:** 2026-10-21
 - **Approved by:** z1mLi (asked to implement phase 1, 2026-10-21)
 
+## Progress
+
+| Phase | State |
+|---|---|
+| 1 — Continuous scrolling | implemented, verified by `scripts/ui-smoke/reader.mjs` |
+| 2 — Modes and orientation | rotation implemented; single/spread modes not yet |
+| 3 — Outline, thumbnails, progress | not yet |
+| 4 — Zoom | implemented: pinch, wheel easing, anchored, 50–400 % |
+| 5 — Find in document | not yet |
+| 6 — Existing paths on the new model | verified: selection, capture, tints, citations |
+
+Merged from `feat/custom-reader` in `ba213a9`; the PDF.js-viewer comparison stays on
+`feat/pdfjs-viewer` and is not merged.
+
 ## Goal
 
 The page area stops being a single-page canvas and becomes a reading surface: continuous scrolling by
