@@ -128,6 +128,9 @@ documents; toasts never block input. A mis-shown banner costs one click, not dat
   bottom of the reader, and the page is remembered per document name in `localStorage` — verified by
   opening a fixture, going to page 3, reloading, and landing on page 3. Outline, thumbnails and
   `⌘F` remain.
+- **P3 outline**: the viewer exposes the PDF's table of contents (flattened with depth), the header
+  gains a contents button, and a left overlay lists the entries indented by depth; clicking one
+  jumps to its page and closes the panel. Verified against a fixture with a four-entry TOC.
 - **P4–P7** not started.
 
 ## Deviations

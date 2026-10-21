@@ -37,6 +37,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- The document outline: a contents button in the header and a left panel listing the PDF's own
+  table of contents, indented by depth; choosing an entry jumps to its page.
+
+
 - A reading progress bar under the document, draggable and keyboard-adjustable, with `page / total`.
 - The reading position is remembered per document: reopening a file returns to the page you left.
 

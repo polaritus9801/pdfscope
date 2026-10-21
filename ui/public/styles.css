@@ -1650,3 +1650,59 @@ body {
   color: var(--ink-muted);
   font-variant-numeric: tabular-nums;
 }
+
+/* Outline: an overlay beside the tool rail, so the column never narrows. */
+.outline {
+  position: absolute;
+  top: var(--space-4);
+  bottom: calc(var(--space-6) + var(--space-2));
+  left: 64px;
+  z-index: 7;
+  display: flex;
+  flex-direction: column;
+  width: min(300px, 42%);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-2);
+  overflow: hidden;
+}
+
+.outline-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--text-sm);
+  color: var(--ink-muted);
+}
+
+.outline-list {
+  overflow: auto;
+  padding: var(--space-2) 0;
+}
+
+.outline-item {
+  display: block;
+  width: 100%;
+  padding: var(--space-1) var(--space-3);
+  text-align: left;
+  font: inherit;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--ink);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.outline-item:hover:not(:disabled) {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.outline-item:disabled {
+  color: var(--ink-faint);
+  cursor: default;
+}

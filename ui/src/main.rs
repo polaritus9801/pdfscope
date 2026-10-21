@@ -261,6 +261,8 @@ fn App() -> impl IntoView {
     let file_name = RwSignal::new(String::new());
     let error = RwSignal::new(Option::<String>::None);
     let settings_open = RwSignal::new(false);
+    let outline = RwSignal::new(Vec::<(String, u32, u8)>::new());
+    let outline_open = RwSignal::new(false);
     let selection = RwSignal::new(Option::<Selection>::None);
     let passages = RwSignal::new(Vec::<Passage>::new());
     let regions = RwSignal::new(Vec::<Region>::new());
@@ -336,6 +338,38 @@ fn App() -> impl IntoView {
                 Ok(count) => {
                     let count = count.as_f64().unwrap_or(0.0).max(0.0) as u32;
                     pages.set(count);
+                    outline.set(Vec::new());
+                    outline_open.set(false);
+
+                    if let Some(handle) = call("outline", &[]) {
+                        spawn_local(async move {
+                            if let Ok(value) = settle(handle).await {
+                                let entries = js_sys::Array::from(&value);
+                                let mut list = Vec::new();
+                                for entry in entries.iter() {
+                                    let title =
+                                        js_sys::Reflect::get(&entry, &JsValue::from_str("title"))
+                                            .ok()
+                                            .and_then(|value| value.as_string())
+                                            .unwrap_or_default();
+                                    let target =
+                                        js_sys::Reflect::get(&entry, &JsValue::from_str("page"))
+                                            .ok()
+                                            .and_then(|value| value.as_f64())
+                                            .unwrap_or(0.0)
+                                            as u32;
+                                    let depth =
+                                        js_sys::Reflect::get(&entry, &JsValue::from_str("depth"))
+                                            .ok()
+                                            .and_then(|value| value.as_f64())
+                                            .unwrap_or(0.0)
+                                            as u8;
+                                    list.push((title, target, depth));
+                                }
+                                outline.set(list);
+                            }
+                        });
+                    }
 
                     let mut sizes = Vec::new();
                     if count > 0 {
@@ -598,6 +632,16 @@ fn App() -> impl IntoView {
 
                 <div class="bar-right">
                     <button
+                        class="button icon-only"
+                        title="目录"
+                        prop:disabled=move || outline.get().is_empty()
+                        on:click=move |_| outline_open.update(|open| *open = !*open)
+                    >
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+                            <path d="M4 6h3M10 6h10M4 12h3M10 12h10M4 18h3M10 18h10" />
+                        </svg>
+                    </button>
+                    <button
                         class="button"
                         prop:disabled=move || { !ready.get() || zoom.get() <= 50 }
                         on:click=move |_| zoom_by(-1)
@@ -635,6 +679,54 @@ fn App() -> impl IntoView {
 
 
             <div class="workspace">
+                <Show when=move || outline_open.get()>
+                    <aside class="outline">
+                        <div class="outline-head">
+                            <span>"目录"</span>
+                            <button
+                                class="icon-button"
+                                title="关闭"
+                                on:click=move |_| outline_open.set(false)
+                            >
+                                "✕"
+                            </button>
+                        </div>
+                        <div class="outline-list">
+                            {move || {
+                                outline
+                                    .get()
+                                    .into_iter()
+                                    .map(|(title, target, depth)| {
+                                        let label = if title.trim().is_empty() {
+                                            format!("第 {target} 页")
+                                        } else {
+                                            title
+                                        };
+                                        view! {
+                                            <button
+                                                class="outline-item"
+                                                style=format!(
+                                                    "padding-left: calc(var(--space-3) + {}px)",
+                                                    u32::from(depth) * 12,
+                                                )
+                                                prop:disabled=target == 0
+                                                on:click=move |_| {
+                                                    if target > 0 {
+                                                        page.set(target);
+                                                        outline_open.set(false);
+                                                    }
+                                                }
+                                            >
+                                                {label}
+                                            </button>
+                                        }
+                                    })
+                                    .collect_view()
+                            }}
+                        </div>
+                    </aside>
+                </Show>
+
                 <div class="float-tools">
                     <button
                         class="tool"

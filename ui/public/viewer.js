@@ -1213,6 +1213,40 @@ window.PDFScope = {
     return document_.numPages;
   },
 
+  /// The document's table of contents, flattened: `[{ title, page, depth }, …]`.
+  async outline() {
+    if (!document_) return [];
+
+    const items = await document_.getOutline();
+    const flat = [];
+
+    const walk = async (nodes, depth) => {
+      for (const node of nodes ?? []) {
+        let page = 0;
+        try {
+          const destination =
+            typeof node.dest === "string" ? await document_.getDestination(node.dest) : node.dest;
+          const reference = destination?.[0];
+          if (reference !== undefined) {
+            const index =
+              typeof reference === "string"
+                ? await document_.getPageIndex(reference)
+                : reference;
+            page = Number(index) + 1;
+          }
+        } catch {
+          /* a broken destination simply has no page */
+        }
+
+        flat.push({ title: String(node.title ?? ""), page, depth });
+        await walk(node.items, depth + 1);
+      }
+    };
+
+    await walk(items, 0);
+    return flat;
+  },
+
   /// Base sizes for Rust's page shells: `[{ width, height }, …]` at scale 1.
   pageSizes() {
     return pageSizes.map(({ width, height }) => ({ width, height }));
