@@ -60,6 +60,8 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Fixed
 
+- A rejected request can no longer leave the panel waiting forever: failures and two minutes of
+  silence both end the turn with a visible message.
 - An answer that ends empty no longer erases the question and its reasoning: finished turns are
   archived when the stream ends, and the status line explains that no body text arrived.
 

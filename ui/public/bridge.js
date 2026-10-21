@@ -31,21 +31,63 @@ window.Bridge = {
   },
 
   async ask(question, references, regions, context, history, onEvent) {
-    if (!available) throw new Error("提问只在桌面版可用");
-    return new Promise(async (resolve, reject) => {
-      const unlisten = await api.event.listen("ask:event", (event) => {
-        onEvent(event.payload);
-        if (event.payload.kind === "done" || event.payload.kind === "error" || event.payload.kind === "stopped") {
-          unlisten();
-          resolve();
+    if (!available) {
+      onEvent({ kind: "error", message: "提问只在桌面版可用" });
+      return;
+    }
+
+    // Every path must end in an event: a rejected invoke used to leave the panel waiting forever,
+    // which looked exactly like the question had never been asked. The timer covers a stream that
+    // stops producing events without saying so.
+    const silenceLimit = 120_000;
+
+    return new Promise((resolve) => {
+      let settled = false;
+      let unlisten = null;
+      let timer = null;
+
+      const settle = (kind, message) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        if (kind) onEvent({ kind, message });
+        try {
+          unlisten?.();
+        } catch {
+          // Already detached.
         }
-      });
-      try {
-        await api.core.invoke("ask", { question, references, regions, context, history });
-      } catch (error) {
-        unlisten();
-        reject(error);
-      }
+        resolve();
+      };
+
+      const arm = () => {
+        clearTimeout(timer);
+        timer = setTimeout(() => settle("error", "长时间没有响应，已结束"), silenceLimit);
+      };
+
+      (async () => {
+        try {
+          unlisten = await api.event.listen("ask:event", (event) => {
+            if (settled) return;
+            arm();
+            onEvent(event.payload);
+            if (["done", "error", "stopped"].includes(event.payload.kind)) {
+              settled = true;
+              clearTimeout(timer);
+              try {
+                unlisten?.();
+              } catch {
+                // Already detached.
+              }
+              resolve();
+            }
+          });
+
+          await api.core.invoke("ask", { question, references, regions, context, history });
+          arm();
+        } catch (error) {
+          settle("error", String(error?.message ?? error));
+        }
+      })();
     });
   },
 };

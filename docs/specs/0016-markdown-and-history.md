@@ -54,6 +54,9 @@ because KaTeX skips `pre`/`code`.
 
 ## Deviations
 
+- Every `ask` ends in an event. A rejected invoke used to leave the promise dropped and the panel
+  waiting forever; the bridge now turns a rejection into an `error` event and ends a stream that has
+  produced nothing for two minutes.
 - A finished turn is archived when the stream ends, not when the next question is sent. Before this,
   an answer that ended empty (the model spent its budget on reasoning) left no trace at all: the
   panel showed its "ask something" hint as if nothing had happened. The question and reasoning now
