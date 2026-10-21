@@ -1,0 +1,53 @@
+name: Bug report
+description: Something behaved differently from what the documentation says
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Please do not attach a PDF you do not have the right to share.
+        Describing the file is usually enough to reproduce.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: Include the exact wording of any error message.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `verso-server --version`, or the app's About screen.
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - macOS (Apple silicon)
+        - macOS (Intel)
+        - Windows
+        - Linux
+        - Web
+    validations:
+      required: true
+  - type: textarea
+    id: document
+    attributes:
+      label: The document
+      description: Page count, language, text layer or scan, encrypted or not. Do not upload private files.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant output
+      description: Set `RUST_LOG=debug` and paste the relevant lines. Remove any file paths you consider private.
+      render: shell

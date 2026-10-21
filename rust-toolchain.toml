@@ -1,0 +1,6 @@
+[toolchain]
+channel = "stable"
+components = ["rustfmt", "clippy"]
+# The UI crate needs this target once it exists; adding it now keeps onboarding one command.
+targets = ["wasm32-unknown-unknown"]
+profile = "minimal"

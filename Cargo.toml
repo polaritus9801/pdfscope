@@ -1,0 +1,78 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/verso-core",
+    "crates/verso-proto",
+    "crates/verso-store",
+    "crates/verso-ai",
+    "crates/verso-api",
+    "crates/verso-server",
+]
+default-members = [
+    "crates/verso-core",
+    "crates/verso-proto",
+    "crates/verso-store",
+    "crates/verso-ai",
+    "crates/verso-api",
+    "crates/verso-server",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT"
+authors = ["polar"]
+# `repository` is intentionally unset until the public URL exists. Set it before publishing.
+
+[workspace.dependencies]
+# Internal
+verso-core = { path = "crates/verso-core" }
+verso-proto = { path = "crates/verso-proto" }
+verso-store = { path = "crates/verso-store" }
+verso-ai = { path = "crates/verso-ai" }
+verso-api = { path = "crates/verso-api" }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Errors
+thiserror = "2"
+anyhow = "1"
+
+# Async
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "net"] }
+futures = "0.3"
+
+# Observability
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Web
+axum = "0.8"
+tower = "0.5"
+tower-http = { version = "0.6", features = ["trace"] }
+
+# Storage
+sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "sqlite", "migrate", "macros"] }
+
+# Time
+time = { version = "0.3", features = ["formatting", "parsing"] }
+
+# Testing
+tempfile = "3"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+unreachable_pub = "warn"
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+dbg_macro = "deny"
+print_stdout = "warn"
+print_stderr = "warn"

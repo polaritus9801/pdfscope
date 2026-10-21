@@ -1,0 +1,22 @@
+[package]
+name = "verso-api"
+description = "HTTP/SSE surface over the Verso domain."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+axum.workspace = true
+tower-http.workspace = true
+verso-proto.workspace = true
+
+[dev-dependencies]
+http-body-util = "0.1"
+serde_json.workspace = true
+tower = { workspace = true, features = ["util"] }
+tokio = { workspace = true, features = ["rt", "macros"] }
+
+[lints]
+workspace = true

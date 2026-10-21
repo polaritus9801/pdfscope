@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# Reject a commit that changes product code without a spec.
+#
+# Implemented as commit-msg rather than pre-commit because git passes the message file here, which
+# is what makes the `[trivial]` exemption possible at all.
+#
+# The rule exists because the most expensive mistakes in this repository are plausible designs that
+# were never agreed to. See AGENTS.md §2.
+#
+# Escape hatches:
+#   - a staged spec under docs/specs/ (not the template)
+#   - `[trivial]` in the commit message, for changes under 10 lines that alter no behaviour
+#   - `git commit --no-verify`, for emergencies only
+set -euo pipefail
+
+message_file="${1:?commit message file required}"
+spec_dir="docs/specs"
+
+# Product code: crate sources and, once it exists, the UI.
+code_pattern='^(crates/[^/]+/src/|ui/src/)'
+
+staged=$(git diff --cached --name-only --diff-filter=ACMR)
+[ -z "$staged" ] && exit 0
+
+changed_code=$(printf '%s\n' "$staged" | grep -E "$code_pattern" || true)
+[ -z "$changed_code" ] && exit 0
+
+# A spec counts if a numbered, non-template file under docs/specs/ was staged.
+staged_spec=$(printf '%s\n' "$staged" \
+    | grep -E "^$spec_dir/[0-9]{4}-.*\.md$" \
+    | grep -v 'template\.md$' \
+    || true)
+
+[ -n "$staged_spec" ] && exit 0
+
+if grep -q '\[trivial\]' "$message_file"; then
+    exit 0
+fi
+
+{
+    echo "commit rejected: product code changed without a spec"
+    echo
+    echo "  changed:"
+    printf '    %s\n' $changed_code
+    echo
+    echo "  AGENTS.md §2 requires an accepted spec before product code changes."
+    echo "  Add or update docs/specs/NNNN-your-feature.md, or put [trivial] in the"
+    echo "  message if this alters no behaviour and is under 10 lines."
+    echo
+    echo "  Scaffold one with: just new-spec your-feature"
+} >&2
+
+exit 1

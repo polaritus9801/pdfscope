@@ -1,0 +1,24 @@
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      # Patch and minor updates for the ecosystem arrive as one reviewable pull request; majors get
+      # their own so they can be evaluated against the changelog.
+      patch-and-minor:
+        applies-to: version-updates
+        update-types: ["patch", "minor"]
+    commit-message:
+      prefix: "build"
+      include: "scope"
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "ci"

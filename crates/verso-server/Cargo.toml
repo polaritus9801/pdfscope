@@ -1,0 +1,23 @@
+[package]
+name = "verso-server"
+description = "The Verso web binary: serves the API and, later, the UI assets."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "verso-server"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+axum.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+verso-api.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,10 @@
+# <type>(<scope>): <imperative summary, lower case, no period>
+#
+# Why this change exists. What the old behaviour was, what it is now,
+# and what a reviewer should look at first.
+#
+# Spec: docs/specs/NNNN-slug.md
+#   Required unless the subject carries [trivial].
+#
+# Types: feat fix refactor perf test docs build ci chore revert
+# Scopes: core proto store ai api desktop ui ci docs

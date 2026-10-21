@@ -1,0 +1,38 @@
+name: Feature request
+description: Propose a behaviour, not an implementation
+title: "feat: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Verso is deliberately narrow: it is a PDF reader with an AI beside the page, not a notes app,
+        not a reference manager. Read `docs/adr/` before proposing something that sounds adjacent —
+        it may already have been considered and rejected for a reason.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you unable to do today? Describe the situation, not the solution.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would like to happen
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you do instead today
+      description: Other tools, workarounds, or nothing at all.
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - label: I have read `AGENTS.md` and understand this needs an accepted spec before implementation.
+          required: true
+        - label: This is not a request for a note editor, sync service, or citation manager.
+          required: true

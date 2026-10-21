@@ -1,0 +1,24 @@
+# Rust
+/target
+**/*.rs.bk
+
+# UI / web build output (arrives with the UI crate)
+/ui/dist
+/ui/target
+node_modules
+
+# Databases and local data
+*.db
+*.db-shm
+*.db-wal
+
+# Editor and OS noise
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Local environment
+.env
+.env.local
