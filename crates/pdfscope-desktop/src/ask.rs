@@ -285,7 +285,7 @@ mod tests {
 
     #[test]
     fn excerpts_are_labelled_with_their_page() {
-        let mut request = build_request(
+        let request = build_request(
             "这一节在讲什么？",
             &[
                 AskReference {
@@ -315,7 +315,7 @@ mod tests {
 
     #[test]
     fn no_excerpts_says_so_instead_of_pretending() {
-        let mut request = build_request(
+        let request = build_request(
             "介绍一下背景",
             &[],
             &[],
@@ -331,7 +331,7 @@ mod tests {
 
     #[test]
     fn a_region_adds_a_label_and_an_image() {
-        let mut request = build_request(
+        let request = build_request(
             "这个公式在说什么？",
             &[],
             &[RegionInput {
@@ -351,7 +351,7 @@ mod tests {
 
     #[test]
     fn page_context_is_labelled_and_marks_scans() {
-        let mut request = build_request(
+        let request = build_request(
             "这一章讲了什么？",
             &[],
             &[],
@@ -414,7 +414,7 @@ mod tests {
 
     #[test]
     fn surrounding_whitespace_is_trimmed() {
-        let mut request = build_request(
+        let request = build_request(
             "  问题  ",
             &[AskReference {
                 page: 1,
