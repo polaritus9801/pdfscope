@@ -37,6 +37,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Toasts for completed actions (settings saved, copied), at most three at a time.
+- A field-level error under 最大输出, and an offline-specific message when the network is down.
+
+
 - `⌘F` find in document: match count across all pages, highlights on rendered pages, and `‹` / `›`
   to step through the pages that contain a hit.
 

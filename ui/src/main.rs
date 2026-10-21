@@ -261,6 +261,29 @@ fn App() -> impl IntoView {
     let file_name = RwSignal::new(String::new());
     let error = RwSignal::new(Option::<String>::None);
     let settings_open = RwSignal::new(false);
+    let toasts = RwSignal::new(Vec::<(f64, String)>::new());
+
+    // A toast is the app's smallest unit of feedback: one line, three seconds, at most three.
+    let notify = Callback::new(move |message: String| {
+        let id = js_sys::Date::now();
+        toasts.update(|list| {
+            list.push((id, message));
+            while list.len() > 3 {
+                list.remove(0);
+            }
+        });
+
+        let removal = Closure::once_into_js(move || {
+            toasts.update(|list| list.retain(|(toast, _)| *toast != id));
+        });
+
+        if let Some(window) = web_sys::window() {
+            let _ = window.set_timeout_with_callback_and_timeout_and_arguments_0(
+                removal.unchecked_ref(),
+                3000,
+            );
+        }
+    });
     let outline = RwSignal::new(Vec::<(String, u32, u8)>::new());
     let outline_open = RwSignal::new(false);
     let find_open = RwSignal::new(false);
@@ -1010,6 +1033,16 @@ fn App() -> impl IntoView {
                 </div>
             </main>
 
+            <div class="toasts">
+                {move || {
+                    toasts
+                        .get()
+                        .into_iter()
+                        .map(|(_, message)| view! { <div class="toast">{message}</div> })
+                        .collect_view()
+                }}
+            </div>
+
             <div class="rail">
                 {move || {
                     hovered
@@ -1035,6 +1068,7 @@ fn App() -> impl IntoView {
                 hovered=hovered
                 clear_selection=clear_selection
                 open=settings_open
+                notify=notify
             />
             </div>
         </div>

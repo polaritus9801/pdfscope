@@ -70,6 +70,22 @@ const PRESET_LABELS: &[&str] = &[
     "Ollama",
 ];
 
+/// Whether the WebView thinks it has no network.
+fn offline() -> bool {
+    web_sys::window()
+        .and_then(|window| {
+            js_sys::Reflect::get(&window.into(), &JsValue::from_str("navigator"))
+                .ok()
+                .and_then(|navigator| {
+                    js_sys::Reflect::get(&navigator, &JsValue::from_str("onLine"))
+                        .ok()
+                        .and_then(|value| value.as_bool())
+                })
+        })
+        .map(|online| !online)
+        .unwrap_or(false)
+}
+
 /// Copies text through the WebView's clipboard API.
 fn copy_to_clipboard(text: &str) {
     let Some(window) = web_sys::window() else {
@@ -139,6 +155,7 @@ pub fn AiPanel(
     hovered: RwSignal<Option<(u32, (f64, f64, f64, f64))>>,
     clear_selection: Callback<()>,
     open: RwSignal<bool>,
+    notify: Callback<String>,
 ) -> impl IntoView {
     let configured = RwSignal::new(false);
     let model = RwSignal::new("未配置".to_owned());
@@ -187,6 +204,7 @@ pub fn AiPanel(
     let form_prompt = RwSignal::new(String::new());
     let form_theme = RwSignal::new("system".to_owned());
     let form_max = RwSignal::new(String::new());
+    let form_max_error = RwSignal::new(Option::<String>::None);
     let tab = RwSignal::new(0_u8);
     let form_error = RwSignal::new(Option::<String>::None);
 
@@ -532,9 +550,13 @@ pub fn AiPanel(
                         interrupted.set(!answer.get().trim().is_empty());
                         archive();
                         failed.set(true);
-                        status.set(
-                            text_of(&event, "message").unwrap_or_else(|| "请求失败".to_owned()),
-                        );
+                        let message =
+                            text_of(&event, "message").unwrap_or_else(|| "请求失败".to_owned());
+                        status.set(if offline() {
+                            "网络已断开，请检查连接后再试。".to_owned()
+                        } else {
+                            message
+                        });
                     }
                     _ => {}
                 }
@@ -605,7 +627,7 @@ pub fn AiPanel(
             text => match text.parse::<u32>() {
                 Ok(value) if value > 0 => JsValue::from_f64(f64::from(value)),
                 _ => {
-                    form_error.set(Some("最大输出要留空，或填一个正整数".to_owned()));
+                    form_max_error.set(Some("留空，或填一个正整数".to_owned()));
                     return None;
                 }
             },
@@ -638,6 +660,7 @@ pub fn AiPanel(
                         configured.set(true);
                         model.set(form_model.get());
                         apply_theme(&form_theme.get());
+                        notify.run("设置已保存".to_owned());
                         form_key.set(String::new());
                     }
                     Err(error) => {
@@ -856,7 +879,10 @@ pub fn AiPanel(
                                                     <div class="turn-actions">
                                                         <button
                                                             class="action"
-                                                            on:click=move |_| copy_to_clipboard(&copied)
+                                                            on:click=move |_| {
+                                        copy_to_clipboard(&copied);
+                                        notify.run("已复制".to_owned());
+                                    }
                                                         >
                                                             "复制"
                                                         </button>
@@ -920,7 +946,10 @@ pub fn AiPanel(
                                             <div class="turn-actions">
                                                 <button
                                                     class="action"
-                                                    on:click=move |_| copy_to_clipboard(&answer.get())
+                                                    on:click=move |_| {
+                                                    copy_to_clipboard(&answer.get());
+                                                    notify.run("已复制".to_owned());
+                                                }
                                                 >
                                                     "复制"
                                                 </button>
@@ -1302,9 +1331,19 @@ pub fn AiPanel(
                                                 min="1"
                                                 placeholder="留空 = 不限制"
                                                 prop:value=move || form_max.get()
-                                                on:input=move |event| form_max.set(event_target_value(&event))
+                                                on:input=move |event| {
+                                                    form_max_error.set(None);
+                                                    form_max.set(event_target_value(&event));
+                                                }
                                             />
                                         </label>
+                                        {move || {
+                                            form_max_error
+                                                .get()
+                                                .map(|message| {
+                                                    view! { <p class="field-error">{message}</p> }
+                                                })
+                                        }}
 
                                         <div class="settings-row">
                                             <span>"连接"</span>

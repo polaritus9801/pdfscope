@@ -134,7 +134,11 @@ documents; toasts never block input. A mis-shown banner costs one click, not dat
 - **P3 find**: `⌘F` opens a floating find bar; `↵` counts matches across every page and highlights
   rendered pages, `‹`/`›` step through the pages that contain a hit. The text layer is transparent,
   so highlights are translucent or they paint over the word; recorded as a deviation.
-- **P4–P7** not started.
+- **P6** started: a toast system (max three, three seconds, bottom centre) reports 设置已保存 and
+  已复制; a failed request while the WebView reports `navigator.onLine === false` says 网络已断开
+  instead of showing a transport error; the output-budget error now sits under its field rather than
+  at the bottom of the dialog. Verified by saving settings (toast) and submitting `0` (field error).
+- **P4, P5, P7** not started.
 
 ## Deviations
 
