@@ -170,6 +170,9 @@ documents; toasts never block input. A mis-shown banner costs one click, not dat
   opened document starts at; the viewer applies it on the first render and the header label follows.
   Verified: `setDefaultZoom(150)` then opening the sample shows 150 % and a 1287 px canvas. Page modes
   (single / spread) remain undone.
+- **P5 resets**: 阅读 has 恢复阅读默认 (zoom 100 %, continuous, remember on) and 提示词 has
+  恢复默认提示词, which clears the field — saving an empty prompt already falls back to the built-in
+  one. Verified: zoom select returns to 100 and the prompt textarea empties.
 - **P1 audit**: the grep for hard-coded `px` outside the token block stood at **223** declarations.
   This round migrated every spacing, radius, type and offset declaration whose value sits on the
   scale, then snapped off-scale spacing (6/10/14/18/20/22) to the nearest step: **223 → 109**. The

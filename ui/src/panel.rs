@@ -1424,6 +1424,19 @@ pub fn AiPanel(
                                             </select>
                                         </label>
 
+                                        <div class="settings-row">
+                                            <span>"恢复默认"</span>
+                                            <button
+                                                class="button"
+                                                on:click=move |_| {
+                                                    form_zoom.set("100".to_owned());
+                                                    form_remember.set(true);
+                                                }
+                                            >
+                                                "恢复阅读默认"
+                                            </button>
+                                        </div>
+
                                         <label class="settings-row">
                                             <span>"记住阅读位置"</span>
                                             <input
@@ -1588,6 +1601,12 @@ pub fn AiPanel(
                                     <section class="settings-section">
                                         <h3>"系统提示词"</h3>
                                         <p class="settings-hint">"每次提问都会带上这段指令。清空会恢复默认。"</p>
+                                        <button
+                                            class="button"
+                                            on:click=move |_| form_prompt.set(String::new())
+                                        >
+                                            "恢复默认提示词"
+                                        </button>
                                         <textarea
                                             class="prompt-field"
                                             prop:value=move || form_prompt.get()

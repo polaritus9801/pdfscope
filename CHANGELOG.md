@@ -55,6 +55,9 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- 恢复阅读默认 and 恢复默认提示词 in settings, so a section can be put back without hunting values.
+
+
 - A default zoom preference (75–150 %): newly opened documents start there.
 
 
