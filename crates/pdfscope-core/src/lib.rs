@@ -13,6 +13,7 @@ pub mod citation;
 pub mod error;
 pub mod geo;
 pub mod ids;
+pub mod ranges;
 
 pub use anchor::{
     Anchor, PageHash, PageText, Resolution, SelectedText, TextItem, capture, normalize, resolve,
@@ -21,3 +22,4 @@ pub use citation::{Segment, segments};
 pub use error::{CoreError, CoreResult};
 pub use geo::Rect;
 pub use ids::{BookId, PageIndex};
+pub use ranges::{PageSpan, RangeError, parse_ranges};
