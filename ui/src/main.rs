@@ -460,18 +460,6 @@ fn App() -> impl IntoView {
 
 
             <div class="workspace">
-            <main
-                class="stage"
-                on:dblclick=move |_| {
-                    if let Some(input) = web_sys::window()
-                        .and_then(|window| window.document())
-                        .and_then(|document| document.get_element_by_id("file-input"))
-                        .and_then(|element| element.dyn_into::<HtmlInputElement>().ok())
-                    {
-                        input.click();
-                    }
-                }
-            >
                 <div class="float-tools">
                     <button
                         class="tool"
@@ -515,6 +503,19 @@ fn App() -> impl IntoView {
                         </svg>
                     </button>
                 </div>
+            <main
+                class="stage"
+                on:dblclick=move |_| {
+                    if let Some(input) = web_sys::window()
+                        .and_then(|window| window.document())
+                        .and_then(|document| document.get_element_by_id("file-input"))
+                        .and_then(|element| element.dyn_into::<HtmlInputElement>().ok())
+                    {
+                        input.click();
+                    }
+                }
+            >
+
                 <div class="page" id="page" class:hidden=move || !ready.get()>
                     <canvas id="page-canvas"></canvas>
                     <div id="text-layer" class="textLayer"></div>
