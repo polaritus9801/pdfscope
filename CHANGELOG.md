@@ -69,6 +69,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Fixed
 
+- A dropped connection mid-answer now reports `连接中断，已保留生成的内容` instead of a bare transport
+  error, and keeps the text that already arrived.
+
+
 - A rejected request can no longer leave the panel waiting forever: failures and two minutes of
   silence both end the turn with a visible message.
 - An answer that ends empty no longer erases the question and its reasoning: finished turns are

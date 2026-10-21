@@ -238,6 +238,10 @@ pub(crate) async fn ask(
             }
         };
 
+        // Track whether anything reached the reader: a stream that dies after text has arrived is a
+        // truncated answer, not a failed request, and the message should say so.
+        let mut received = false;
+
         while let Some(event) = events.next().await {
             if stop.load(Ordering::SeqCst) {
                 send(AskEvent::Stopped);
@@ -245,8 +249,14 @@ pub(crate) async fn ask(
             }
 
             match event {
-                Ok(StreamEvent::Reasoning(text)) => send(AskEvent::Reasoning { text }),
-                Ok(StreamEvent::Text(text)) => send(AskEvent::Text { text }),
+                Ok(StreamEvent::Reasoning(text)) => {
+                    received = true;
+                    send(AskEvent::Reasoning { text });
+                }
+                Ok(StreamEvent::Text(text)) => {
+                    received = true;
+                    send(AskEvent::Text { text });
+                }
                 Ok(StreamEvent::Usage(usage)) => send(AskEvent::Usage {
                     prompt: usage.prompt_tokens,
                     completion: usage.completion_tokens,
@@ -258,7 +268,11 @@ pub(crate) async fn ask(
                 }
                 Err(error) => {
                     send(AskEvent::Error {
-                        message: error.to_string(),
+                        message: if received {
+                            format!("连接中断，已保留生成的内容（{error}）")
+                        } else {
+                            error.to_string()
+                        },
                     });
                     return;
                 }
@@ -266,7 +280,11 @@ pub(crate) async fn ask(
         }
 
         send(AskEvent::Error {
-            message: "回答在中途结束了".to_owned(),
+            message: if received {
+                "连接中断，已保留生成的内容".to_owned()
+            } else {
+                "回答在中途结束了".to_owned()
+            },
         });
     });
 

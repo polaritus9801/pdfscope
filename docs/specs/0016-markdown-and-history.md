@@ -54,6 +54,11 @@ because KaTeX skips `pre`/`code`.
 
 ## Deviations
 
+- A stream that dies after text has arrived reports `连接中断，已保留生成的内容（…）` instead of a raw
+  transport error: the partial answer is kept, and the wording says so. The cause is the connection,
+  not the output budget — long streams simply have more time to be cut.
+
+
 - Every `ask` ends in an event. A rejected invoke used to leave the promise dropped and the panel
   waiting forever; the bridge now turns a rejection into an `error` event and ends a stream that has
   produced nothing for two minutes.
