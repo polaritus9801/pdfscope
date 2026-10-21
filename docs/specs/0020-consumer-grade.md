@@ -211,6 +211,14 @@ as Preview does; the paper is the document, not the interface.
 
 ## Deviations
 
+- **Page modes were attempted and reverted.** A single-page mode implemented as a CSS toggle
+  (`display: none` on non-current pages) switched correctly and left one page visible, but the page
+  did not return to the top of the viewport: the continuous layout's scroll position and metrics are
+  baked into `render`, and a display-only change fights them. Shipping a visibly broken mode is worse
+  than not shipping it, so the change was reverted; the tree is unchanged. A real page-mode feature
+  needs its own layout model (absolute positioning, its own metrics, and paging gestures), which is a
+  slice of its own rather than an addition to this one.
+
 ## Open questions
 
 1. Is `⌘K` acceptable on Windows/Linux builds, or should it be `Ctrl+K` with platform mapping?
