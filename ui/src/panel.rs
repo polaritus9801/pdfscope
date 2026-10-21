@@ -223,6 +223,7 @@ pub fn AiPanel(
     let form_max_error = RwSignal::new(Option::<String>::None);
     let form_font_size = RwSignal::new("14".to_owned());
     let form_remember = RwSignal::new(true);
+    let form_zoom = RwSignal::new("100".to_owned());
     let tab = RwSignal::new(0_u8);
     let form_error = RwSignal::new(Option::<String>::None);
 
@@ -260,6 +261,17 @@ pub fn AiPanel(
                         .unwrap_or_else(|| "14".to_owned()),
                 );
                 form_remember.set(flag_of(&value, "remember_position").unwrap_or(true));
+                form_zoom.set(
+                    number_of(&value, "default_zoom")
+                        .map(|zoom| (zoom as u16).to_string())
+                        .unwrap_or_else(|| "100".to_owned()),
+                );
+                let _ = crate::call(
+                    "setDefaultZoom",
+                    &[JsValue::from_f64(
+                        form_zoom.get().parse::<f64>().unwrap_or(100.0),
+                    )],
+                );
                 apply_font_size(&form_font_size.get());
                 let _ = crate::call(
                     "setRememberPosition",
@@ -673,6 +685,11 @@ pub fn AiPanel(
             &JsValue::from_str("remember_position"),
             &JsValue::from_bool(form_remember.get()),
         );
+        let _ = js_sys::Reflect::set(
+            &payload,
+            &JsValue::from_str("default_zoom"),
+            &JsValue::from_f64(form_zoom.get().parse::<f64>().unwrap_or(100.0)),
+        );
 
         let key = form_key.get();
         if !key.trim().is_empty() {
@@ -704,6 +721,12 @@ pub fn AiPanel(
                         let _ = crate::call(
                             "setRememberPosition",
                             &[JsValue::from_bool(form_remember.get())],
+                        );
+                        let _ = crate::call(
+                            "setDefaultZoom",
+                            &[JsValue::from_f64(
+                                form_zoom.get().parse::<f64>().unwrap_or(100.0),
+                            )],
                         );
                         notify.run("设置已保存".to_owned());
                         form_key.set(String::new());
@@ -1380,6 +1403,27 @@ pub fn AiPanel(
                                     <section class="settings-section">
                                         <h3>"阅读"</h3>
                                         <p class="settings-hint">"重新打开文件时回到上次读到的位置。"</p>
+                                        <label class="settings-row">
+                                            <span>"默认缩放"</span>
+                                            <select on:change=move |event| form_zoom.set(event_target_value(&event))>
+                                                {[75_u16, 90, 100, 110, 125, 150]
+                                                    .into_iter()
+                                                    .map(|percent| {
+                                                        let value = percent.to_string();
+                                                        let selected = {
+                                                            let value = value.clone();
+                                                            move || form_zoom.get() == value
+                                                        };
+                                                        view! {
+                                                            <option value=value.clone() selected=selected>
+                                                                {format!("{percent}%")}
+                                                            </option>
+                                                        }
+                                                    })
+                                                    .collect_view()}
+                                            </select>
+                                        </label>
+
                                         <label class="settings-row">
                                             <span>"记住阅读位置"</span>
                                             <input

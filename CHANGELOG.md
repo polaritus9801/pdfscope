@@ -55,6 +55,9 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- A default zoom preference (75–150 %): newly opened documents start there.
+
+
 - The window remembers its size, position and maximised state across launches.
 
 

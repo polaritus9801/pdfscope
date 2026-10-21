@@ -29,6 +29,8 @@ let pageSizes = [];
 let currentPage = 1;
 let documentName = "";
 let rememberPosition = true;
+let defaultZoom = 100;
+let pendingDefaultZoom = 0;
 let restorePage = 0;
 let initialized = false;
 
@@ -1296,6 +1298,7 @@ window.PDFScope = {
     document_ = await pdfjs.getDocument({ data: bytes }).promise;
     pageSizes = await measurePages(document_.numPages);
     restorePage = rememberedPage();
+    pendingDefaultZoom = defaultZoom;
     thumbnailCache.clear();
     thumbnailObserver?.disconnect();
     thumbnailObserver = null;
@@ -1315,6 +1318,12 @@ window.PDFScope = {
     input.files = transfer.files;
     input.dispatchEvent(new Event("change", { bubbles: true }));
     return true;
+  },
+
+  /// The zoom a freshly opened document starts at, as a percentage of fit width.
+  setDefaultZoom(percent) {
+    const value = Number(percent);
+    defaultZoom = Number.isFinite(value) && value >= 50 && value <= 400 ? value : 100;
   },
 
   /// Turns the remembered reading position on or off.
@@ -1424,6 +1433,10 @@ window.PDFScope = {
   },
 
   async render(pageNumber) {
+    if (pendingDefaultZoom > 0) {
+      setZoomTarget(pendingDefaultZoom / 100, { direct: true });
+      pendingDefaultZoom = 0;
+    }
     if (!document_) return;
     const target = clampedPage(restorePage > 0 ? restorePage : pageNumber);
     restorePage = 0;

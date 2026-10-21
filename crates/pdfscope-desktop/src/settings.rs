@@ -71,9 +71,16 @@ pub(crate) struct Settings {
     /// Whether to reopen a document where it was left.
     #[serde(default = "default_true")]
     pub(crate) remember_position: bool,
+    /// Zoom a newly opened document starts at, as a percentage of fit width.
+    #[serde(default = "default_zoom")]
+    pub(crate) default_zoom: u16,
     /// Last window geometry, when the shell has recorded one.
     #[serde(default)]
     pub(crate) window: Option<WindowState>,
+}
+
+fn default_zoom() -> u16 {
+    100
 }
 
 fn default_font_size() -> u16 {
@@ -104,6 +111,7 @@ impl Default for Settings {
             max_tokens: None,
             font_size: default_font_size(),
             remember_position: true,
+            default_zoom: default_zoom(),
             window: None,
         }
     }
@@ -135,6 +143,9 @@ pub(crate) struct SettingsInput {
     /// Whether to reopen a document where it was left.
     #[serde(default)]
     pub(crate) remember_position: Option<bool>,
+    /// Zoom a newly opened document starts at.
+    #[serde(default)]
+    pub(crate) default_zoom: Option<u16>,
     /// A new key, when the user typed one. `None` keeps the stored key.
     pub(crate) api_key: Option<String>,
 }
@@ -160,6 +171,8 @@ pub(crate) struct SettingsView {
     pub(crate) font_size: u16,
     /// Whether to reopen a document where it was left.
     pub(crate) remember_position: bool,
+    /// Zoom a newly opened document starts at.
+    pub(crate) default_zoom: u16,
     /// Whether a key is stored. The key itself never crosses this boundary.
     pub(crate) has_key: bool,
 }
@@ -246,6 +259,7 @@ pub(crate) fn load_settings(app: tauri::AppHandle) -> Result<SettingsView, Strin
         max_tokens: settings.max_tokens,
         font_size: settings.font_size,
         remember_position: settings.remember_position,
+        default_zoom: settings.default_zoom,
         has_key: has_key(&app),
     })
 }
@@ -280,6 +294,7 @@ pub(crate) fn save_settings(app: tauri::AppHandle, settings: SettingsInput) -> R
         max_tokens: settings.max_tokens,
         font_size: settings.font_size.unwrap_or_else(default_font_size),
         remember_position: settings.remember_position.unwrap_or(true),
+        default_zoom: settings.default_zoom.unwrap_or_else(default_zoom),
         window: stored_window,
     };
 

@@ -166,6 +166,10 @@ documents; toasts never block input. A mis-shown banner costs one click, not dat
 - **P7 measurements**: an 11.7 MB, 80-page image PDF renders its first page in **60 ms**; typing
   latency is **17 ms** median (19 ms max) over 20 keystrokes. Both spec budgets are met and recorded
   in `docs/performance.md`. Window-geometry restore still needs a human pass.
+- **P5 default zoom**: a new preference (75–150 % in steps, default 100 %) sets the zoom a freshly
+  opened document starts at; the viewer applies it on the first render and the header label follows.
+  Verified: `setDefaultZoom(150)` then opening the sample shows 150 % and a 1287 px canvas. Page modes
+  (single / spread) remain undone.
 - **P1 audit**: the grep for hard-coded `px` outside the token block stood at **223** declarations.
   This round migrated every spacing, radius, type and offset declaration whose value sits on the
   scale, then snapped off-scale spacing (6/10/14/18/20/22) to the nearest step: **223 → 109**. The
