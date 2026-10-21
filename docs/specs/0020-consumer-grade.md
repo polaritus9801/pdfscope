@@ -191,6 +191,14 @@ documents; toasts never block input. A mis-shown banner costs one click, not dat
   header floats on a blurred surface.
 - Palette and fonts are unchanged; the change is layout, elevation and background only.
 
+## Toast and rail
+
+- Toasts hold while hovered: the dismiss timer checks a paused set and does nothing if the reader is
+  still reading; leaving re-arms a fresh three seconds (remaining time is not tracked — a deliberate
+  simplification). Verified: hover 4 s keeps it, leave 3.6 s removes it.
+- The tool rail is a layout column now, not an overlay: as an overlay it forced asymmetric stage
+  padding, and the page stopped being centred at low zoom (the smoke caught 30 px of drift).
+
 ## Screenshot matrix
 
 `docs/images/matrix/` holds twelve captures: welcome and reader, at 900×700, 1280×800 and 1512×982,

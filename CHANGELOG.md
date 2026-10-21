@@ -137,6 +137,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Fixed
 
+- Toasts stay while hovered, and the tool rail is part of the layout so pages stay centred when
+  zoomed out.
+
+
 - On narrow windows the page no longer slides under the tool rail; the stage reserves room for it.
 
 

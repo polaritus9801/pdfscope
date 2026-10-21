@@ -269,17 +269,16 @@ fn App() -> impl IntoView {
     let toasts = RwSignal::new(Vec::<(f64, String)>::new());
 
     // A toast is the app's smallest unit of feedback: one line, three seconds, at most three.
-    let notify = Callback::new(move |message: String| {
-        let id = js_sys::Date::now();
-        toasts.update(|list| {
-            list.push((id, message));
-            while list.len() > 3 {
-                list.remove(0);
-            }
-        });
+    // Hovering holds it: the timer checks the paused set when it fires, and leaving re-arms it.
+    let paused_toasts = RwSignal::new(Vec::<f64>::new());
 
+    let arm = move |id: f64| {
         let removal = Closure::once_into_js(move || {
+            if paused_toasts.get().contains(&id) {
+                return;
+            }
             toasts.update(|list| list.retain(|(toast, _)| *toast != id));
+            paused_toasts.update(|list| list.retain(|toast| *toast != id));
         });
 
         if let Some(window) = web_sys::window() {
@@ -288,6 +287,17 @@ fn App() -> impl IntoView {
                 3000,
             );
         }
+    };
+
+    let notify = Callback::new(move |message: String| {
+        let id = js_sys::Date::now();
+        toasts.update(|list| {
+            list.push((id, message));
+            while list.len() > 3 {
+                list.remove(0);
+            }
+        });
+        arm(id);
     });
     let outline = RwSignal::new(Vec::<(String, u32, u8)>::new());
     let outline_open = RwSignal::new(false);
@@ -1190,7 +1200,28 @@ fn App() -> impl IntoView {
                     toasts
                         .get()
                         .into_iter()
-                        .map(|(_, message)| view! { <div class="toast">{message}</div> })
+                        .map(|(id, message)| {
+                            view! {
+                                <div
+                                    class="toast"
+                                    on:mouseenter=move |_| {
+                                        paused_toasts.update(|list| {
+                                            if !list.contains(&id) {
+                                                list.push(id);
+                                            }
+                                        });
+                                    }
+                                    on:mouseleave=move |_| {
+                                        paused_toasts.update(|list| {
+                                            list.retain(|toast| *toast != id);
+                                        });
+                                        arm(id);
+                                    }
+                                >
+                                    {message}
+                                </div>
+                            }
+                        })
                         .collect_view()
                 }}
             </div>

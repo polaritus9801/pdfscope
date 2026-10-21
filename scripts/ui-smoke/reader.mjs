@@ -325,7 +325,7 @@ try {
   await waitFor(
     `!document.getElementById('pages').classList.contains('zooming') &&
      Number.parseFloat(getComputedStyle(document.getElementById('pages')).getPropertyValue('--view-scale') || '1') >= 0.999 &&
-     document.querySelector('#page-1').getBoundingClientRect().width > 800`,
+     document.querySelector('#page-1').getBoundingClientRect().width > 760`,
     "the column back at fit width",
   );
   // `render` restores the reading line after the new layout settles; do not race it.
