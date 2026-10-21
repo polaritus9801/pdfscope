@@ -142,6 +142,10 @@ console.log("serving", APP_URL);
 
 const DEBUG_PORT = 9225;
 const profile = `/tmp/pdfscope-reader-${Date.now()}`;
+// Extra flags let the same suite run under accessibility settings, e.g.
+// SMOKE_FLAGS="--force-prefers-reduced-motion" node scripts/ui-smoke/reader.mjs
+const extraFlags = (process.env.SMOKE_FLAGS ?? "").split(" ").filter(Boolean);
+
 const chrome = spawn(CHROME, [
   "--headless=new",
   "--no-sandbox",
@@ -156,6 +160,7 @@ const chrome = spawn(CHROME, [
   `--remote-debugging-port=${DEBUG_PORT}`,
   "--window-size=1280,860",
   `--user-data-dir=${profile}`,
+  ...extraFlags,
   "about:blank",
 ]);
 
