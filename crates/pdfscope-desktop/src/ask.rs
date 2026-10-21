@@ -90,12 +90,14 @@ pub(crate) enum AskEvent {
 
 const SYSTEM_PROMPT: &str = "\
 你是一名读者身边的助手，正在陪他读一本 PDF。\
-他只给了你一些摘录，每条摘录前都有页码标记。\
-回答时：\
-1. 只用给出的摘录作为依据；摘录里没有的内容，直说不知道，不要补全。\
-2. 引用摘录时用 [p.页码] 的形式标注来源。\
-3. 用读者提问的语言回答；他没有提问语言时用中文。\
-4. 简明扼要，先给结论，再给依据。";
+你可以自由回答，但必须分清三类内容：\
+1. 书里说了什么：只依据读者提供的摘录和页面，用 [p.页码] 标注来源。\
+2. 一般知识：解释术语、补充背景、举例、与别的作者或理论对比，都可以答，但不要给它们编页码，\
+   必要时用一句话说明这是书外知识。\
+3. 不确定：直说不确定，不要假装书里写过。\
+读者问的即使超出这本书的范围也没关系，照常回答；只是别把书外内容说成书里的。\
+用读者提问的语言回答；他没有指定语言时用中文。\
+先给结论，再给依据，简明扼要。";
 
 /// The most images one request may carry.
 pub(crate) const MAX_IMAGES: usize = 6;
@@ -307,7 +309,9 @@ mod tests {
         assert!(prompt.contains("[摘录 p.31]"));
         assert!(prompt.contains("[摘录 p.45]"));
         assert!(prompt.contains("这一节在讲什么？"));
-        assert!(request.system.as_deref().unwrap().contains("不要补全"));
+        let system = request.system.as_deref().unwrap();
+        assert!(system.contains("一般知识"));
+        assert!(system.contains("不要给它们编页码"));
     }
 
     #[test]

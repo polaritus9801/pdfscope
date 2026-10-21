@@ -114,6 +114,14 @@ request is built from exactly the tray, and the panel header states the model be
 - `keyring` 4.x uses the login keychain on macOS without extra configuration.
 - Tauri's `withGlobalTauri` is acceptable for this slice; a typed client arrives with the web build.
 
+## Prompt
+
+The system prompt distinguishes three kinds of content instead of forbidding everything outside the
+excerpts: what the book says (cite `[p.N]`), general knowledge (allowed, no page citation, marked as
+outside the book when it matters), and uncertainty (say so). Questions about the book but beyond its
+text — later developments, other authors, comparisons — are answered normally; the only hard rule is
+that book-external material must not be presented as the book's.
+
 ## Deviations
 
 - The keychain round-trip could not be exercised in this environment (no interactive keychain). The

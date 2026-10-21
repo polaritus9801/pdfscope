@@ -10,6 +10,11 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Changed
 
+- The system prompt distinguishes the book's content from general knowledge instead of refusing
+  anything outside the excerpts: background, comparisons and follow-up questions are answered, with
+  page citations reserved for what the book actually says.
+
+
 - The API key is stored in a `0600` file next to the settings instead of the OS keychain: no prompt on
   launch, and the trade is written down in `SECURITY.md`.
 - Markdown now uses `pulldown-cmark`: tables, strikethrough and task lists join headings, lists,
