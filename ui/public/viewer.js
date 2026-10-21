@@ -146,6 +146,20 @@ document.addEventListener("selectionchange", reportSelection);
 document.addEventListener("mouseup", reportSelection);
 document.addEventListener("keyup", reportSelection);
 
+// Trackpad pinch and ctrl+wheel both arrive as wheel events with ctrlKey set.
+window.addEventListener(
+  "wheel",
+  (event) => {
+    if (!event.ctrlKey || !document_) return;
+    event.preventDefault();
+    const step = event.deltaY < 0 ? 10 : -10;
+    const next = Math.min(300, Math.max(50, currentZoom + step));
+    if (next === currentZoom) return;
+    window.__pdfscopeZoom?.(next);
+  },
+  { passive: false },
+);
+
 let resizeTimer = null;
 window.addEventListener("resize", () => {
   if (!document_) return;
@@ -232,19 +246,20 @@ function disarmCapture() {
   pageElement()?.classList.remove("capturing");
 }
 
-pageElement()?.addEventListener("pointerdown", (event) => {
+document.addEventListener("pointerdown", (event) => {
   if (!captureArmed) return;
+  if (!pageElement()?.contains(event.target)) return;
   marqueeStart = normalise(event.clientX, event.clientY);
   if (marqueeStart) event.preventDefault();
 });
 
-pageElement()?.addEventListener("pointermove", (event) => {
+document.addEventListener("pointermove", (event) => {
   if (!captureArmed || !marqueeStart) return;
   const current = normalise(event.clientX, event.clientY);
   if (current) drawMarquee(marqueeStart, current);
 });
 
-pageElement()?.addEventListener("pointerup", async (event) => {
+document.addEventListener("pointerup", async (event) => {
   if (!captureArmed || !marqueeStart) return;
   const end = normalise(event.clientX, event.clientY);
   const start = marqueeStart;
@@ -321,6 +336,10 @@ window.PDFScope = {
     captureArmed = true;
     pageElement()?.classList.add("capturing");
     window.getSelection()?.removeAllRanges();
+  },
+
+  disarmCapture() {
+    disarmCapture();
   },
 
   clearSelection() {

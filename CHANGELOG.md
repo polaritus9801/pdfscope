@@ -16,6 +16,15 @@ minor releases may contain breaking changes; they are always called out.
   are saved.
 - The streaming answer is announced to screen readers; the composer has a label.
 
+### Fixed
+
+- The window no longer scrolls as a whole: only the reader and the panel body do.
+- Box capture fires: its pointer listeners are on the document, because the page element does not
+  exist when the renderer module loads.
+- References moved from a toolbar into the composer, one row each, with a persistent tint on the page.
+- The panel collapses and can be resized; the app icon is a proper rounded square with a margin.
+- The reader gains the three floating tools (text, box, range) and pinch/ctrl-wheel zoom.
+
 ### Changed
 
 - Streaming updates are coalesced to one per 50 ms; the answer re-parses citations on every change, so

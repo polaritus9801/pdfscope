@@ -777,3 +777,180 @@ body {
   background: var(--accent-strong);
   border-radius: 3px;
 }
+
+/* #2: the window never scrolls; only the reader and the panel body do. */
+html,
+body {
+  overflow: hidden;
+}
+
+.app {
+  overflow: hidden;
+}
+
+.workspace,
+.stage,
+.panel {
+  min-height: 0;
+}
+
+/* #6: floating tool rail */
+.float-tools {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 8;
+}
+
+.tool {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: inherit;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-panel);
+  cursor: pointer;
+}
+
+.tool:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: var(--accent-soft);
+}
+
+.tool:disabled {
+  color: var(--ink-faint);
+  cursor: default;
+}
+
+/* #8: references live in the composer */
+.ref-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  border: 1px solid var(--border);
+}
+
+.ref-row:hover {
+  border-color: var(--border-strong);
+}
+
+.ref-kind {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: var(--accent);
+  background: var(--surface);
+  border-radius: 4px;
+}
+
+.ref-thumb {
+  flex: none;
+  width: 28px;
+  height: 18px;
+  object-fit: cover;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+}
+
+.ref-text {
+  flex: 1;
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.ref-page {
+  flex: none;
+  font-size: 11px;
+  color: var(--ink-muted);
+}
+
+.ref-remove {
+  flex: none;
+  border: none;
+  background: transparent;
+  color: var(--ink-faint);
+  cursor: pointer;
+  font: inherit;
+  padding: 0 2px;
+}
+
+.ref-remove:hover {
+  color: var(--danger);
+}
+
+/* #8: a reference stays tinted on the page while it is attached */
+.ref-tint {
+  position: absolute;
+  background: rgb(203 184 236 / 22%);
+  border-left: 2px solid var(--accent-strong);
+  pointer-events: none;
+  z-index: 3;
+}
+
+/* #5: collapsible, resizable panel */
+.panel {
+  position: relative;
+}
+
+.panel.collapsed .panel-body,
+.panel.collapsed .composer,
+.panel.collapsed .panel-title,
+.panel.collapsed .panel-model,
+.panel.collapsed .panel-head .button,
+.panel.collapsed .panel-resize {
+  display: none;
+}
+
+.panel:not(.collapsed) .panel-expand {
+  display: none;
+}
+
+.panel-resize {
+  display: block;
+  position: absolute;
+  top: 0;
+  left: -3px;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 6;
+}
+
+.panel-resize:hover {
+  background: var(--accent-strong);
+}
+
+.panel-expand {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: transparent;
+  color: var(--ink-muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.panel-expand:hover {
+  background: var(--accent-soft);
+}

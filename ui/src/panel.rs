@@ -112,6 +112,9 @@ pub fn AiPanel(
     let show_all = RwSignal::new(false);
     let notice = RwSignal::new(Option::<String>::None);
     let testing = RwSignal::new(false);
+    let collapsed = RwSignal::new(false);
+    let dragging = RwSignal::new(false);
+    let width = RwSignal::new(340_u32);
     let test_result = RwSignal::new(Option::<String>::None);
     let pending = RwSignal::new(String::new());
     let scheduled = RwSignal::new(false);
@@ -459,14 +462,63 @@ pub fn AiPanel(
     };
 
     view! {
-        <aside class="panel">
+        <aside
+            class="panel"
+            class:collapsed=move || collapsed.get()
+            style=move || {
+                if collapsed.get() {
+                    "width: 28px".to_owned()
+                } else {
+                    format!("width: {}px", width.get())
+                }
+            }
+        >
+            <div
+                class="panel-resize"
+                on:pointerdown=move |event: web_sys::PointerEvent| {
+                    if let Some(target) = event
+                        .current_target()
+                        .and_then(|target| target.dyn_into::<web_sys::HtmlElement>().ok())
+                    {
+                        let _ = target.set_pointer_capture(event.pointer_id());
+                    }
+                    dragging.set(true);
+                }
+                on:pointermove=move |event: web_sys::PointerEvent| {
+                    if !dragging.get() {
+                        return;
+                    }
+                    let viewport = web_sys::window()
+                        .and_then(|window| window.inner_width().ok())
+                        .and_then(|value| value.as_f64())
+                        .unwrap_or(1280.0);
+                    let next = (viewport - f64::from(event.client_x())).clamp(260.0, 640.0);
+                    width.set(next as u32);
+                }
+                on:pointerup=move |_| dragging.set(false)
+            ></div>
             <div class="panel-head">
+                <button
+                    class="button"
+                    title="收起"
+                    on:click=move |_| collapsed.set(true)
+                >
+                    "›"
+                </button>
                 <span class="panel-title">"AI"</span>
                 <span class="panel-model">{move || model.get()}</span>
                 <button class="button" on:click=move |_| open.set(true)>
                     "设置"
                 </button>
             </div>
+
+            <button
+                class="panel-expand"
+                title="展开"
+                on:click=move |_| collapsed.set(false)
+            >
+                "‹"
+            </button>
 
             <div class="panel-body">
                 {move || {
@@ -596,8 +648,69 @@ pub fn AiPanel(
                     }
                         .into_any()
                 }}
+                {move || {
+                    passages
+                        .get()
+                        .into_iter()
+                        .enumerate()
+                        .map(|(index, passage)| {
+                            view! {
+                                <div class="ref-row">
+                                    <span class="ref-kind">"文"</span>
+                                    <span class="ref-text">{passage.quote.clone()}</span>
+                                    <span class="ref-page">{format!("p.{}", passage.page)}</span>
+                                    <button
+                                        class="ref-remove"
+                                        title="移除"
+                                        on:click=move |_| {
+                                            passages
+                                                .update(|list| {
+                                                    if index < list.len() {
+                                                        list.remove(index);
+                                                    }
+                                                });
+                                        }
+                                    >
+                                        "✕"
+                                    </button>
+                                </div>
+                            }
+                        })
+                        .collect_view()
+                }}
+                {move || {
+                    regions
+                        .get()
+                        .into_iter()
+                        .enumerate()
+                        .map(|(index, region)| {
+                            view! {
+                                <div class="ref-row">
+                                    <img class="ref-thumb" src=region.image alt="" />
+                                    <span class="ref-text">"截图"</span>
+                                    <span class="ref-page">{format!("p.{}", region.page)}</span>
+                                    <button
+                                        class="ref-remove"
+                                        title="移除"
+                                        on:click=move |_| {
+                                            regions
+                                                .update(|list| {
+                                                    if index < list.len() {
+                                                        list.remove(index);
+                                                    }
+                                                });
+                                        }
+                                    >
+                                        "✕"
+                                    </button>
+                                </div>
+                            }
+                        })
+                        .collect_view()
+                }}
                 <div class="range-row">
                     <input
+                        id="range-input"
                         class="range-input"
                         type="text"
                         placeholder="页码范围 31-45, 60"

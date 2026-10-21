@@ -330,6 +330,23 @@ fn App() -> impl IntoView {
         callback.forget();
     });
 
+    // Pinch gestures arrive as ctrl+wheel; the renderer reports the new zoom here.
+    Effect::new(move |_| {
+        let callback = Closure::<dyn Fn(JsValue)>::new(move |value: JsValue| {
+            if let Some(next) = value.as_f64() {
+                zoom.set((next as u32).clamp(50, 300));
+            }
+        });
+        if let Some(window) = web_sys::window() {
+            let _ = js_sys::Reflect::set(
+                &window,
+                &JsValue::from_str("__pdfscopeZoom"),
+                callback.as_ref(),
+            );
+        }
+        callback.forget();
+    });
+
     // A page change invalidates whatever was selected on the previous page.
     Effect::new(move |_| {
         let _ = page.get();
@@ -379,15 +396,7 @@ fn App() -> impl IntoView {
                         />
                     </label>
                     <span class="file-name">{move || file_name.get()}</span>
-                    <button
-                        class="button"
-                        prop:disabled=move || !ready.get()
-                        on:click=move |_| {
-                            let _ = call("beginCapture", &[]);
-                        }
-                    >
-                        "框选"
-                    </button>
+
                 </div>
 
                 <div class="bar-center">
@@ -448,86 +457,88 @@ fn App() -> impl IntoView {
                 </div>
             </header>
 
-            <section
-                class="tray"
-                class:hidden=move || { passages.get().is_empty() && regions.get().is_empty() }
-            >
-                <span class="tray-label">
-                    {move || format!("引用 {}", passages.get().len())}
-                </span>
-                <div class="chips">
-                    {move || {
-                        regions
-                            .get()
-                            .into_iter()
-                            .enumerate()
-                            .map(|(index, region)| {
-                                view! {
-                                    <span class="chip chip-region">
-                                        <img class="chip-thumb" src=region.image alt="" />
-                                        <span class="chip-label">
-                                            {format!("p.{}", region.page)}
-                                        </span>
-                                        <button
-                                            class="chip-remove"
-                                            title="移除"
-                                            on:click=move |_| {
-                                                regions
-                                                    .update(|list| {
-                                                        if index < list.len() {
-                                                            list.remove(index);
-                                                        }
-                                                    });
-                                            }
-                                        >
-                                            "✕"
-                                        </button>
-                                    </span>
-                                }
-                            })
-                            .collect_view()
-                    }}
-                    {move || {
-                        passages
-                            .get()
-                            .into_iter()
-                            .enumerate()
-                            .map(|(index, passage)| {
-                                let label = format!(
-                                    "p.{} · {}",
-                                    passage.page,
-                                    truncate(&passage.quote, 18),
-                                );
-                                view! {
-                                    <span class="chip">
-                                        <span class="chip-label">{label}</span>
-                                        <button
-                                            class="chip-remove"
-                                            title="移除"
-                                            on:click=move |_| {
-                                                passages
-                                                    .update(|list| {
-                                                        if index < list.len() {
-                                                            list.remove(index);
-                                                        }
-                                                    });
-                                            }
-                                        >
-                                            "✕"
-                                        </button>
-                                    </span>
-                                }
-                            })
-                            .collect_view()
-                    }}
-                </div>
-            </section>
+
 
             <div class="workspace">
-            <main class="stage">
+            <main
+                class="stage"
+                on:dblclick=move |_| {
+                    if let Some(input) = web_sys::window()
+                        .and_then(|window| window.document())
+                        .and_then(|document| document.get_element_by_id("file-input"))
+                        .and_then(|element| element.dyn_into::<HtmlInputElement>().ok())
+                    {
+                        input.click();
+                    }
+                }
+            >
+                <div class="float-tools">
+                    <button
+                        class="tool"
+                        title="文字选择：直接拖选正文"
+                        on:click=move |_| {
+                            let _ = call("disarmCapture", &[]);
+                        }
+                    >
+                        "文"
+                    </button>
+                    <button
+                        class="tool"
+                        title="框选：拖出一个矩形"
+                        prop:disabled=move || !ready.get()
+                        on:click=move |_| {
+                            let _ = call("beginCapture", &[]);
+                        }
+                    >
+                        "框"
+                    </button>
+                    <button
+                        class="tool"
+                        title="页面范围：在右侧输入页码"
+                        on:click=move |_| {
+                            if let Some(input) = web_sys::window()
+                                .and_then(|window| window.document())
+                                .and_then(|document| document.get_element_by_id("range-input"))
+                                .and_then(|element| element.dyn_into::<HtmlInputElement>().ok())
+                            {
+                                let _ = input.focus();
+                            }
+                        }
+                    >
+                        "页"
+                    </button>
+                </div>
                 <div class="page" id="page" class:hidden=move || !ready.get()>
                     <canvas id="page-canvas"></canvas>
                     <div id="text-layer" class="textLayer"></div>
+
+                    {move || {
+                        let current = page.get();
+                        let mut tints: Vec<(f64, f64, f64, f64)> = Vec::new();
+                        for passage in passages.get() {
+                            if passage.page == current {
+                                tints.push(passage.rect);
+                            }
+                        }
+                        for region in regions.get() {
+                            if region.page == current {
+                                tints.push(region.rect);
+                            }
+                        }
+                        tints
+                            .into_iter()
+                            .map(|(x, y, width, height)| {
+                                let style = format!(
+                                    "left:{:.3}%; top:{:.3}%; width:{:.3}%; height:{:.3}%;",
+                                    x * 100.0,
+                                    y * 100.0,
+                                    width * 100.0,
+                                    height * 100.0,
+                                );
+                                view! { <div class="ref-tint" style=style></div> }
+                            })
+                            .collect_view()
+                    }}
 
                     {move || {
                         hovered
