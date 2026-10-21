@@ -27,12 +27,15 @@ If those documents contradict each other, stop and ask. Do not pick the convenie
 7. **One vertical slice per commit.** No drive-by refactors, no reformatting unrelated files.
 8. **Read before you write.** Never assume an API from memory: open the code, the crate source, or
    the upstream docs. Guessing is how a codebase rots.
+9. **No control ships without a reviewed interaction design.** Every button, gesture, menu item and
+   mode is designed in writing, with alternatives, and shown to the human before implementation.
+   See §1 P3.
 
 ---
 
 ## 1. The loop
 
-Six phases. Do not skip forward. It is always acceptable to go back.
+Eight phases. Do not skip forward. It is always acceptable to go back.
 
 ### P0 — Clarify
 
@@ -65,25 +68,58 @@ A spec is not approved because it looks reasonable. It is approved when the huma
 explicitly ("approved", "批准", "go ahead"). At that point — and only then — flip `status: accepted`
 in the first commit that implements it.
 
-### P3 — Slice
+### P3 — Interaction design
+
+Do this for anything a person can click, drag, or type. A spec that says "add a box-selection
+button" is not ready to implement: it names a widget and skips every question that matters.
+
+Every control must be described in the spec, in this form:
+
+| Field | The question it answers |
+|---|---|
+| Label | What does the user actually read? |
+| Location | Where does it live, and why there rather than somewhere else? |
+| Enabled when | What makes it available, unavailable, or hidden? |
+| Pointer | Click, drag, double-click, right-click — what happens on each? |
+| Keyboard | What is the shortcut, and can the action be completed without a mouse? |
+| Touch | What is the equivalent gesture? |
+| Result | What changes on screen immediately afterwards? |
+| Cancel | How does the user back out, and what is preserved? |
+| Error | What does the user see when it fails, and what can they do next? |
+
+Also required:
+
+- **At least two alternatives** for every new control, and why the chosen one won.
+- **Discoverability**: how someone finds this without reading documentation. If the answer is
+  "they read the docs", the design is wrong.
+- **A state table** for anything with modes: what is legal in each state, and what is impossible.
+- **A cost of being wrong** note: what happens to the user's work if this interaction misbehaves.
+
+Then **ask the human to react to the design, not the code**. This is a separate checkpoint from the
+spec approval: the spec says *what* the product does, this says *how it feels to use*.
+
+Do not implement a control the human has not seen described. Gestures are cheap to change in a
+document and expensive to change once three screens depend on them.
+
+### P4 — Slice
 
 Break the spec into the smallest vertical slices that each produce something observable. State the
 slice you are doing before doing it. If a slice needs more than one commit, say why.
 
-### P4 — Implement
+### P5 — Implement
 
 - Test first where the behaviour is testable in isolation; test with the change otherwise.
 - Keep the diff readable. A reviewer should be able to follow it once, top to bottom.
 - Leave the tree better: no dead code, no commented-out blocks, no `TODO` without an issue link.
 
-### P5 — Verify
+### P6 — Verify
 
 - `just check` — format, clippy, tests.
 - `just doc` — public API documentation builds without warnings.
 - UI changes: attach a screenshot or recording. "It works" is not evidence.
 - Behaviour changes: show the test that fails without the change.
 
-### P6 — Land
+### P7 — Land
 
 - Update `CHANGELOG.md` under `## [Unreleased]`.
 - Record any deviation from the spec in its `Deviations` section.
@@ -98,7 +134,7 @@ slice you are doing before doing it. If a slice needs more than one commit, say 
 |---|---|---|
 | `draft` | agent | No |
 | `accepted` | agent, after explicit human approval | Yes |
-| `implemented` | agent, at P6 | — |
+| `implemented` | agent, at P7 | — |
 | `superseded` | agent, when replaced | — |
 
 The gate exists because most bad code in this repository will come from a plausible-sounding design
@@ -120,6 +156,8 @@ Required sections — a spec missing any of them is not ready for review:
 - **Behaviour** — observable outcomes, including error paths.
 - **Data model** — schema or type changes, with migration notes.
 - **Interface** — command/HTTP signatures, events, error shapes.
+- **Interaction design** — every control, in the table from P3, with alternatives. Required for
+  anything a person can see or touch.
 - **Test plan** — unit, integration, end-to-end; name the cases.
 - **Risks** — what could be wrong, and the rollback.
 - **Assumptions** — anything you could not verify.
@@ -153,6 +191,7 @@ A change is done when all of the following are true:
 
 - [ ] Spec accepted, and this change is inside its scope.
 - [ ] `just check` passes locally.
+- [ ] Interaction design reviewed with the human, and the decisions recorded in the spec.
 - [ ] New behaviour has a test that fails without the change.
 - [ ] Error paths are handled, not `unwrap()`ed.
 - [ ] Public items have doc comments.

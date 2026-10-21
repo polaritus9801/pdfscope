@@ -29,6 +29,31 @@ is.
 
 Commands, HTTP routes, events, error shapes. Signatures, not prose.
 
+## Interaction design
+
+Required for anything a person can see or touch. Delete this section only if the change has no
+interface at all, and say why.
+
+| Control | Label | Location | Enabled when | Pointer | Keyboard | Touch | Result | Cancel / error |
+|---|---|---|---|---|---|---|---|---|
+| … | … | … | … | … | … | … | … | … |
+
+**Alternatives considered.** At least two, and why this one won.
+
+- Chosen: …
+- Rejected: … because …
+
+**Discoverability.** How a first-time user finds it without documentation.
+
+**States.** If there are modes, what is legal in each, and what becomes impossible.
+
+**Cost of being wrong.** What the user loses if this misbehaves, and what prevents that.
+
+## Design review
+
+- Reviewed with: … on …
+- Decisions: what changed as a result
+
 ## Test plan
 
 - Unit: …
