@@ -6,7 +6,7 @@ use wasm_bindgen::closure::Closure;
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 
-use pdfscope_core::{Segment, parse_ranges, segments};
+use pdfscope_core::parse_ranges;
 
 use crate::{Passage, Region, truncate};
 
@@ -99,7 +99,9 @@ pub fn AiPanel(
     let configured = RwSignal::new(false);
     let model = RwSignal::new("未配置".to_owned());
     let answer = RwSignal::new(String::new());
-    let thinking = RwSignal::new(0_usize);
+    let reasoning = RwSignal::new(String::new());
+    let think_started = RwSignal::new(0.0_f64);
+    let think_seconds = RwSignal::new(0.0_f64);
     let status = RwSignal::new(String::new());
     let streaming = RwSignal::new(false);
     let question = RwSignal::new(String::new());
@@ -191,7 +193,9 @@ pub fn AiPanel(
         }
 
         answer.set(String::new());
-        thinking.set(0);
+        reasoning.set(String::new());
+        think_started.set(0.0);
+        think_seconds.set(0.0);
         streaming.set(true);
         failed.set(false);
         status.set("准备中…".to_owned());
@@ -295,10 +299,16 @@ pub fn AiPanel(
                 match kind.as_str() {
                     "reasoning" => {
                         if let Some(delta) = text_of(&event, "text") {
-                            thinking.update(|count| *count += delta.chars().count());
+                            if think_started.get() == 0.0 {
+                                think_started.set(js_sys::Date::now());
+                            }
+                            reasoning.update(|buffer| buffer.push_str(&delta));
                         }
                     }
                     "text" => {
+                        if think_seconds.get() == 0.0 && think_started.get() > 0.0 {
+                            think_seconds.set((js_sys::Date::now() - think_started.get()) / 1000.0);
+                        }
                         if let Some(delta) = text_of(&event, "text") {
                             // Coalesce tokens into one reactive update per frame: the answer
                             // re-parses citations on every change, so per-token updates are O(n²).
@@ -332,13 +342,17 @@ pub fn AiPanel(
                     }
                     "stopped" => {
                         flush_pending();
-                        thinking.set(0);
+                        if think_seconds.get() == 0.0 && think_started.get() > 0.0 {
+                            think_seconds.set((js_sys::Date::now() - think_started.get()) / 1000.0);
+                        }
                         streaming.set(false);
                         status.set("已停止".to_owned());
                     }
                     "done" => {
                         flush_pending();
-                        thinking.set(0);
+                        if think_seconds.get() == 0.0 && think_started.get() > 0.0 {
+                            think_seconds.set((js_sys::Date::now() - think_started.get()) / 1000.0);
+                        }
                         streaming.set(false);
                         let elapsed = js_sys::Date::now() - started;
                         if elapsed > 0.0 {
@@ -349,7 +363,9 @@ pub fn AiPanel(
                     }
                     "error" => {
                         flush_pending();
-                        thinking.set(0);
+                        if think_seconds.get() == 0.0 && think_started.get() > 0.0 {
+                            think_seconds.set((js_sys::Date::now() - think_started.get()) / 1000.0);
+                        }
                         streaming.set(false);
                         failed.set(true);
                         status.set(
@@ -499,11 +515,13 @@ pub fn AiPanel(
             ></div>
             <div class="panel-head">
                 <button
-                    class="button"
+                    class="panel-toggle"
                     title="收起"
                     on:click=move |_| collapsed.set(true)
                 >
-                    "›"
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M9 6l6 6-6 6" />
+                    </svg>
                 </button>
                 <span class="panel-title">"AI"</span>
                 <span class="panel-model">{move || model.get()}</span>
@@ -517,7 +535,9 @@ pub fn AiPanel(
                 title="展开"
                 on:click=move |_| collapsed.set(false)
             >
-                "‹"
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M15 6l-6 6 6 6" />
+                </svg>
             </button>
 
             <div class="panel-body">
@@ -530,46 +550,49 @@ pub fn AiPanel(
                         view! {
                             <div class="answer">
                                 {move || {
-                                    if thinking.get() > 0 {
-                                        view! {
-                                            <p class="thinking">
-                                                {format!("思考中 · {} 字", thinking.get())}
-                                            </p>
-                                        }
-                                            .into_any()
-                                    } else {
-                                        ().into_any()
+                                    let text = reasoning.get();
+                                    if text.is_empty() {
+                                        return ().into_any();
                                     }
+                                    let streaming_now = streaming.get();
+                                    let label = if streaming_now {
+                                        "思考中…".to_owned()
+                                    } else {
+                                        let seconds = think_seconds.get();
+                                        if seconds > 0.0 {
+                                            format!("思考 {seconds:.1} 秒")
+                                        } else {
+                                            "思考过程".to_owned()
+                                        }
+                                    };
+                                    view! {
+                                        <details class="think" prop:open=streaming_now>
+                                            <summary>{label}</summary>
+                                            <pre class="think-text">{text}</pre>
+                                        </details>
+                                    }
+                                        .into_any()
                                 }}
-                                <p class="answer-text" aria-live="polite">
-                                    {move || {
-                                        segments(&answer.get())
-                                            .into_iter()
-                                            .map(|segment| match segment {
-                                                Segment::Text(text) => {
-                                                    view! { <span>{text}</span> }.into_any()
-                                                }
-                                                Segment::Citation(number) => {
-                                                    let known = number >= 1 && number <= pages.get();
-                                                    if known {
-                                                        view! {
-                                                            <button
-                                                                class="citation"
-                                                                on:click=move |_| jump(number)
-                                                            >
-                                                                {format!("p.{number}")}
-                                                            </button>
-                                                        }
-                                                            .into_any()
-                                                    } else {
-                                                        view! { <span>{format!("p.{number}")}</span> }
-                                                            .into_any()
-                                                    }
-                                                }
-                                            })
-                                            .collect_view()
-                                    }}
-                                </p>
+                                <div
+                                    class="answer-text markdown"
+                                    aria-live="polite"
+                                    inner_html=move || pdfscope_core::to_html(&answer.get())
+                                    on:click=move |event: web_sys::MouseEvent| {
+                                        let Some(target) = event
+                                            .target()
+                                            .and_then(|target| target.dyn_into::<web_sys::Element>().ok())
+                                        else {
+                                            return;
+                                        };
+                                        if let Some(number) = target
+                                            .get_attribute("data-page")
+                                            .and_then(|value| value.parse::<u32>().ok())
+                                        {
+                                            event.prevent_default();
+                                            jump(number);
+                                        }
+                                    }
+                                ></div>
                             </div>
                         }
                             .into_any()

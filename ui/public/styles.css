@@ -806,8 +806,8 @@ body {
 }
 
 .tool {
-  width: 34px;
-  height: 34px;
+  width: 42px;
+  height: 42px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -821,8 +821,9 @@ body {
 }
 
 .tool:hover:not(:disabled) {
-  border-color: var(--border-strong);
+  border-color: var(--accent);
   background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .tool:disabled {
@@ -953,4 +954,140 @@ body {
 
 .panel-expand:hover {
   background: var(--accent-soft);
+}
+
+.panel-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  color: var(--ink-muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.panel-toggle:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.panel-expand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-muted);
+}
+
+.panel-expand:hover {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* Reasoning, collapsed once the answer starts */
+.think {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+
+.think summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 2px 0;
+}
+
+.think summary::-webkit-details-marker {
+  display: none;
+}
+
+.think summary::before {
+  content: "▸ ";
+  color: var(--ink-faint);
+}
+
+.think[open] summary::before {
+  content: "▾ ";
+}
+
+.think-text {
+  margin: 6px 0 0;
+  padding: 8px;
+  max-height: 180px;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ink-muted);
+  background: var(--surface-sunken);
+  border-radius: var(--radius-sm);
+}
+
+/* Markdown */
+.markdown p {
+  margin: 0 0 8px;
+}
+
+.markdown p:last-child {
+  margin-bottom: 0;
+}
+
+.markdown h1,
+.markdown h2,
+.markdown h3,
+.markdown h4 {
+  margin: 12px 0 6px;
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.markdown ul,
+.markdown ol {
+  margin: 0 0 8px;
+  padding-left: 20px;
+}
+
+.markdown li {
+  margin: 2px 0;
+}
+
+.markdown code {
+  padding: 1px 4px;
+  font-size: 12px;
+  background: var(--surface-sunken);
+  border-radius: 4px;
+}
+
+.markdown pre {
+  margin: 0 0 8px;
+  padding: 8px;
+  overflow: auto;
+  background: var(--surface-sunken);
+  border-radius: var(--radius-sm);
+}
+
+.markdown pre code {
+  padding: 0;
+  background: transparent;
+}
+
+.markdown a.citation {
+  display: inline;
+  padding: 0 4px;
+  margin: 0 1px;
+  font-size: 12px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+}
+
+.markdown a.citation:hover {
+  border-color: var(--accent);
 }

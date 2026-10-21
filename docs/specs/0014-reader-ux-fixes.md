@@ -25,6 +25,16 @@ panel that could not be collapsed.
    left edge is a drag handle, clamped to 260–640 px.
 8. **Pinch zoom.** Trackpad pinch and ctrl+wheel change the zoom, reported back to the zoom field.
 
+## Second pass (same day)
+
+- The three floating tools are icons, not characters, at 42 px; hover keeps them opaque and tints
+  them with the accent instead of fading.
+- The panel's collapse and expand controls are 34 px icon buttons.
+- Reasoning is shown in full while it streams and collapses to `思考 N 秒` when the answer begins.
+- The answer is rendered as Markdown: headings, paragraphs, lists, fenced code, bold, italic and
+  inline code. Everything is escaped first, and page citations become links with `data-page` that the
+  panel intercepts — the renderer lives in `pdfscope-core::markdown`, so it is unit-tested.
+
 ## Non-goals
 
 - Continuous scrolling, single/double page modes and page-by-page navigation are **not** in this

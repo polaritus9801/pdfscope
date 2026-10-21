@@ -16,6 +16,13 @@ minor releases may contain breaking changes; they are always called out.
   are saved.
 - The streaming answer is announced to screen readers; the composer has a label.
 
+### Added
+
+- Reasoning streams in full and collapses to `思考 N 秒` once the answer starts.
+- Answers render as Markdown (headings, lists, code, emphasis, inline code, citations), escaped
+  first, with citations as interceptable links.
+- The floating tools are 42 px icons; the panel toggles are 34 px icons.
+
 ### Fixed
 
 - The window no longer scrolls as a whole: only the reader and the panel body do.

@@ -480,7 +480,9 @@ fn App() -> impl IntoView {
                             let _ = call("disarmCapture", &[]);
                         }
                     >
-                        "文"
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+                            <path d="M4 6h16M4 12h11M4 18h16" />
+                        </svg>
                     </button>
                     <button
                         class="tool"
@@ -490,7 +492,9 @@ fn App() -> impl IntoView {
                             let _ = call("beginCapture", &[]);
                         }
                     >
-                        "框"
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
+                        </svg>
                     </button>
                     <button
                         class="tool"
@@ -505,7 +509,10 @@ fn App() -> impl IntoView {
                             }
                         }
                     >
-                        "页"
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="4" y="3" width="12" height="16" rx="1.5" />
+                            <path d="M8 21h10a2 2 0 0 0 2-2V8" />
+                        </svg>
                     </button>
                 </div>
                 <div class="page" id="page" class:hidden=move || !ready.get()>
