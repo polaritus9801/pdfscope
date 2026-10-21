@@ -854,6 +854,28 @@ pub fn AiPanel(
                                 }
                             >
                                 {move || {
+                                    if !(failed.get() && !streaming.get()) {
+                                        return ().into_any();
+                                    }
+                                    view! {
+                                        <div class="error-card">
+                                            <span>{status.get()}</span>
+                                            <button
+                                                class="action"
+                                                on:click=move |_| {
+                                                    if let Some(last) = turns.get().last().cloned() {
+                                                        send_text(last.question);
+                                                    }
+                                                }
+                                            >
+                                                "重试"
+                                            </button>
+                                        </div>
+                                    }
+                                        .into_any()
+                                }}
+
+                                {move || {
                                     let all = turns.get();
                                     let last = all.len().saturating_sub(1);
                                     all

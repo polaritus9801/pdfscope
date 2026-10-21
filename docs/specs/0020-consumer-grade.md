@@ -141,6 +141,8 @@ documents; toasts never block input. A mis-shown banner costs one click, not dat
   已复制; a failed request while the WebView reports `navigator.onLine === false` says 网络已断开
   instead of showing a transport error; the output-budget error now sits under its field rather than
   at the bottom of the dialog. Verified by saving settings (toast) and submitting `0` (field error).
+- **P4** (progress): an inline error card now sits at the top of the transcript with 重试, instead of
+  leaving failures only in the status line.
 - **P4** started: every answer whose text cites a page gains **定位**, which jumps to the first
   citation; the composer grows with its content up to 150 px and then scrolls. Verified by rendering
   an answer with `[p.31]` (定位 / 复制 / 重新生成) and by typing six lines (70 → 131 px). Keyboard
@@ -171,6 +173,16 @@ documents; toasts never block input. A mis-shown banner costs one click, not dat
   fails when a component rule hard-codes a pixel value without that comment. **P1 is complete**, with
   the honest caveat that `/* size */` is our own declaration — the check enforces that every number is
   classified, not that the classification is right.
+
+## Polish pass
+
+- The tool rail is a vertical pill with a real active state: 文字 / 框选 / 页 each own a mode, 框选
+  toggles and mirrors the renderer's armed state (including Esc), and the active tool is filled with
+  the accent soft colour.
+- The shell reads as a desk: the stage carries a soft lilac wash, the page is a white sheet with one
+  shadow, the AI panel is a floating rounded card with margin rather than a flush column, and the
+  header floats on a blurred surface.
+- Palette and fonts are unchanged; the change is layout, elevation and background only.
 
 ## Deviations
 

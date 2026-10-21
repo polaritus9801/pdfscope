@@ -127,9 +127,10 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
-  height: 52px;  /* size */
-  padding: 0 var(--space-4);
-  background: var(--surface);
+  height: 56px;  /* size */
+  padding: 0 var(--space-5);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  backdrop-filter: blur(10px);  /* size */
   border-bottom: 1px solid var(--border);
 }
 
@@ -245,6 +246,9 @@ body {
 }
 
 .stage {
+  background:
+    radial-gradient(1200px 480px at 50% -10%, color-mix(in srgb, var(--lilac-100) 70%, transparent), transparent 70%),
+    var(--surface-muted);
   position: relative;
   flex: 1;
   min-width: 0;
@@ -572,11 +576,16 @@ body {
   display: flex;
   flex-direction: column;
   width: 340px;  /* size */
+  margin: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
   background: var(--surface);
-  border-left: 1px solid var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-2);
+  overflow: hidden;
 }
 
 .panel-head {
+  border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -944,29 +953,32 @@ body {
   position: absolute;
   top: var(--space-4);
   left: var(--space-4);
+  z-index: 8;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  z-index: 8;
+  gap: 2px;  /* size */
+  padding: var(--space-1);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-2);
 }
 
 .tool {
-  width: 42px;  /* size */
-  height: 42px;  /* size */
+  width: var(--space-6);  /* size */
+  height: var(--space-6);  /* size */
   display: flex;
   align-items: center;
   justify-content: center;
   font: inherit;
-  color: var(--ink);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-panel);
+  color: var(--ink-muted);
+  background: transparent;
+  border: none;
+  border-radius: 50%;
   cursor: pointer;
 }
 
 .tool:hover:not(:disabled) {
-  border-color: var(--accent);
   background: var(--accent-soft);
   color: var(--accent);
 }
@@ -1931,4 +1943,32 @@ mark.find-hit {
   color: var(--ink);
   background: var(--accent-soft);
   border-bottom: 1px solid var(--border);
+}
+
+/* The page is a sheet of paper on a desk: one shadow, one radius, no border. */
+.page {
+  box-shadow: var(--shadow-2);
+  border-radius: 2px;  /* size */
+}
+
+.tool.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.tool.active:hover:not(:disabled) {
+  background: var(--accent-soft);
+}
+
+.error-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--ink);
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, var(--border));
+  border-radius: var(--radius-md);
 }

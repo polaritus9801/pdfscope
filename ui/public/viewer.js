@@ -1190,8 +1190,13 @@ async function renderRegion(pageNumber, rect) {
   return cropped.toDataURL("image/png");
 }
 
+function reportCapture() {
+  window.__pdfscopeCapture?.(captureArmed);
+}
+
 function disarmCapture() {
   captureArmed = false;
+  reportCapture();
   capturePage = 0;
   marqueeStart = null;
   clearMarquee();
@@ -1499,6 +1504,7 @@ window.PDFScope = {
       pagesElement()?.classList.remove("zooming");
     }
     captureArmed = true;
+    reportCapture();
     stageElement()?.classList.add("capturing");
     window.getSelection()?.removeAllRanges();
     window.__pdfscopeCleared?.();

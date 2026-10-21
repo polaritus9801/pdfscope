@@ -262,6 +262,8 @@ fn App() -> impl IntoView {
     let error = RwSignal::new(Option::<String>::None);
     let settings_open = RwSignal::new(false);
     let reading = RwSignal::new(false);
+    // 0 text, 1 box, 2 page range: the rail's active tool.
+    let tool = RwSignal::new(0_u8);
     // Starts true so the banner does not flash before settings load.
     let configured = RwSignal::new(true);
     let toasts = RwSignal::new(Vec::<(f64, String)>::new());
@@ -627,6 +629,25 @@ fn App() -> impl IntoView {
         callback.forget();
     });
 
+    // The renderer reports arming; the rail follows, including when Esc disarms it.
+    Effect::new(move |_| {
+        let callback = Closure::<dyn Fn(bool)>::new(move |armed: bool| {
+            if armed {
+                tool.set(1);
+            } else if tool.get() == 1 {
+                tool.set(0);
+            }
+        });
+        if let Some(window) = web_sys::window() {
+            let _ = js_sys::Reflect::set(
+                &window,
+                &JsValue::from_str("__pdfscopeCapture"),
+                callback.as_ref(),
+            );
+        }
+        callback.forget();
+    });
+
     // The renderer clears the browser selection; the bar must go with it.
     Effect::new(move |_| {
         let callback = Closure::<dyn Fn()>::new(move || selection.set(None));
@@ -985,8 +1006,10 @@ fn App() -> impl IntoView {
                 <div class="float-tools">
                     <button
                         class="tool"
-                        title="文字选择：直接拖选正文"
+                        class:active=move || tool.get() == 0
+                        title="文字：拖选正文，选中后加入引用"
                         on:click=move |_| {
+                            tool.set(0);
                             let _ = call("disarmCapture", &[]);
                         }
                     >
@@ -996,10 +1019,17 @@ fn App() -> impl IntoView {
                     </button>
                     <button
                         class="tool"
-                        title="框选：拖出一个矩形"
+                        class:active=move || tool.get() == 1
+                        title="框选：框住图表或公式，再提问"
                         prop:disabled=move || !ready.get()
                         on:click=move |_| {
-                            let _ = call("beginCapture", &[]);
+                            if tool.get() == 1 {
+                                tool.set(0);
+                                let _ = call("disarmCapture", &[]);
+                            } else {
+                                tool.set(1);
+                                let _ = call("beginCapture", &[]);
+                            }
                         }
                     >
                         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
@@ -1008,8 +1038,10 @@ fn App() -> impl IntoView {
                     </button>
                     <button
                         class="tool"
-                        title="页面范围：在右侧输入页码"
+                        class:active=move || tool.get() == 2
+                        title="页码：把整页纳入提问范围"
                         on:click=move |_| {
+                            tool.set(2);
                             if let Some(input) = web_sys::window()
                                 .and_then(|window| window.document())
                                 .and_then(|document| document.get_element_by_id("range-input"))

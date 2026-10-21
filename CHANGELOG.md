@@ -10,6 +10,12 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Changed
 
+- The shell was restyled without touching the palette or fonts: floating panel card, paper-like page,
+  blurred header and a vertical tool pill with a real active state.
+- The three tools are now modes (文字 / 框选 / 页); 框选 toggles and follows the renderer when Esc
+  disarms it. Failures appear as an inline card with 重试.
+
+
 - Every remaining pixel value in the stylesheet is either a token or annotated `/* size */`;
   `just tokens` enforces it in `just check`.
 
