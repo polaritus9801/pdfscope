@@ -5,7 +5,7 @@
 //! given. Everything else is transport.
 
 use futures::StreamExt;
-use pdfscope_ai::{ChatRequest, Message, Protocol, ProviderConfig, StreamEvent};
+use pdfscope_ai::{ChatRequest, Image, Message, Protocol, ProviderConfig, StreamEvent};
 use serde::{Deserialize, Serialize};
 use tauri::Emitter;
 
@@ -16,6 +16,15 @@ pub(crate) struct AskReference {
     pub(crate) page: u32,
     /// The quoted words.
     pub(crate) quote: String,
+}
+
+/// One captured region the reader attached.
+#[derive(Debug, Clone, Deserialize)]
+pub(crate) struct RegionInput {
+    /// One-based page number.
+    pub page: u32,
+    /// A `data:image/png;base64,…` URL.
+    pub image: String,
 }
 
 /// What the panel receives while an answer streams.
@@ -59,31 +68,61 @@ const SYSTEM_PROMPT: &str = "\
 3. 用读者提问的语言回答；他没有提问语言时用中文。\
 4. 简明扼要，先给结论，再给依据。";
 
+/// The most images one request may carry.
+pub(crate) const MAX_IMAGES: usize = 6;
+/// The most base64 one image may carry (about 3 MB of PNG).
+pub(crate) const MAX_BASE64: usize = 4 * 1024 * 1024;
+
 /// Builds the request. Pure, so the prompt can be tested without a network.
-pub(crate) fn build_request(question: &str, references: &[AskReference]) -> ChatRequest {
+pub(crate) fn build_request(
+    question: &str,
+    references: &[AskReference],
+    regions: &[RegionInput],
+) -> Result<ChatRequest, String> {
+    if regions.len() > MAX_IMAGES {
+        return Err(format!(
+            "一次最多附 {MAX_IMAGES} 张截图，现在有 {} 张",
+            regions.len()
+        ));
+    }
+
     let mut prompt = String::new();
 
-    if references.is_empty() {
-        prompt.push_str("（读者没有提供摘录。请基于一般知识回答，不要编造页码。）\n\n");
-    } else {
-        for reference in references {
-            prompt.push_str(&format!(
-                "[摘录 p.{}]\n{}\n\n",
-                reference.page,
-                reference.quote.trim()
-            ));
-        }
+    if references.is_empty() && regions.is_empty() {
+        prompt.push_str("（读者没有提供摘录或截图。请基于一般知识回答，不要编造页码。）\n\n");
+    }
+
+    for reference in references {
+        prompt.push_str(&format!(
+            "[摘录 p.{}]\n{}\n\n",
+            reference.page,
+            reference.quote.trim()
+        ));
+    }
+
+    for region in regions {
+        prompt.push_str(&format!("[截图 p.{}，见附带的图片]\n\n", region.page));
     }
 
     prompt.push_str("问题：");
     prompt.push_str(question.trim());
 
-    ChatRequest {
+    let mut images = Vec::with_capacity(regions.len());
+    for region in regions {
+        if region.image.len() > MAX_BASE64 {
+            return Err(format!("p.{} 的截图太大，请框小一点", region.page));
+        }
+        let image = Image::from_data_url(&region.image)
+            .ok_or_else(|| format!("p.{} 的截图格式无法识别", region.page))?;
+        images.push(image);
+    }
+
+    Ok(ChatRequest {
         system: Some(SYSTEM_PROMPT.to_owned()),
-        messages: vec![Message::user(prompt)],
+        messages: vec![Message::user_with_images(prompt, images)],
         max_tokens: 2048,
         temperature: None,
-    }
+    })
 }
 
 /// Starts a streamed answer and reports it through `ask:event`.
@@ -92,6 +131,7 @@ pub(crate) async fn ask(
     app: tauri::AppHandle,
     question: String,
     references: Vec<AskReference>,
+    regions: Vec<RegionInput>,
 ) -> Result<(), String> {
     if question.trim().is_empty() {
         return Err("问题不能为空".to_owned());
@@ -113,7 +153,7 @@ pub(crate) async fn ask(
     )
     .map_err(|error| error.to_string())?;
 
-    let request = build_request(&question, &references);
+    let request = build_request(&question, &references, &regions)?;
 
     tauri::async_runtime::spawn(async move {
         let emitter = app.clone();
@@ -179,7 +219,9 @@ mod tests {
                     quote: "规范的有效性".to_owned(),
                 },
             ],
-        );
+            &[],
+        )
+        .unwrap();
 
         let prompt = &request.messages[0].content;
         assert!(prompt.contains("[摘录 p.31]"));
@@ -190,10 +232,51 @@ mod tests {
 
     #[test]
     fn no_excerpts_says_so_instead_of_pretending() {
-        let request = build_request("介绍一下背景", &[]);
+        let request = build_request("介绍一下背景", &[], &[]).unwrap();
         let prompt = &request.messages[0].content;
         assert!(prompt.contains("没有提供摘录"));
         assert!(prompt.contains("不要编造页码"));
+    }
+
+    #[test]
+    fn a_region_adds_a_label_and_an_image() {
+        let request = build_request(
+            "这个公式在说什么？",
+            &[],
+            &[RegionInput {
+                page: 12,
+                image: "data:image/png;base64,AAAA".to_owned(),
+            }],
+        )
+        .unwrap();
+
+        assert!(request.messages[0].content.contains("[截图 p.12"));
+        assert_eq!(request.messages[0].images.len(), 1);
+        assert_eq!(request.messages[0].images[0].mime, "image/png");
+    }
+
+    #[test]
+    fn too_many_regions_is_refused() {
+        let regions: Vec<RegionInput> = (0..7)
+            .map(|page| RegionInput {
+                page,
+                image: "data:image/png;base64,AAAA".to_owned(),
+            })
+            .collect();
+        assert!(build_request("q", &[], &regions).is_err());
+    }
+
+    #[test]
+    fn a_broken_image_is_refused_before_it_is_sent() {
+        let result = build_request(
+            "q",
+            &[],
+            &[RegionInput {
+                page: 1,
+                image: "not-a-data-url".to_owned(),
+            }],
+        );
+        assert!(result.is_err());
     }
 
     #[test]
@@ -204,7 +287,9 @@ mod tests {
                 page: 1,
                 quote: "  引文  ".to_owned(),
             }],
-        );
+            &[],
+        )
+        .unwrap();
         let prompt = &request.messages[0].content;
         assert!(prompt.contains("[摘录 p.1]\n引文\n"));
         assert!(prompt.ends_with("问题：问题"));

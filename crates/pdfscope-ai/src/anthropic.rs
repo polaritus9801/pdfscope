@@ -83,7 +83,23 @@ fn body(config: &ProviderConfig, request: &ChatRequest) -> Value {
                 Role::User => "user",
                 Role::Assistant => "assistant",
             };
-            json!({ "role": role, "content": message.content })
+
+            if message.images.is_empty() {
+                return json!({ "role": role, "content": message.content });
+            }
+
+            let mut parts = vec![json!({ "type": "text", "text": message.content })];
+            for image in &message.images {
+                parts.push(json!({
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": image.mime,
+                        "data": image.base64
+                    }
+                }));
+            }
+            json!({ "role": role, "content": parts })
         })
         .collect();
     body.insert("messages".to_owned(), Value::Array(messages));
@@ -179,6 +195,38 @@ mod tests {
                 .apply(Some("content_block_start"), &json!({}))
                 .is_empty()
         );
+    }
+
+    #[test]
+    fn images_become_image_blocks() {
+        let config = ProviderConfig::new(
+            "Anthropic",
+            crate::Protocol::Anthropic,
+            "https://api.anthropic.com/v1",
+            "claude-sonnet-4",
+            crate::Secret::new("k"),
+        )
+        .unwrap();
+
+        let request = ChatRequest {
+            system: None,
+            messages: vec![crate::Message::user_with_images(
+                "看这个",
+                vec![crate::Image {
+                    mime: "image/png".to_owned(),
+                    base64: "AAAA".to_owned(),
+                }],
+            )],
+            max_tokens: 10,
+            temperature: None,
+        };
+
+        let body = body(&config, &request);
+        let content = &body["messages"][0]["content"];
+        assert_eq!(content[0]["type"], "text");
+        assert_eq!(content[1]["type"], "image");
+        assert_eq!(content[1]["source"]["media_type"], "image/png");
+        assert_eq!(content[1]["source"]["data"], "AAAA");
     }
 
     #[test]

@@ -561,7 +561,7 @@ fn App() -> impl IntoView {
                 }}
             </main>
 
-            <panel::AiPanel passages=passages page=page pages=pages />
+            <panel::AiPanel passages=passages regions=regions page=page pages=pages />
             </div>
         </div>
     }

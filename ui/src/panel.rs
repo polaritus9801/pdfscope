@@ -8,7 +8,7 @@ use wasm_bindgen_futures::JsFuture;
 
 use pdfscope_core::{Segment, segments};
 
-use crate::Passage;
+use crate::{Passage, Region};
 
 /// Calls one function on `window.Bridge`.
 fn bridge(name: &str, args: &[JsValue]) -> Option<JsValue> {
@@ -73,6 +73,7 @@ const PRESET_LABELS: &[&str] = &[
 #[component]
 pub fn AiPanel(
     passages: RwSignal<Vec<Passage>>,
+    regions: RwSignal<Vec<Region>>,
     page: RwSignal<u32>,
     pages: RwSignal<u32>,
 ) -> impl IntoView {
@@ -160,6 +161,22 @@ pub fn AiPanel(
             references.push(&item);
         }
 
+        let images = js_sys::Array::new();
+        for region in regions.get() {
+            let item = js_sys::Object::new();
+            let _ = js_sys::Reflect::set(
+                &item,
+                &JsValue::from_str("page"),
+                &JsValue::from(region.page),
+            );
+            let _ = js_sys::Reflect::set(
+                &item,
+                &JsValue::from_str("image"),
+                &JsValue::from_str(&region.image),
+            );
+            images.push(&item);
+        }
+
         let started = js_sys::Date::now();
         let callback = Closure::<dyn Fn(JsValue)>::new(move |event: JsValue| {
             let kind = text_of(&event, "kind").unwrap_or_default();
@@ -203,6 +220,7 @@ pub fn AiPanel(
             &[
                 JsValue::from_str(&asked),
                 references.into(),
+                images.into(),
                 callback.as_ref().clone(),
             ],
         );

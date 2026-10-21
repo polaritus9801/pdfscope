@@ -60,7 +60,20 @@ fn messages(request: &ChatRequest) -> Value {
             Role::User => "user",
             Role::Assistant => "assistant",
         };
-        items.push(json!({ "role": role, "content": message.content }));
+
+        if message.images.is_empty() {
+            items.push(json!({ "role": role, "content": message.content }));
+            continue;
+        }
+
+        let mut parts = vec![json!({ "type": "text", "text": message.content })];
+        for image in &message.images {
+            parts.push(json!({
+                "type": "image_url",
+                "image_url": { "url": format!("data:{};base64,{}", image.mime, image.base64) }
+            }));
+        }
+        items.push(json!({ "role": role, "content": parts }));
     }
 
     Value::Array(items)
@@ -195,6 +208,24 @@ mod tests {
                 cached_tokens: 0,
             })]
         );
+    }
+
+    #[test]
+    fn images_become_image_url_parts() {
+        let mut request = ChatRequest::new("be brief", "看这个");
+        request.messages = vec![crate::Message::user_with_images(
+            "看这个",
+            vec![crate::Image {
+                mime: "image/png".to_owned(),
+                base64: "AAAA".to_owned(),
+            }],
+        )];
+
+        let messages = messages(&request);
+        let content = &messages[1]["content"];
+        assert_eq!(content[0]["type"], "text");
+        assert_eq!(content[1]["type"], "image_url");
+        assert_eq!(content[1]["image_url"]["url"], "data:image/png;base64,AAAA");
     }
 
     #[test]

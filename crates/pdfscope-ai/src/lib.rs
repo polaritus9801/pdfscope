@@ -193,6 +193,31 @@ pub enum Role {
     Assistant,
 }
 
+/// An image attached to a message.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Image {
+    /// MIME type, for example `image/png`.
+    pub mime: String,
+    /// The bytes, base64-encoded, without the data-URL prefix.
+    pub base64: String,
+}
+
+impl Image {
+    /// Accepts `data:image/png;base64,…` and nothing else.
+    pub fn from_data_url(url: &str) -> Option<Self> {
+        let rest = url.strip_prefix("data:")?;
+        let (meta, data) = rest.split_once(',')?;
+        let mime = meta.strip_suffix(";base64")?;
+        if !mime.starts_with("image/") || data.is_empty() {
+            return None;
+        }
+        Some(Self {
+            mime: mime.to_owned(),
+            base64: data.to_owned(),
+        })
+    }
+}
+
 /// One turn of a conversation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Message {
@@ -200,6 +225,9 @@ pub struct Message {
     pub role: Role,
     /// What was said.
     pub content: String,
+    /// Images attached to this turn, in order.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub images: Vec<Image>,
 }
 
 impl Message {
@@ -208,6 +236,16 @@ impl Message {
         Self {
             role: Role::User,
             content: content.into(),
+            images: Vec::new(),
+        }
+    }
+
+    /// A message from the reader with images attached.
+    pub fn user_with_images(content: impl Into<String>, images: Vec<Image>) -> Self {
+        Self {
+            role: Role::User,
+            content: content.into(),
+            images,
         }
     }
 
@@ -216,6 +254,7 @@ impl Message {
         Self {
             role: Role::Assistant,
             content: content.into(),
+            images: Vec::new(),
         }
     }
 }
@@ -349,6 +388,20 @@ pub(crate) async fn ensure_success(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_png_data_url_becomes_an_image() {
+        let image = Image::from_data_url("data:image/png;base64,AAAA").unwrap();
+        assert_eq!(image.mime, "image/png");
+        assert_eq!(image.base64, "AAAA");
+    }
+
+    #[test]
+    fn other_data_urls_are_rejected() {
+        assert!(Image::from_data_url("data:text/plain;base64,AAAA").is_none());
+        assert!(Image::from_data_url("data:image/png;base64,").is_none());
+        assert!(Image::from_data_url("https://example.com/a.png").is_none());
+    }
 
     fn config(model: &str, key: &str) -> Result<ProviderConfig, AiError> {
         ProviderConfig::new(

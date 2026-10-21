@@ -10,6 +10,9 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Multimodal requests: a captured region is sent as an image part — `image_url` on the OpenAI protocol,
+  an `image` block on Anthropic — with a page label in the prompt. Six images and 4 MB each are the
+  caps, checked before anything is sent.
 - Region capture: `框选` arms a marquee; the crop is re-rendered from the PDF at the scale needed for
   its long side to reach 1600 px and encoded as PNG, so it is sharp regardless of zoom or display
   density. The chip shows a thumbnail and can be removed. No OCR is involved.
