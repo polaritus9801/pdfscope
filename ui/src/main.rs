@@ -46,6 +46,7 @@ struct Selection {
 pub(crate) struct Region {
     pub(crate) page: u32,
     pub(crate) image: String,
+    pub(crate) rect: (f64, f64, f64, f64),
 }
 
 /// A passage the reader added to the tray.
@@ -53,6 +54,7 @@ pub(crate) struct Region {
 pub(crate) struct Passage {
     pub(crate) page: u32,
     pub(crate) quote: String,
+    pub(crate) rect: (f64, f64, f64, f64),
 }
 
 fn read_number(value: &JsValue, key: &str) -> Option<f64> {
@@ -147,6 +149,7 @@ fn App() -> impl IntoView {
     let selection = RwSignal::new(Option::<Selection>::None);
     let passages = RwSignal::new(Vec::<Passage>::new());
     let regions = RwSignal::new(Vec::<Region>::new());
+    let hovered = RwSignal::new(None::<(u32, (f64, f64, f64, f64))>);
 
     let go = move |delta: i64| {
         let total = pages.get();
@@ -225,6 +228,7 @@ fn App() -> impl IntoView {
                 list.push(Passage {
                     page: current.page,
                     quote: current.text.clone(),
+                    rect: current.rect,
                 });
             });
             selection.set(None);
@@ -297,11 +301,21 @@ fn App() -> impl IntoView {
         let callback = Closure::<dyn Fn(JsValue)>::new(move |value: JsValue| {
             let page = read_number(&value, "page").unwrap_or(0.0) as u32;
             let image = read_string(&value, "image").unwrap_or_default();
+            let x = read_number(&value, "x").unwrap_or(0.0);
+            let y = read_number(&value, "y").unwrap_or(0.0);
+            let width = read_number(&value, "width").unwrap_or(0.0);
+            let height = read_number(&value, "height").unwrap_or(0.0);
             if page == 0 {
                 return;
             }
             if image.starts_with("data:image/") {
-                regions.update(|list| list.push(Region { page, image }));
+                regions.update(|list| {
+                    list.push(Region {
+                        page,
+                        image,
+                        rect: (x, y, width, height),
+                    })
+                });
             } else {
                 error.set(Some("这一块没截下来。".to_owned()));
             }
@@ -516,6 +530,22 @@ fn App() -> impl IntoView {
                     <div id="text-layer" class="textLayer"></div>
 
                     {move || {
+                        hovered
+                            .get()
+                            .filter(|(target, _)| *target == page.get())
+                            .map(|(_, (x, y, width, height))| {
+                                let style = format!(
+                                    "left:{:.3}%; top:{:.3}%; width:{:.3}%; height:{:.3}%;",
+                                    x * 100.0,
+                                    y * 100.0,
+                                    width * 100.0,
+                                    height * 100.0,
+                                );
+                                view! { <div class="hover-tint" style=style></div> }
+                            })
+                    }}
+
+                    {move || {
                         selection
                             .get()
                             .map(|current| {
@@ -561,7 +591,30 @@ fn App() -> impl IntoView {
                 }}
             </main>
 
-            <panel::AiPanel passages=passages regions=regions page=page pages=pages />
+            <div class="rail">
+                {move || {
+                    hovered
+                        .get()
+                        .map(|(target, _)| {
+                            let total = pages.get().max(1) as f64;
+                            let top = (target as f64 - 0.5) / total * 100.0;
+                            view! {
+                                <div
+                                    class="rail-marker"
+                                    style=format!("top:{top:.2}%")
+                                ></div>
+                            }
+                        })
+                }}
+            </div>
+
+            <panel::AiPanel
+                passages=passages
+                regions=regions
+                page=page
+                pages=pages
+                hovered=hovered
+            />
             </div>
         </div>
     }

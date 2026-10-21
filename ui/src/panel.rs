@@ -94,6 +94,7 @@ pub fn AiPanel(
     regions: RwSignal<Vec<Region>>,
     page: RwSignal<u32>,
     pages: RwSignal<u32>,
+    hovered: RwSignal<Option<(u32, (f64, f64, f64, f64))>>,
 ) -> impl IntoView {
     let configured = RwSignal::new(false);
     let model = RwSignal::new("未配置".to_owned());
@@ -548,21 +549,27 @@ pub fn AiPanel(
                             {entries
                                 .into_iter()
                                 .map(|(index, entry)| {
-                                    let (label, preview, page_number) = match &entry {
+                                    let (label, preview, page_number, rect) = match &entry {
                                         Stored::Passage(passage) => (
                                             format!("p.{} · {}", passage.page, truncate(&passage.quote, 14)),
                                             passage.quote.clone(),
                                             passage.page,
+                                            passage.rect,
                                         ),
                                         Stored::Region(region) => (
                                             format!("p.{} · 截图", region.page),
                                             "（截图）".to_owned(),
                                             region.page,
+                                            region.rect,
                                         ),
                                     };
                                     view! {
                                         <div
                                             class="history-row"
+                                            on:mouseenter=move |_| {
+                                                hovered.set(Some((page_number, rect)));
+                                            }
+                                            on:mouseleave=move |_| hovered.set(None)
                                             on:click=move |event: web_sys::MouseEvent| {
                                                 if event.shift_key() {
                                                     let total = pages.get();

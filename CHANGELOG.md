@@ -10,6 +10,8 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Hovering a history reference tints its rectangle when you are on that page and marks its position on
+  a thin rail; hovering never scrolls the document.
 - `测试连接` in the settings sheet: one tiny request verifies the key, endpoint and model before they
   are saved.
 - The streaming answer is announced to screen readers; the composer has a label.

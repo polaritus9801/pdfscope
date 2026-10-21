@@ -191,9 +191,9 @@ window, Send is disabled with a specific message rather than a generic failure.
 
 - History keeps passages and regions only; page-range and answer references join when their slices
   land.
-- Hovering a row shows a delayed preview (600 ms, CSS) and a `p.N →` jump control. The in-page tint and
-  the scrollbar marker from the design are **not** implemented yet: a passage does not store its
-  rectangle, and the rail needs a layout pass of its own.
+- Hovering a row shows a delayed preview (600 ms, CSS), a `p.N →` jump control, a tint over the
+  rectangle when the reference is on the page being read, and a marker on the rail at the reference's
+  position in the document. Hovering never scrolls, as designed.
 - Shift+click jumps and flashes the page; a plain click redeems into the tray.
 - History lives in memory for the session, as designed.
 

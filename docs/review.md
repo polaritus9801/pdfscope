@@ -40,7 +40,7 @@ own task. The debug figure is recorded only so a later release figure has someth
 | F2 | Per-token reactive updates made long answers quadratic | medium | fixed |
 | F3 | No `⌘↵` to send, no `Esc` to stop | medium | fixed |
 | F4 | The last ~50 ms of tokens could arrive after `done` | low | fixed |
-| F5 | History has no in-page tint or scrollbar marker | medium | deferred: a passage does not store its rectangle, and the rail needs its own layout |
+| F5 | History has no in-page tint or scrollbar marker | medium | fixed |
 | F6 | Stop does not abort the HTTP request, so the provider may bill a few more tokens | low | accepted in the spec |
 | F7 | Settings cannot test the connection before saving | medium | fixed |
 | F8 | Up to 20 page texts are fetched sequentially at send time | low | acceptable for now; parallelising changes ordering semantics |
