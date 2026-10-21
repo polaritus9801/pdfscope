@@ -31,6 +31,30 @@ pub enum CoreError {
         /// Number of pages in the document.
         page_count: u32,
     },
+
+    /// A page yielded no text at all.
+    #[error("page {0} has no extractable text")]
+    EmptyPage(u32),
+
+    /// A selection contained no characters after normalisation.
+    #[error("selection contains no text")]
+    EmptySelection,
+
+    /// A selection's text does not occur on the page it was reported from.
+    #[error("the quoted text does not occur on page {page}")]
+    QuoteNotFound {
+        /// Page the selection claimed to be on, zero-based.
+        page: u32,
+    },
+
+    /// A selection was reported for a different page than the one supplied.
+    #[error("selection is on page {selection} but the page given is {page}")]
+    PageMismatch {
+        /// Page the selection claimed to be on, zero-based.
+        selection: u32,
+        /// Page that was supplied, zero-based.
+        page: u32,
+    },
 }
 
 /// Convenience alias for results produced by this crate.

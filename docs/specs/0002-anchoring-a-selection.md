@@ -1,9 +1,9 @@
 # 0002 — Anchoring a selection to a page
 
-- **Status:** draft
+- **Status:** accepted
 - **Author:** z1mLi
 - **Date:** 2026-10-21
-- **Approved by:** —
+- **Approved by:** z1mLi ("开始做吧，反正一定按规范做")
 
 ## Goal
 
@@ -108,7 +108,21 @@ belongs to the desktop layer and is specified separately.
 
 ## Deviations
 
-*(empty)*
+- `SelectedText` carries the book, so `capture` takes one argument fewer than sketched above. The
+  UI already knows the book; passing it separately invited the two to disagree.
+- Rectangles come from the union of the *text runs* covering a match, not from glyph boxes. PDF.js
+  supplies run-level geometry, and inventing per-glyph precision would have been a lie.
+- `resolve` returns `NeedsReview` when handed a page other than the anchor's. The spec did not say
+  what happens on a mismatch; refusing to guess is the only safe answer.
+- `Anchor` and `Resolution` cannot derive `Eq`, because `Rect` is `f32`. Callers comparing positions
+  compare with a tolerance; equality of `Rect` is exact.
+- A single-rectangle union returns the input untouched. Recomputing its edges from itself introduced
+  f32 rounding, which made a resolution compare unequal to the rectangle it came from.
+
+## Design review
+
+No interface in this slice: it is `pdfscope-core` only. The controls that produce a `SelectedText`
+are specified in 0003 and reviewed there.
 
 ## Open questions
 

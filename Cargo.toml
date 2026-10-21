@@ -60,6 +60,9 @@ sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio",
 # Time
 time = { version = "0.3", features = ["formatting", "parsing"] }
 
+# Hashing
+sha2 = "0.10"
+
 # Testing
 tempfile = "3"
 

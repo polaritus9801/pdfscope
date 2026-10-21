@@ -8,10 +8,14 @@
 
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
+pub mod anchor;
 pub mod error;
 pub mod geo;
 pub mod ids;
 
+pub use anchor::{
+    Anchor, PageHash, PageText, Resolution, SelectedText, TextItem, capture, normalize, resolve,
+};
 pub use error::{CoreError, CoreResult};
 pub use geo::Rect;
 pub use ids::{BookId, PageIndex};

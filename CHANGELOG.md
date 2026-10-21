@@ -10,6 +10,11 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Anchoring: a selection is captured with its page, quote, surrounding context and a page hash, and
+  resolved later to `Exact`, `Relocated`, `Ambiguous` or `NeedsReview` — never to a guessed
+  position.
+- Text normalisation shared by capture and resolution: whitespace runs, ideographic spaces and the
+  usual PDF ligatures collapse identically on both sides.
 - Workspace layout with one-way crate dependencies: `core`, `proto`, `store`, `ai`, `api`, `server`.
 - Domain primitives: content-hash book identity, zero-based page indices that display one-based,
   normalised page rectangles with a validated invariant.
