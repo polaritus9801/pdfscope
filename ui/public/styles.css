@@ -634,6 +634,8 @@ body {
 .ask {
   height: 72px;
   padding: 8px;
+  max-height: 150px;
+  overflow-y: auto;
   resize: none;
   font: inherit;
   color: var(--ink);

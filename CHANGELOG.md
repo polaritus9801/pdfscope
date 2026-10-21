@@ -37,6 +37,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- **定位** on answers that cite a page: jumps to the first citation in the document.
+- The composer grows with its content up to 150 px, then scrolls.
+
+
 - Page thumbnails in the same rail as the outline, rendered lazily and cached; a document without a
   table of contents can still use them.
 

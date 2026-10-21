@@ -6,7 +6,7 @@ use wasm_bindgen::closure::Closure;
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 
-use pdfscope_core::parse_ranges;
+use pdfscope_core::{Segment, parse_ranges, segments};
 
 use crate::{Passage, Region, truncate};
 
@@ -848,6 +848,23 @@ pub fn AiPanel(
 
                                             let copied = turn.answer.clone();
                                             let retry = turn.question.clone();
+                                            let locate = segments(&turn.answer)
+                                                .into_iter()
+                                                .find_map(|segment| match segment {
+                                                    Segment::Citation(target) => Some(target),
+                                                    Segment::Text(_) => None,
+                                                });
+                                            let located = locate
+                                                .map(|target| {
+                                                    view! {
+                                                        <button
+                                                            class="action"
+                                                            on:click=move |_| jump(target)
+                                                        >
+                                                            "定位"
+                                                        </button>
+                                                    }
+                                                });
                                             let regenerate = (index == last)
                                                 .then(|| {
                                                     view! {
@@ -877,12 +894,13 @@ pub fn AiPanel(
                                                     {detail}
                                                     {body}
                                                     <div class="turn-actions">
+                                                        {located}
                                                         <button
                                                             class="action"
                                                             on:click=move |_| {
-                                        copy_to_clipboard(&copied);
-                                        notify.run("已复制".to_owned());
-                                    }
+                                                                copy_to_clipboard(&copied);
+                                                                notify.run("已复制".to_owned());
+                                                            }
                                                         >
                                                             "复制"
                                                         </button>
@@ -1141,7 +1159,17 @@ pub fn AiPanel(
                     aria-label="问题"
                     placeholder="问点什么…"
                     prop:value=move || question.get()
-                    on:input=move |event| question.set(event_target_value(&event))
+                    on:input=move |event| {
+                        question.set(event_target_value(&event));
+                        if let Some(target) = event
+                            .current_target()
+                            .and_then(|target| target.dyn_into::<web_sys::HtmlTextAreaElement>().ok())
+                        {
+                            let _ = target.set_attribute("style", "height:auto");
+                            let height = target.scroll_height().min(150);
+                            let _ = target.set_attribute("style", &format!("height:{height}px"));
+                        }
+                    }
                     on:keydown=move |event: web_sys::KeyboardEvent| {
                         let modified = event.meta_key()
                             || event.ctrl_key()
