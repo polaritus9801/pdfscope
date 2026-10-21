@@ -19,8 +19,8 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
-- LaTeX maths renders as MathML: `$…$` inline and `$$…$$` as a centred block, with code fences left
-  alone and invalid input falling back to its source.
+- LaTeX maths renders with KaTeX: `$…$` inline and `$$…$$` as a centred block. `latex2mathml` was
+  tried first and dropped — it could not parse `\le`, `\ge`, `\mathbb` or `\dots`.
 
 
 - Smooth zoom: trackpad pinch (WKWebView `gesture*` and Chromium `ctrl`+wheel), eased `ctrl`/`⌘`+wheel,

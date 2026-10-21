@@ -621,6 +621,7 @@ pub fn AiPanel(
                     } else {
                         view! {
                             <div
+                                id="transcript"
                                 class="transcript"
                                 on:click=move |event: web_sys::MouseEvent| {
                                     let Some(target) = event

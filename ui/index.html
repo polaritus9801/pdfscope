@@ -8,9 +8,15 @@
     <link data-trunk rel="css" href="public/styles.css" />
     <link data-trunk rel="copy-file" href="public/viewer.js" />
     <link data-trunk rel="copy-file" href="public/bridge.js" />
+    <link data-trunk rel="copy-file" href="public/katex.js" />
+    <link data-trunk rel="copy-dir" href="public/katex" />
+    <link rel="stylesheet" href="katex/katex.min.css" />
     <link data-trunk rel="copy-dir" href="public/pdfjs" />
   </head>
   <body>
+    <script src="katex/katex.min.js"></script>
+    <script src="katex/contrib/auto-render.min.js"></script>
+    <script src="katex.js"></script>
     <script type="module" src="bridge.js"></script>
     <script type="module" src="viewer.js"></script>
   </body>

@@ -43,11 +43,14 @@ lists). Two things are ours:
 
 ## Math
 
-`$…$` and `$$…$$` are extracted before parsing, rendered with `latex2mathml`, and substituted back
-through a private-use placeholder; fenced code is left alone and invalid LaTeX falls back to its
-source. Inline math typesets correctly. Display math is centred but its internal layout depends on
-the browser's MathML implementation, and constructs like `\max \sum` can place the operator awkwardly
-— if that proves unacceptable, KaTeX is the fallback.
+`latex2mathml` was tried first and rejected: it does not understand `\le`, `\ge`, `\mathbb` or
+`\dots`, so ordinary answers produced `[PARSE ERROR: …]` in place of the formula.
+
+KaTeX now typesets maths in the browser. The Markdown renderer leaves `$…$` and `$$…$$` untouched;
+`ui/public/katex.js` observes the transcript, renders with KaTeX's auto-render extension, and
+disconnects the observer while KaTeX mutates the DOM so its own insertions cannot retrigger it.
+Only the WOFF2 fonts are vendored (596 KB for the whole KaTeX directory); code fences are untouched
+because KaTeX skips `pre`/`code`.
 
 ## Deviations
 
