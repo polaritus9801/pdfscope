@@ -41,6 +41,16 @@ panel that could not be collapsed.
   selection, marks the document `resizing` (so the browser cannot start one), and prevents the
   default on pointer down and move. Both the system highlight and our own selection bar stay put.
 
+## Fourth pass
+
+- "准备中" split into `准备上下文…` (fetching page text) and `等待回答…` (request sent, first token
+  pending), so the two waits are distinguishable.
+- Reasoning timing starts when the request is sent, never reads `0.0`, and the block no longer uses a
+  controlled `open` attribute: while streaming it is a plain block, when finished it is an ordinary
+  `<details>` the reader controls. The controlled attribute was why it could not be closed and
+  reopened as `思考 0.0 秒`.
+- `Enter` sends; `Shift`, `⌘`, `Ctrl` or `Alt` + `Enter` inserts a newline.
+
 ## Non-goals
 
 - Continuous scrolling, single/double page modes and page-by-page navigation are **not** in this

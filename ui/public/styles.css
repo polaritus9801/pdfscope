@@ -1061,6 +1061,15 @@ body {
   content: "▾ ";
 }
 
+.think-head {
+  padding: 2px 0;
+  color: var(--ink-faint);
+}
+
+.think-head::before {
+  content: "▾ ";
+}
+
 .think-text {
   margin: 6px 0 0;
   padding: 8px;
@@ -1077,7 +1086,7 @@ body {
 
 /* Markdown */
 .markdown p {
-  margin: 0 0 8px;
+  margin: 0 0 6px;
 }
 
 .markdown p:last-child {

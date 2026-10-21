@@ -43,6 +43,11 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Fixed
 
+- The reasoning block can be collapsed again and never reports `0.0 秒`: the streaming state is a
+  plain block, the finished state an uncontrolled `<details>`.
+- `准备中` now says whether it is building context or waiting for the first token.
+- `Enter` sends; any modifier plus `Enter` inserts a newline.
+
 - Rotated PDF pages now select the text under the pointer: the text layer gets PDF.js's
   `data-main-rotation` transforms, and a stale selection bar clears when the selection collapses or
   the page re-renders.

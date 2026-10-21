@@ -220,11 +220,11 @@ pub fn AiPanel(
         question.set(String::new());
         answer.set(String::new());
         reasoning.set(String::new());
-        think_started.set(0.0);
+        think_started.set(js_sys::Date::now());
         think_seconds.set(0.0);
         streaming.set(true);
         failed.set(false);
-        status.set("准备中…".to_owned());
+        status.set("准备上下文…".to_owned());
 
         let passages_now = passages.get();
         let regions_now = regions.get();
@@ -338,6 +338,7 @@ pub fn AiPanel(
                 history.push(&item);
             }
 
+            status.set("等待回答…".to_owned());
             let started = js_sys::Date::now();
             let callback = Closure::<dyn Fn(JsValue)>::new(move |event: JsValue| {
                 let flush_pending = move || {
@@ -648,7 +649,7 @@ pub fn AiPanel(
                                                 view! {
                                                     <details class="think">
                                                         <summary>
-                                                            {format!("思考 {:.1} 秒", turn.seconds)}
+                                                            {format!("思考 {:.1} 秒", turn.seconds.max(0.1))}
                                                         </summary>
                                                         <pre class="think-text">{turn.reasoning.clone()}</pre>
                                                     </details>
@@ -682,13 +683,23 @@ pub fn AiPanel(
                                         } else {
                                             format!("思考 {:.1} 秒", think_seconds.get())
                                         };
-                                        view! {
-                                            <details class="think" prop:open=streaming_now>
-                                                <summary>{label}</summary>
-                                                <pre class="think-text">{reasoning.get()}</pre>
-                                            </details>
+                                        if streaming_now {
+                                            view! {
+                                                <div class="think">
+                                                    <div class="think-head">{label}</div>
+                                                    <pre class="think-text">{reasoning.get()}</pre>
+                                                </div>
+                                            }
+                                                .into_any()
+                                        } else {
+                                            view! {
+                                                <details class="think">
+                                                    <summary>{label}</summary>
+                                                    <pre class="think-text">{reasoning.get()}</pre>
+                                                </details>
+                                            }
+                                                .into_any()
                                         }
-                                            .into_any()
                                     };
                                     view! {
                                         <div class="turn current">
@@ -888,7 +899,11 @@ pub fn AiPanel(
                     prop:value=move || question.get()
                     on:input=move |event| question.set(event_target_value(&event))
                     on:keydown=move |event: web_sys::KeyboardEvent| {
-                        if event.key() == "Enter" && (event.meta_key() || event.ctrl_key()) {
+                        let modified = event.meta_key()
+                            || event.ctrl_key()
+                            || event.alt_key()
+                            || event.shift_key();
+                        if event.key() == "Enter" && !modified {
                             event.prevent_default();
                             send(());
                         } else if event.key() == "Escape" && streaming.get() {
