@@ -64,7 +64,11 @@ fn count(data: &Value, pointer: &str) -> u32 {
 fn body(config: &ProviderConfig, request: &ChatRequest) -> Value {
     let mut body = serde_json::Map::new();
     body.insert("model".to_owned(), json!(config.model()));
-    body.insert("max_tokens".to_owned(), json!(request.max_tokens));
+    // Anthropic requires the field; treat "no limit" as a generous ceiling.
+    body.insert(
+        "max_tokens".to_owned(),
+        json!(request.max_tokens.unwrap_or(8192)),
+    );
     body.insert("stream".to_owned(), json!(true));
 
     if let Some(system) = &request.system {
@@ -217,7 +221,7 @@ mod tests {
                     base64: "AAAA".to_owned(),
                 }],
             )],
-            max_tokens: 10,
+            max_tokens: Some(10),
             temperature: None,
         };
 

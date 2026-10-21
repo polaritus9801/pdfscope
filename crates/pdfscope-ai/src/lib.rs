@@ -266,8 +266,8 @@ pub struct ChatRequest {
     pub system: Option<String>,
     /// The turns so far, oldest first.
     pub messages: Vec<Message>,
-    /// An upper bound on generated tokens. Sent to every provider; some require it.
-    pub max_tokens: u32,
+    /// An upper bound on generated tokens; `None` means no limit where the provider allows it.
+    pub max_tokens: Option<u32>,
     /// Sampling temperature, when the provider takes one.
     pub temperature: Option<f32>,
 }
@@ -278,7 +278,7 @@ impl ChatRequest {
         Self {
             system: Some(system.into()),
             messages: vec![Message::user(question)],
-            max_tokens: 2048,
+            max_tokens: Some(2048),
             temperature: None,
         }
     }

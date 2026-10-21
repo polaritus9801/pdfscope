@@ -83,7 +83,9 @@ fn body(config: &ProviderConfig, request: &ChatRequest) -> Value {
     let mut body = serde_json::Map::new();
     body.insert("model".to_owned(), json!(config.model()));
     body.insert("messages".to_owned(), messages(request));
-    body.insert("max_tokens".to_owned(), json!(request.max_tokens));
+    if let Some(limit) = request.max_tokens {
+        body.insert("max_tokens".to_owned(), json!(limit));
+    }
     body.insert("stream".to_owned(), json!(true));
     // Ask for the usage summary in the final frame; providers that do not know the field ignore it.
     body.insert(

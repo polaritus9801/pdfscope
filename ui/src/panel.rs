@@ -182,6 +182,7 @@ pub fn AiPanel(
     let form_key = RwSignal::new(String::new());
     let form_prompt = RwSignal::new(String::new());
     let form_theme = RwSignal::new("system".to_owned());
+    let form_max = RwSignal::new(String::new());
     let tab = RwSignal::new(0_u8);
     let form_error = RwSignal::new(Option::<String>::None);
 
@@ -213,6 +214,11 @@ pub fn AiPanel(
                     apply_theme(&stored);
                     form_theme.set(stored);
                 }
+                form_max.set(
+                    number_of(&value, "max_tokens")
+                        .map(|limit| (limit as u32).to_string())
+                        .unwrap_or_default(),
+                );
             });
         }
     });
@@ -516,7 +522,7 @@ pub fn AiPanel(
 
     let send = move |_| send_text(question.get());
 
-    let build_payload = move || {
+    let build_payload = move || -> Option<js_sys::Object> {
         let payload = js_sys::Object::new();
         let _ = js_sys::Reflect::set(
             &payload,
@@ -550,6 +556,18 @@ pub fn AiPanel(
             &JsValue::from_str(&form_theme.get()),
         );
 
+        let limit = match form_max.get().trim() {
+            "" => JsValue::NULL,
+            text => match text.parse::<u32>() {
+                Ok(value) if value > 0 => JsValue::from_f64(f64::from(value)),
+                _ => {
+                    form_error.set(Some("最大输出要留空，或填一个正整数".to_owned()));
+                    return None;
+                }
+            },
+        };
+        let _ = js_sys::Reflect::set(&payload, &JsValue::from_str("max_tokens"), &limit);
+
         let key = form_key.get();
         if !key.trim().is_empty() {
             let _ = js_sys::Reflect::set(
@@ -559,11 +577,13 @@ pub fn AiPanel(
             );
         }
 
-        payload
+        Some(payload)
     };
 
     let save = move |_| {
-        let payload = build_payload();
+        let Some(payload) = build_payload() else {
+            return;
+        };
 
         if let Some(promise) = bridge("saveSettings", &[payload.into()]) {
             spawn_local(async move {
@@ -1210,6 +1230,17 @@ pub fn AiPanel(
                                             />
                                         </label>
                                     </section>
+
+                                        <label class="settings-row">
+                                            <span>"最大输出"</span>
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                placeholder="留空 = 不限制"
+                                                prop:value=move || form_max.get()
+                                                on:input=move |event| form_max.set(event_target_value(&event))
+                                            />
+                                        </label>
 
                                         <div class="settings-row">
                                             <span>"连接"</span>

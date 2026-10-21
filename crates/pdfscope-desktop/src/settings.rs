@@ -47,6 +47,9 @@ pub(crate) struct Settings {
     /// `system`, `light` or `dark`.
     #[serde(default = "default_theme")]
     pub(crate) theme: String,
+    /// Upper bound on generated tokens; `None` means no limit.
+    #[serde(default)]
+    pub(crate) max_tokens: Option<u32>,
 }
 
 fn default_prompt() -> String {
@@ -66,6 +69,7 @@ impl Default for Settings {
             model: "mimo-v2.6-flash".to_owned(),
             system_prompt: default_prompt(),
             theme: default_theme(),
+            max_tokens: None,
         }
     }
 }
@@ -87,6 +91,9 @@ pub(crate) struct SettingsInput {
     /// `system`, `light` or `dark`.
     #[serde(default)]
     pub(crate) theme: Option<String>,
+    /// Upper bound on generated tokens; absent or null means no limit.
+    #[serde(default)]
+    pub(crate) max_tokens: Option<u32>,
     /// A new key, when the user typed one. `None` keeps the stored key.
     pub(crate) api_key: Option<String>,
 }
@@ -106,6 +113,8 @@ pub(crate) struct SettingsView {
     pub(crate) system_prompt: String,
     /// `system`, `light` or `dark`.
     pub(crate) theme: String,
+    /// Upper bound on generated tokens; `None` means no limit.
+    pub(crate) max_tokens: Option<u32>,
     /// Whether a key is stored. The key itself never crosses this boundary.
     pub(crate) has_key: bool,
 }
@@ -173,6 +182,7 @@ pub(crate) fn load_settings(app: tauri::AppHandle) -> Result<SettingsView, Strin
         model: settings.model,
         system_prompt: settings.system_prompt,
         theme: settings.theme,
+        max_tokens: settings.max_tokens,
         has_key: has_key(&app),
     })
 }
@@ -203,6 +213,7 @@ pub(crate) fn save_settings(app: tauri::AppHandle, settings: SettingsInput) -> R
             .filter(|prompt| !prompt.trim().is_empty())
             .unwrap_or_else(default_prompt),
         theme: settings.theme.unwrap_or_else(default_theme),
+        max_tokens: settings.max_tokens,
     };
 
     let path = settings_path(&app)?;
@@ -249,7 +260,7 @@ pub(crate) async fn test_settings(
     let request = ChatRequest {
         system: None,
         messages: vec![Message::user("只回复 ok")],
-        max_tokens: 16,
+        max_tokens: Some(16),
         temperature: None,
     };
 

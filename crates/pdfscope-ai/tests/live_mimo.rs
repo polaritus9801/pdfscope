@@ -27,7 +27,7 @@ async fn mimo_streams_reasoning_and_text() {
     let request = ChatRequest {
         system: Some("你是一个简洁的助手。".to_owned()),
         messages: vec![Message::user("只回复两个字：收到")],
-        max_tokens: 256,
+        max_tokens: Some(256),
         temperature: None,
     };
 

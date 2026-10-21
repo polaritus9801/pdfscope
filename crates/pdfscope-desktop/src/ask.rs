@@ -163,9 +163,9 @@ pub(crate) fn build_request(
     }
 
     Ok(ChatRequest {
+        max_tokens: Some(2048),
         system: Some(system.to_owned()),
         messages: vec![Message::user_with_images(prompt, images)],
-        max_tokens: 2048,
         temperature: None,
     })
 }
@@ -210,7 +210,7 @@ pub(crate) async fn ask(
         .into_iter()
         .rev()
         .collect();
-    let request = build_request(
+    let mut request = build_request(
         &question,
         &references,
         &regions,
@@ -218,6 +218,7 @@ pub(crate) async fn ask(
         &history,
         &settings.system_prompt,
     )?;
+    request.max_tokens = settings.max_tokens;
     let stop = control.stop.clone();
     stop.store(false, Ordering::SeqCst);
 
@@ -284,7 +285,7 @@ mod tests {
 
     #[test]
     fn excerpts_are_labelled_with_their_page() {
-        let request = build_request(
+        let mut request = build_request(
             "这一节在讲什么？",
             &[
                 AskReference {
@@ -314,7 +315,7 @@ mod tests {
 
     #[test]
     fn no_excerpts_says_so_instead_of_pretending() {
-        let request = build_request(
+        let mut request = build_request(
             "介绍一下背景",
             &[],
             &[],
@@ -330,7 +331,7 @@ mod tests {
 
     #[test]
     fn a_region_adds_a_label_and_an_image() {
-        let request = build_request(
+        let mut request = build_request(
             "这个公式在说什么？",
             &[],
             &[RegionInput {
@@ -350,7 +351,7 @@ mod tests {
 
     #[test]
     fn page_context_is_labelled_and_marks_scans() {
-        let request = build_request(
+        let mut request = build_request(
             "这一章讲了什么？",
             &[],
             &[],
@@ -413,7 +414,7 @@ mod tests {
 
     #[test]
     fn surrounding_whitespace_is_trimmed() {
-        let request = build_request(
+        let mut request = build_request(
             "  问题  ",
             &[AskReference {
                 page: 1,

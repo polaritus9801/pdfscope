@@ -74,6 +74,13 @@ the result.
   `模型只返回了思考过程，没有正文` with the same retry control.
 - The prompt field is full width, 260 px tall and not manually resizable.
 
+## Eighth pass — output budget
+
+- Settings gained **最大输出**: a positive integer, or empty for no limit. OpenAI-compatible providers
+  then omit `max_tokens` entirely; Anthropic requires the field, so "no limit" is sent as 8192.
+- The empty-answer case is the reason this exists: a long reasoning budget can consume the reply
+  entirely.
+
 ## Non-goals
 
 - Continuous scrolling, single/double page modes and page-by-page navigation are **not** in this

@@ -37,6 +37,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- A **最大输出** setting: a token ceiling, or empty for no limit. OpenAI-compatible requests omit
+  `max_tokens` when unset; Anthropic, which requires it, receives 8192.
+
+
 - LaTeX maths renders with KaTeX: `$…$` inline and `$$…$$` as a centred block. `latex2mathml` was
   tried first and dropped — it could not parse `\le`, `\ge`, `\mathbb` or `\dots`.
 
