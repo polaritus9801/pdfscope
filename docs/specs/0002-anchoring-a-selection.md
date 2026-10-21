@@ -79,7 +79,7 @@ pub fn capture(page: &PageText, selection: &SelectedText) -> CoreResult<Anchor>;
 pub fn resolve(anchor: &Anchor, page: &PageText) -> Resolution;
 ```
 
-`PageText` and `SelectedText` are inputs owned by `verso-core`; their construction from PDF.js output
+`PageText` and `SelectedText` are inputs owned by `pdfscope-core`; their construction from PDF.js output
 belongs to the desktop layer and is specified separately.
 
 ## Test plan

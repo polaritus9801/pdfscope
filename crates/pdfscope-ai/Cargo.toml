@@ -1,6 +1,6 @@
 [package]
-name = "verso-store"
-description = "SQLite persistence and migrations for Verso."
+name = "pdfscope-ai"
+description = "Model providers, streaming and secret handling for PDFScope."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,11 +9,6 @@ authors.workspace = true
 
 [dependencies]
 thiserror.workspace = true
-sqlx.workspace = true
-tokio.workspace = true
-
-[dev-dependencies]
-tempfile.workspace = true
 
 [lints]
 workspace = true

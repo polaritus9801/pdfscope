@@ -1,4 +1,4 @@
-# Verso — one entry point for every routine task.
+# PDFScope — one entry point for every routine task.
 #
 # `just` is a convenience, not a dependency: every recipe below is a short shell command that can be
 # copied and run directly. The point of the file is that humans and agents run the *same* commands,
@@ -50,7 +50,7 @@ outdated:  # Dependency freshness. Requires `cargo install cargo-outdated`.
     cargo outdated --workspace
 
 run:  # Run the web server on the default port.
-    cargo run -p verso-server
+    cargo run -p pdfscope-server
 
 new-spec name:  # Scaffold docs/specs/NNNN-name.md.
     @./scripts/new-doc.sh spec "{{name}}"

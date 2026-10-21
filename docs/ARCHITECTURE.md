@@ -1,6 +1,6 @@
 # Architecture
 
-Verso is a local-first PDF reader with an AI beside the page. This document describes the shape of
+PDFScope is a local-first PDF reader with an AI beside the page. This document describes the shape of
 the system, the reasoning behind it, and the rules that keep it that shape.
 
 Decisions with alternatives considered live in [`adr/`](adr/). This file states the current design;
@@ -27,41 +27,41 @@ the ADRs record why.
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│  verso-desktop (Tauri 2)              verso-server (axum)        │
+│  pdfscope-desktop (Tauri 2)              pdfscope-server (axum)        │
 │  window, dialogs, keychain            HTTP + SSE, static assets  │
 └───────────────┬───────────────────────────────┬──────────────────┘
                 │                               │
                 └───────────┬───────────────────┘
                             │
                      ┌──────▼──────┐
-                     │  verso-api  │  requests, SSE events, errors
+                     │  pdfscope-api  │  requests, SSE events, errors
                      └──────┬──────┘
               ┌─────────────┼─────────────┐
         ┌─────▼─────┐ ┌─────▼─────┐ ┌─────▼─────┐
-        │verso-store│ │ verso-ai  │ │verso-proto│
+        │pdfscope-store│ │ pdfscope-ai  │ │pdfscope-proto│
         └─────┬─────┘ └─────┬─────┘ └─────┬─────┘
               └─────────────┼─────────────┘
                      ┌──────▼──────┐
-                     │ verso-core  │  types and rules, no I/O
+                     │ pdfscope-core  │  types and rules, no I/O
                      └─────────────┘
 ```
 
-The front end (Leptos, compiled to WebAssembly) talks only to `verso-api` — over Tauri IPC in the
+The front end (Leptos, compiled to WebAssembly) talks only to `pdfscope-api` — over Tauri IPC in the
 desktop build, over HTTP in the web build. It does not know which one it is talking to.
 
 ### Crates
 
 | Crate | Owns | Must not |
 |---|---|---|
-| `verso-core` | Anchors, page ranges, context assembly, prompt construction | Import `tauri`, `axum`, `sqlx`, or touch I/O |
-| `verso-proto` | Wire types shared by client and server | Contain logic |
-| `verso-store` | SQLite schema, migrations, queries | Know about HTTP or models |
-| `verso-ai` | Provider clients, streaming, secret handling | Know about PDFs or storage |
-| `verso-api` | Routing, request validation, SSE framing | Contain domain rules |
-| `verso-server` | Composition, config, lifecycle | Contain domain rules |
-| `verso-desktop` | Window, dialogs, keychain, IPC bridge | Contain domain rules |
+| `pdfscope-core` | Anchors, page ranges, context assembly, prompt construction | Import `tauri`, `axum`, `sqlx`, or touch I/O |
+| `pdfscope-proto` | Wire types shared by client and server | Contain logic |
+| `pdfscope-store` | SQLite schema, migrations, queries | Know about HTTP or models |
+| `pdfscope-ai` | Provider clients, streaming, secret handling | Know about PDFs or storage |
+| `pdfscope-api` | Routing, request validation, SSE framing | Contain domain rules |
+| `pdfscope-server` | Composition, config, lifecycle | Contain domain rules |
+| `pdfscope-desktop` | Window, dialogs, keychain, IPC bridge | Contain domain rules |
 
-The same `verso-api` handlers serve both shells. If a feature works in one shell and not the other,
+The same `pdfscope-api` handlers serve both shells. If a feature works in one shell and not the other,
 the bug is in the shell, not the API.
 
 ---
@@ -138,7 +138,7 @@ SQLite, one file per installation, migrations append-only.
 
 - The **library** is an index, not a source of truth: it can be rebuilt by rescanning the disk.
 - **Annotations** live beside the document, keyed by content hash and page.
-- **Notes** are not stored at all by default. Verso produces Markdown for the user to paste into
+- **Notes** are not stored at all by default. PDFScope produces Markdown for the user to paste into
   whatever they already use. It deliberately owns no note format.
 
 That last point is a product decision with architectural weight: it removes an editor, a sync

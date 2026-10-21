@@ -1,4 +1,4 @@
-# Contributing to Verso
+# Contributing to PDFScope
 
 Thanks for considering it. This project is small on purpose, and the strongest contribution is
 usually the one that removes something.
@@ -14,8 +14,8 @@ it applies to maintainers as much as to outside contributors. The short version:
 ## Setup
 
 ```sh
-git clone https://github.com/polaritus9801/verso.git
-cd verso
+git clone https://github.com/polaritus9801/pdfscope.git
+cd pdfscope
 just setup     # configures git hooks, prints the toolchain versions
 just check     # fmt + clippy + tests + docs
 ```
@@ -55,7 +55,7 @@ Types and scopes are listed in [`AGENTS.md`](AGENTS.md) §4. The `Spec:` trailer
 
 ## Reporting bugs
 
-Include the version (`verso-server --version` or the app's About screen), the operating system, and
+Include the version (`pdfscope-server --version` or the app's About screen), the operating system, and
 the smallest PDF that reproduces the problem. If the file is private, describe its properties —
 scanned or text layer, page count, language, encryption — and we will find or synthesise an
 equivalent.

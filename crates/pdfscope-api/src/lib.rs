@@ -1,17 +1,17 @@
-//! The HTTP surface over the Verso domain.
+//! The HTTP surface over the PDFScope domain.
 //!
 //! Both shells talk to this crate: the web build over TCP, the desktop build by dispatching the
 //! same handlers through Tauri IPC. Keeping one implementation is what stops the two builds from
 //! becoming two products.
 //!
 //! Handlers validate, delegate, and format. They do not contain domain rules — those live in
-//! `verso-core` — and they do not touch storage directly.
+//! `pdfscope-core` — and they do not touch storage directly.
 
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 use axum::{Json, Router, extract::State, routing::get};
+use pdfscope_proto::{HealthResponse, SERVICE_NAME};
 use tower_http::trace::TraceLayer;
-use verso_proto::{HealthResponse, SERVICE_NAME};
 
 /// Shared state for every handler.
 ///
@@ -75,7 +75,7 @@ mod tests {
         let body = response.into_body().collect().await.unwrap().to_bytes();
         let health: HealthResponse = serde_json::from_slice(&body).unwrap();
 
-        assert_eq!(health.service, "verso");
+        assert_eq!(health.service, "pdfscope");
         assert_eq!(health.version, env!("CARGO_PKG_VERSION"));
     }
 

@@ -1,10 +1,10 @@
 <div align="center">
 
-# Verso
+# PDFScope
 
 **Read PDFs with AI. Page by page, with citations that actually point to the page.**
 
-[![CI](https://github.com/polaritus9801/verso/actions/workflows/ci.yml/badge.svg)](https://github.com/polaritus9801/verso/actions/workflows/ci.yml)
+[![CI](https://github.com/polaritus9801/pdfscope/actions/workflows/ci.yml/badge.svg)](https://github.com/polaritus9801/pdfscope/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-black.svg)](LICENSE)
 [![MSRV](https://img.shields.io/badge/MSRV-1.85-black.svg)](rust-toolchain.toml)
 
@@ -12,7 +12,7 @@
 
 ---
 
-Verso is a local-first PDF reader that puts an AI beside the page you are reading. Select text,
+PDFScope is a local-first PDF reader that puts an AI beside the page you are reading. Select text,
 drag a box around a figure, or point it at a page range — the answer comes back with the page it
 came from, so you can check it instead of trusting it.
 
@@ -25,7 +25,7 @@ Feeding a whole PDF to a chat model loses the one thing that makes reading possi
 Answers arrive without provenance, scans have no text layer at all, and a 400-page book becomes a
 single undifferentiated blob.
 
-Verso is built around the opposite assumption — the page is the unit of work.
+PDFScope is built around the opposite assumption — the page is the unit of work.
 
 - **Text, boxes, and ranges.** Ask about a selection, a dragged rectangle, one page, or a chapter.
 - **Citations that resolve.** Every answer carries the page it drew from; click it and you are there.
@@ -55,8 +55,8 @@ The reasoning, including the options rejected, is in [`docs/ARCHITECTURE.md`](do
 ## Build
 
 ```sh
-git clone https://github.com/polaritus9801/verso.git
-cd verso
+git clone https://github.com/polaritus9801/pdfscope.git
+cd pdfscope
 just setup   # installs git hooks, checks toolchain
 just check   # fmt + clippy + tests
 ```

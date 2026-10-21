@@ -1,7 +1,7 @@
 //! The web binary.
 //!
 //! This crate is composition only: parse the environment, build the router, bind a listener, run.
-//! Any line here that starts looking like a rule belongs in `verso-api` or `verso-core` instead.
+//! Any line here that starts looking like a rule belongs in `pdfscope-api` or `pdfscope-core` instead.
 
 use std::net::SocketAddr;
 
@@ -16,11 +16,11 @@ const DEFAULT_PORT: u16 = 8787;
 async fn main() -> anyhow::Result<()> {
     init_tracing();
 
-    let port = std::env::var("VERSO_PORT")
+    let port = std::env::var("PDFSCOPE_PORT")
         .ok()
         .map(|raw| raw.parse::<u16>())
         .transpose()
-        .context("VERSO_PORT must be a number between 0 and 65535")?
+        .context("PDFSCOPE_PORT must be a number between 0 and 65535")?
         .unwrap_or(DEFAULT_PORT);
 
     let address = SocketAddr::from(([127, 0, 0, 1], port));
@@ -28,11 +28,14 @@ async fn main() -> anyhow::Result<()> {
         .await
         .with_context(|| format!("failed to bind {address}"))?;
 
-    tracing::info!(%address, "verso-server listening");
+    tracing::info!(%address, "pdfscope-server listening");
 
-    axum::serve(listener, verso_api::router(verso_api::AppState::current()))
-        .await
-        .context("server stopped unexpectedly")?;
+    axum::serve(
+        listener,
+        pdfscope_api::router(pdfscope_api::AppState::current()),
+    )
+    .await
+    .context("server stopped unexpectedly")?;
 
     Ok(())
 }

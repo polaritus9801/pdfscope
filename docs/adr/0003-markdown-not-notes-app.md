@@ -1,4 +1,4 @@
-# 0003 — Verso produces Markdown, but owns no note system
+# 0003 — PDFScope produces Markdown, but owns no note system
 
 - **Status:** accepted
 - **Date:** 2026-10-21
@@ -40,7 +40,7 @@ to capture it together with where it came from, without breaking their existing 
 
 ## Decision
 
-We will **own no notes**. Verso assembles a citation-ready block — quoted text, page number,
+We will **own no notes**. PDFScope assembles a citation-ready block — quoted text, page number,
 question, answer, and (for selections) the cropped image — and puts it on the clipboard as both
 Markdown and HTML. Persistence, organisation, and linking belong to whatever the user already uses.
 
@@ -55,7 +55,7 @@ format.
   more testable thing to get right than an editor.
 - Users who want automatic writing into a vault can be served later by an optional exporter, which
   is additive and does not change this decision.
-- This decision is the reason `verso-core` has no filesystem dependency beyond reading the PDF.
+- This decision is the reason `pdfscope-core` has no filesystem dependency beyond reading the PDF.
 
 ## References
 

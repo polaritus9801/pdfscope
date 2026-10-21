@@ -9,7 +9,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Service name reported by every health check.
-pub const SERVICE_NAME: &str = "verso";
+pub const SERVICE_NAME: &str = "pdfscope";
 
 /// Body of `GET /healthz`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -37,7 +37,7 @@ mod tests {
     #[test]
     fn current_reports_the_crate_version() {
         let health = HealthResponse::current();
-        assert_eq!(health.service, "verso");
+        assert_eq!(health.service, "pdfscope");
         assert_eq!(health.version, env!("CARGO_PKG_VERSION"));
     }
 
@@ -47,6 +47,6 @@ mod tests {
         let json = serde_json::to_string(&health).unwrap();
         let back: HealthResponse = serde_json::from_str(&json).unwrap();
         assert_eq!(health, back);
-        assert!(json.contains("\"service\":\"verso\""));
+        assert!(json.contains("\"service\":\"pdfscope\""));
     }
 }

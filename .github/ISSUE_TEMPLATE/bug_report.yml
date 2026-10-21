@@ -25,7 +25,7 @@ body:
     id: version
     attributes:
       label: Version
-      description: Output of `verso-server --version`, or the app's About screen.
+      description: Output of `pdfscope-server --version`, or the app's About screen.
     validations:
       required: true
   - type: dropdown

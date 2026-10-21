@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Verso is pre-1.0. Only the latest release receives security fixes.
+PDFScope is pre-1.0. Only the latest release receives security fixes.
 
 ## Reporting a vulnerability
 
@@ -21,7 +21,7 @@ to be.
 
 ## Threat model
 
-Verso is a local application. The relevant assets are the user's documents and their model
+PDFScope is a local application. The relevant assets are the user's documents and their model
 credentials.
 
 | Asset | Where it lives | Protection |

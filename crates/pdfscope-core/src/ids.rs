@@ -15,7 +15,7 @@ pub struct BookId(String);
 impl BookId {
     /// Wraps a digest.
     ///
-    /// The digest is not re-derived here; callers obtain it from `verso-store` when a file is
+    /// The digest is not re-derived here; callers obtain it from `pdfscope-store` when a file is
     /// imported. Storing a non-digest value is a programming error, not a user error, so this
     /// constructor does not validate.
     pub fn new(digest: impl Into<String>) -> Self {

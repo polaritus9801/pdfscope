@@ -218,14 +218,14 @@ A change is done when all of the following are true:
 
 ```
 crates/
-  verso-core      pure domain types and rules
-  verso-proto     wire types shared by client and server
-  verso-store     SQLite persistence and migrations
-  verso-ai        model providers, streaming, redaction
-  verso-api       HTTP/SSE surface over core
-  verso-server    the web binary
-  verso-desktop   Tauri shell (arrives with its own spec)
-ui/               Leptos front end (arrives with its own spec)
-docs/specs/       what we are going to build
-docs/adr/         what we already decided
+  pdfscope-core     pure domain types and rules
+  pdfscope-proto    wire types shared by client and server
+  pdfscope-store    SQLite persistence and migrations
+  pdfscope-ai       model providers, streaming, redaction
+  pdfscope-api      HTTP/SSE surface over core
+  pdfscope-server   the web binary
+  pdfscope-desktop  Tauri shell (arrives with its own spec)
+ui/                 Leptos front end (arrives with its own spec)
+docs/specs/         what we are going to build
+docs/adr/           what we already decided
 ```

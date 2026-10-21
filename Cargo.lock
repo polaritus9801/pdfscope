@@ -878,6 +878,65 @@ dependencies = [
 ]
 
 [[package]]
+name = "pdfscope-ai"
+version = "0.1.0"
+dependencies = [
+ "thiserror",
+]
+
+[[package]]
+name = "pdfscope-api"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "http-body-util",
+ "pdfscope-proto",
+ "serde_json",
+ "tokio",
+ "tower",
+ "tower-http",
+]
+
+[[package]]
+name = "pdfscope-core"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
+name = "pdfscope-proto"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "pdfscope-server"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "pdfscope-api",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "pdfscope-store"
+version = "0.1.0"
+dependencies = [
+ "sqlx",
+ "tempfile",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
 name = "percent-encoding"
 version = "2.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1638,65 +1697,6 @@ name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
-
-[[package]]
-name = "verso-ai"
-version = "0.1.0"
-dependencies = [
- "thiserror",
-]
-
-[[package]]
-name = "verso-api"
-version = "0.1.0"
-dependencies = [
- "axum",
- "http-body-util",
- "serde_json",
- "tokio",
- "tower",
- "tower-http",
- "verso-proto",
-]
-
-[[package]]
-name = "verso-core"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
- "thiserror",
-]
-
-[[package]]
-name = "verso-proto"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "verso-server"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "axum",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "verso-api",
-]
-
-[[package]]
-name = "verso-store"
-version = "0.1.0"
-dependencies = [
- "sqlx",
- "tempfile",
- "thiserror",
- "tokio",
-]
 
 [[package]]
 name = "wasi"

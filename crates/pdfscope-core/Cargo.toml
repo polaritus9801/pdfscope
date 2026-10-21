@@ -1,6 +1,6 @@
 [package]
-name = "verso-proto"
-description = "Wire types shared by the Verso desktop and web clients."
+name = "pdfscope-core"
+description = "Pure domain types and rules for PDFScope. No I/O, no frameworks."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,6 +9,7 @@ authors.workspace = true
 
 [dependencies]
 serde.workspace = true
+thiserror.workspace = true
 
 [dev-dependencies]
 serde_json.workspace = true

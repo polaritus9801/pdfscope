@@ -6,7 +6,7 @@
 
 ## Context
 
-Verso must ship on macOS, Windows, and Linux, and — because "read this PDF with me" is a request
+PDFScope must ship on macOS, Windows, and Linux, and — because "read this PDF with me" is a request
 people make from a browser — ideally on the web too, from one codebase. It must be small, start
 fast, and render PDFs with a selectable text layer, because every core interaction (select, cite,
 highlight back) depends on knowing where each glyph is.
@@ -47,14 +47,14 @@ most code. Rejected on preference, not on merit; it remains the fallback if Lept
 We will build the desktop shell with **Tauri 2**, the UI with **Leptos** compiled to Wasm, and render
 PDFs with **PDF.js**, treating the renderer as a component we own but do not rewrite.
 
-The web build serves the same UI assets from `verso-server`; only the transport between UI and
-`verso-api` differs.
+The web build serves the same UI assets from `pdfscope-server`; only the transport between UI and
+`pdfscope-api` differs.
 
 ## Consequences
 
 - Logic lives in Rust and is testable without a browser.
 - UI work will occasionally be slower than the React equivalent; the escape hatch is Option D,
-  which is possible because the UI talks to `verso-api` rather than to Rust directly.
+  which is possible because the UI talks to `pdfscope-api` rather than to Rust directly.
 - Three WebViews must be tested for PDF.js behaviour. This is a known, budgeted cost, and it is
   cheaper than writing a renderer.
 - PDF.js version, worker file, and CMaps are vendored and pinned. An unpinned renderer is an

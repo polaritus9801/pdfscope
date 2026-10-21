@@ -6,7 +6,7 @@
 
 ## Context
 
-Verso has several decisions that are expensive to reverse and easy to forget: the rendering engine,
+PDFScope has several decisions that are expensive to reverse and easy to forget: the rendering engine,
 the UI stack, the packaging model, and the deliberate refusal to build a notes system. Without a
 record, each new contributor will re-litigate them from memory, and the reasoning behind a choice
 will be lost the moment the person who made it stops answering messages.

@@ -19,7 +19,7 @@ can read one file to know how work is supposed to proceed.
 
 - **No product behaviour.** No PDF parsing, no OCR, no model calls, no UI. Those arrive with their
   own specs (0002 and later).
-- **No desktop shell yet.** `verso-desktop` and `ui/` are mapped and documented but not created;
+- **No desktop shell yet.** `pdfscope-desktop` and `ui/` are mapped and documented but not created;
   creating them without their spec would violate the gate this spec establishes.
 - **No release pipeline.** Tagging and signing need the desktop app to exist first.
 - **No plugin system, no sync, no account model.**
@@ -48,20 +48,20 @@ that cannot be rebuilt.
 
 Public surfaces created here, deliberately minimal:
 
-- `verso_core::{BookId, PageIndex, Rect, CoreError}` — types only.
-- `verso_proto::HealthResponse` — the one wire type both shells share today.
-- `verso_ai::{ProviderConfig, Secret}` — configuration plus a type whose `Debug` redacts.
-- `verso_api::router(state)` — serves `GET /healthz`.
-- `verso-server` — a binary that binds `PORT` (default 8787) and serves the router.
+- `pdfscope_core::{BookId, PageIndex, Rect, CoreError}` — types only.
+- `pdfscope_proto::HealthResponse` — the one wire type both shells share today.
+- `pdfscope_ai::{ProviderConfig, Secret}` — configuration plus a type whose `Debug` redacts.
+- `pdfscope_api::router(state)` — serves `GET /healthz`.
+- `pdfscope-server` — a binary that binds `PORT` (default 8787) and serves the router.
 
 No other public API is added.
 
 ## Test plan
 
-- `verso-core`: page-index display is one-based, `Rect` rejects out-of-range values, serde round-trip.
-- `verso-ai`: `Secret` debug output never contains the secret; config reject empty model.
-- `verso-store`: an in-memory database migrates, inserts a book, and reads it back.
-- `verso-api`: `GET /healthz` returns 200 and a JSON body with the version.
+- `pdfscope-core`: page-index display is one-based, `Rect` rejects out-of-range values, serde round-trip.
+- `pdfscope-ai`: `Secret` debug output never contains the secret; config reject empty model.
+- `pdfscope-store`: an in-memory database migrates, inserts a book, and reads it back.
+- `pdfscope-api`: `GET /healthz` returns 200 and a JSON body with the version.
 - Hook: a scripted check that a fake staged change without a spec is refused.
 
 ## Risks
@@ -70,7 +70,7 @@ No other public API is added.
   CI, and Dependabot keeps versions moving.
 - **The gate can annoy on small changes.** Mitigation: the `[trivial]` exemption and a documented
   `--no-verify` escape hatch for emergencies.
-- **Workspace boundaries can be documented but not enforced.** Mitigation: `verso-core` carries no
+- **Workspace boundaries can be documented but not enforced.** Mitigation: `pdfscope-core` carries no
   framework dependency, so an accidental import fails to compile rather than passing review.
 
 ## Assumptions
@@ -89,6 +89,8 @@ No other public API is added.
   when the desktop binary runs from an app bundle.
 - `rustfmt.toml` omits `imports_granularity`: it is a nightly-only option, and a repository that
   cannot be formatted with its own pinned toolchain is a repository that fights itself.
+- Renamed from the working title to `PDFScope` before any public release. Package names, imports,
+  and documentation changed; behaviour did not, which the unchanged tests confirm.
 
 ## Open questions
 

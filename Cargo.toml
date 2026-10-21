@@ -1,20 +1,20 @@
 [workspace]
 resolver = "3"
 members = [
-    "crates/verso-core",
-    "crates/verso-proto",
-    "crates/verso-store",
-    "crates/verso-ai",
-    "crates/verso-api",
-    "crates/verso-server",
+    "crates/pdfscope-core",
+    "crates/pdfscope-proto",
+    "crates/pdfscope-store",
+    "crates/pdfscope-ai",
+    "crates/pdfscope-api",
+    "crates/pdfscope-server",
 ]
 default-members = [
-    "crates/verso-core",
-    "crates/verso-proto",
-    "crates/verso-store",
-    "crates/verso-ai",
-    "crates/verso-api",
-    "crates/verso-server",
+    "crates/pdfscope-core",
+    "crates/pdfscope-proto",
+    "crates/pdfscope-store",
+    "crates/pdfscope-ai",
+    "crates/pdfscope-api",
+    "crates/pdfscope-server",
 ]
 
 [workspace.package]
@@ -23,15 +23,15 @@ edition = "2024"
 rust-version = "1.85"
 license = "MIT"
 authors = ["z1mLi"]
-repository = "https://github.com/polaritus9801/verso"
+repository = "https://github.com/polaritus9801/pdfscope"
 
 [workspace.dependencies]
 # Internal
-verso-core = { path = "crates/verso-core" }
-verso-proto = { path = "crates/verso-proto" }
-verso-store = { path = "crates/verso-store" }
-verso-ai = { path = "crates/verso-ai" }
-verso-api = { path = "crates/verso-api" }
+pdfscope-core = { path = "crates/pdfscope-core" }
+pdfscope-proto = { path = "crates/pdfscope-proto" }
+pdfscope-store = { path = "crates/pdfscope-store" }
+pdfscope-ai = { path = "crates/pdfscope-ai" }
+pdfscope-api = { path = "crates/pdfscope-api" }
 
 # Serialization
 serde = { version = "1", features = ["derive"] }

@@ -22,4 +22,4 @@ minor releases may contain breaking changes; they are always called out.
 - Repository protocol in `AGENTS.md`, architecture in `docs/ARCHITECTURE.md`, decision records in
   `docs/adr/`, and specification templates in `docs/specs/`.
 
-[Unreleased]: https://github.com/polaritus9801/verso/commits/main
+[Unreleased]: https://github.com/polaritus9801/pdfscope/commits/main
