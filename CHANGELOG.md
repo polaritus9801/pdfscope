@@ -60,6 +60,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Fixed
 
+- An answer that ends empty no longer erases the question and its reasoning: finished turns are
+  archived when the stream ends, and the status line explains that no body text arrived.
+
+
 - Markdown list items no longer leave a large blank line between the number and its text: a bare
   `1.` line is joined to its content before parsing.
 - Answer paragraphs no longer show the blank lines that `pre-wrap` turned into real layout.

@@ -213,6 +213,34 @@ pub fn AiPanel(
         }
     };
 
+    let settle_seconds = move || {
+        if think_seconds.get() == 0.0 && think_started.get() > 0.0 {
+            think_seconds.set(((js_sys::Date::now() - think_started.get()) / 1000.0).max(0.1));
+        }
+    };
+
+    // A finished turn is archived here rather than on the next send: an answer that ends empty
+    // (reasoning consumed the budget) must still leave a trace instead of vanishing.
+    let archive = move || {
+        if current_question.get().trim().is_empty() {
+            return;
+        }
+        if answer.get().trim().is_empty() && reasoning.get().trim().is_empty() {
+            return;
+        }
+
+        let finished = Turn {
+            question: current_question.get(),
+            answer: answer.get(),
+            reasoning: reasoning.get(),
+            seconds: think_seconds.get().max(0.1),
+        };
+        turns.update(|list| list.push(finished));
+        current_question.set(String::new());
+        answer.set(String::new());
+        reasoning.set(String::new());
+    };
+
     let send = move |_| {
         if streaming.get() {
             return;
@@ -224,16 +252,6 @@ pub fn AiPanel(
         if !configured.get() {
             open.set(true);
             return;
-        }
-
-        if !answer.get().trim().is_empty() {
-            let previous = Turn {
-                question: current_question.get(),
-                answer: answer.get(),
-                reasoning: reasoning.get(),
-                seconds: think_seconds.get(),
-            };
-            turns.update(|list| list.push(previous));
         }
 
         current_question.set(asked.clone());
@@ -415,31 +433,43 @@ pub fn AiPanel(
                     }
                     "stopped" => {
                         flush_pending();
-                        if think_seconds.get() == 0.0 && think_started.get() > 0.0 {
-                            think_seconds.set((js_sys::Date::now() - think_started.get()) / 1000.0);
-                        }
                         streaming.set(false);
-                        status.set("已停止".to_owned());
+                        settle_seconds();
+                        let kept = !answer.get().trim().is_empty();
+                        archive();
+                        status.set(if kept {
+                            "已停止".to_owned()
+                        } else {
+                            "已停止，没有生成正文".to_owned()
+                        });
                     }
                     "done" => {
                         flush_pending();
-                        if think_seconds.get() == 0.0 && think_started.get() > 0.0 {
-                            think_seconds.set((js_sys::Date::now() - think_started.get()) / 1000.0);
-                        }
                         streaming.set(false);
+                        settle_seconds();
+
                         let elapsed = js_sys::Date::now() - started;
-                        if elapsed > 0.0 {
-                            let characters = answer.get().chars().count() as f64;
+                        let characters = answer.get().chars().count() as f64;
+                        let empty = answer.get().trim().is_empty();
+                        let had_reasoning = !reasoning.get().trim().is_empty();
+                        archive();
+
+                        if empty {
+                            status.set(if had_reasoning {
+                                "模型只返回了思考过程，没有正文".to_owned()
+                            } else {
+                                "模型没有返回内容".to_owned()
+                            });
+                        } else if elapsed > 0.0 {
                             let rate = (characters / 2.0) / (elapsed / 1000.0);
                             status.update(|line| line.push_str(&format!(" · ≈ {rate:.0} tok/s")));
                         }
                     }
                     "error" => {
                         flush_pending();
-                        if think_seconds.get() == 0.0 && think_started.get() > 0.0 {
-                            think_seconds.set((js_sys::Date::now() - think_started.get()) / 1000.0);
-                        }
                         streaming.set(false);
+                        settle_seconds();
+                        archive();
                         failed.set(true);
                         status.set(
                             text_of(&event, "message").unwrap_or_else(|| "请求失败".to_owned()),

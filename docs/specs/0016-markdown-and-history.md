@@ -54,6 +54,12 @@ because KaTeX skips `pre`/`code`.
 
 ## Deviations
 
+- A finished turn is archived when the stream ends, not when the next question is sent. Before this,
+  an answer that ended empty (the model spent its budget on reasoning) left no trace at all: the
+  panel showed its "ask something" hint as if nothing had happened. The question and reasoning now
+  stay on screen, and the status line says `模型只返回了思考过程，没有正文`.
+
+
 - Models write `1.` on its own line, then a blank line, then the item's text. CommonMark reads that
   as a loose list with an empty first paragraph, which rendered as a large gap between the number and
   its text. `to_html` now joins a bare marker to its first line before parsing.
