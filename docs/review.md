@@ -42,9 +42,9 @@ own task. The debug figure is recorded only so a later release figure has someth
 | F4 | The last ~50 ms of tokens could arrive after `done` | low | fixed |
 | F5 | History has no in-page tint or scrollbar marker | medium | deferred: a passage does not store its rectangle, and the rail needs its own layout |
 | F6 | Stop does not abort the HTTP request, so the provider may bill a few more tokens | low | accepted in the spec |
-| F7 | Settings cannot test the connection before saving | medium | proposed |
+| F7 | Settings cannot test the connection before saving | medium | fixed |
 | F8 | Up to 20 page texts are fetched sequentially at send time | low | acceptable for now; parallelising changes ordering semantics |
-| F9 | The streaming answer is not announced by screen readers | medium | proposed: `aria-live="polite"` on the answer, throttled |
+| F9 | The streaming answer is not announced by screen readers | medium | fixed: `aria-live="polite"` on the answer |
 | F10 | No desktop session has exercised any path | high | needs a human |
 
 ## Acceptance list

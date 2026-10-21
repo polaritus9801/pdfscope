@@ -25,6 +25,11 @@ window.Bridge = {
     return api.core.invoke("stop_ask");
   },
 
+  async testSettings(settings) {
+    if (!available) throw new Error("设置只在桌面版可用");
+    return api.core.invoke("test_settings", { settings });
+  },
+
   async ask(question, references, regions, context, onEvent) {
     if (!available) throw new Error("提问只在桌面版可用");
     return new Promise(async (resolve, reject) => {

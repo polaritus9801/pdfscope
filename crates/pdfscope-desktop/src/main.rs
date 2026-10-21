@@ -20,6 +20,7 @@ fn main() -> anyhow::Result<()> {
         .invoke_handler(tauri::generate_handler![
             settings::load_settings,
             settings::save_settings,
+            settings::test_settings,
             ask::ask,
             ask::stop_ask
         ])

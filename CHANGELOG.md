@@ -8,6 +8,12 @@ minor releases may contain breaking changes; they are always called out.
 
 ## [Unreleased]
 
+### Added
+
+- `测试连接` in the settings sheet: one tiny request verifies the key, endpoint and model before they
+  are saved.
+- The streaming answer is announced to screen readers; the composer has a label.
+
 ### Changed
 
 - Streaming updates are coalesced to one per 50 ms; the answer re-parses citations on every change, so

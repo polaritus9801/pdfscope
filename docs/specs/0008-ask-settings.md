@@ -124,6 +124,11 @@ request is built from exactly the tray, and the panel header states the model be
 - The web build knows nothing about settings: `Bridge.loadSettings` returns `null`, and the panel
   reports "未配置模型" rather than pretending.
 - `withGlobalTauri` is enabled for this slice; a typed client replaces it when the web build is real.
+- A `测试连接` button sends one 16-token request before saving, using the typed key when there is one
+  and the stored key otherwise. It exists because a settings sheet that cannot be checked turns a
+  typo into a mystery.
+- The answer carries `aria-live="polite"` and the composer has an `aria-label`, so a screen reader
+  announces the stream instead of silently filling the panel.
 
 ## Open questions
 

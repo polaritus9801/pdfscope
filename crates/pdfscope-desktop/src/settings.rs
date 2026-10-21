@@ -6,6 +6,8 @@
 
 use std::path::PathBuf;
 
+use futures::StreamExt;
+use pdfscope_ai::{ChatRequest, Message, Protocol, ProviderConfig, StreamEvent};
 use serde::{Deserialize, Serialize};
 use tauri::Manager;
 
@@ -137,6 +139,63 @@ pub(crate) fn save_settings(app: tauri::AppHandle, settings: SettingsInput) -> R
         .map_err(|error| format!("无法序列化设置：{error}"))?;
     std::fs::write(path, json).map_err(|error| format!("无法写入设置：{error}"))?;
     Ok(())
+}
+
+/// Sends one tiny request so the reader can find out whether the settings work before saving them.
+#[tauri::command]
+pub(crate) async fn test_settings(settings: SettingsInput) -> Result<String, String> {
+    let key = match settings
+        .api_key
+        .as_deref()
+        .map(str::trim)
+        .filter(|key| !key.is_empty())
+    {
+        Some(key) => pdfscope_ai::Secret::new(key),
+        None => {
+            let entry = keyring::Entry::new(KEYCHAIN_SERVICE, KEYCHAIN_ACCOUNT)
+                .map_err(|error| format!("无法访问钥匙串：{error}"))?;
+            let stored = entry
+                .get_password()
+                .map_err(|_| "还没有保存 API Key".to_owned())?;
+            pdfscope_ai::Secret::new(stored)
+        }
+    };
+
+    let protocol = if settings.protocol == "anthropic" {
+        Protocol::Anthropic
+    } else {
+        Protocol::OpenAi
+    };
+
+    let config = ProviderConfig::new(
+        settings.preset,
+        protocol,
+        settings.base_url,
+        settings.model,
+        key,
+    )
+    .map_err(|error| error.to_string())?;
+
+    let request = ChatRequest {
+        system: None,
+        messages: vec![Message::user("只回复 ok")],
+        max_tokens: 16,
+        temperature: None,
+    };
+
+    let mut events = pdfscope_ai::stream(&config, &request)
+        .await
+        .map_err(|error| error.to_string())?;
+
+    while let Some(event) = events.next().await {
+        match event {
+            Ok(StreamEvent::Done) => break,
+            Ok(_) => {}
+            Err(error) => return Err(error.to_string()),
+        }
+    }
+
+    Ok(format!("连接正常 · {}", config.model()))
 }
 
 /// Reads the configuration and the key, for the request layer.

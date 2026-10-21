@@ -110,6 +110,8 @@ pub fn AiPanel(
     let history = RwSignal::new(Vec::<Stored>::new());
     let show_all = RwSignal::new(false);
     let notice = RwSignal::new(Option::<String>::None);
+    let testing = RwSignal::new(false);
+    let test_result = RwSignal::new(Option::<String>::None);
     let pending = RwSignal::new(String::new());
     let scheduled = RwSignal::new(false);
 
@@ -365,7 +367,7 @@ pub fn AiPanel(
         });
     };
 
-    let save = move |_| {
+    let build_payload = move || {
         let payload = js_sys::Object::new();
         let _ = js_sys::Reflect::set(
             &payload,
@@ -397,6 +399,12 @@ pub fn AiPanel(
             );
         }
 
+        payload
+    };
+
+    let save = move |_| {
+        let payload = build_payload();
+
         if let Some(promise) = bridge("saveSettings", &[payload.into()]) {
             spawn_local(async move {
                 match JsFuture::from(js_sys::Promise::from(promise)).await {
@@ -414,6 +422,35 @@ pub fn AiPanel(
                     }
                 }
             });
+        }
+    };
+
+    let test = move |_| {
+        if testing.get() {
+            return;
+        }
+        testing.set(true);
+        test_result.set(None);
+        let payload = build_payload();
+
+        if let Some(promise) = bridge("testSettings", &[payload.into()]) {
+            spawn_local(async move {
+                match JsFuture::from(js_sys::Promise::from(promise)).await {
+                    Ok(value) => {
+                        test_result.set(Some(
+                            value.as_string().unwrap_or_else(|| "连接正常".to_owned()),
+                        ));
+                    }
+                    Err(error) => {
+                        test_result.set(Some(
+                            error.as_string().unwrap_or_else(|| "连接失败".to_owned()),
+                        ));
+                    }
+                }
+                testing.set(false);
+            });
+        } else {
+            testing.set(false);
         }
     };
 
@@ -448,7 +485,7 @@ pub fn AiPanel(
                                         ().into_any()
                                     }
                                 }}
-                                <p class="answer-text">
+                                <p class="answer-text" aria-live="polite">
                                     {move || {
                                         segments(&answer.get())
                                             .into_iter()
@@ -594,6 +631,7 @@ pub fn AiPanel(
                 }}
                 <textarea
                     class="ask"
+                    aria-label="问题"
                     placeholder="问点什么…"
                     prop:value=move || question.get()
                     on:input=move |event| question.set(event_target_value(&event))
@@ -697,7 +735,20 @@ pub fn AiPanel(
                                 .map(|message| view! { <p class="error sheet-error">{message}</p> })
                         }}
 
+                        {move || {
+                            test_result
+                                .get()
+                                .map(|message| view! { <p class="range-summary">{message}</p> })
+                        }}
+
                         <div class="sheet-actions">
+                            <button
+                                class="button"
+                                on:click=test
+                                prop:disabled=move || testing.get()
+                            >
+                                {move || if testing.get() { "测试中…" } else { "测试连接" }}
+                            </button>
                             <button class="button" on:click=move |_| open.set(false)>
                                 "取消"
                             </button>
