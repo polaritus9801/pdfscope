@@ -1,14 +1,33 @@
 # Design tokens
 
-The default theme is **white, lilac, black** — a quiet surface, one accent, and ink dark enough to
-read for hours. Everything in the interface is built from these tokens; no component invents a
-colour, a radius, or a spacing value.
+The default theme is **white, lilac, black**. One accent, used sparingly; ink dark enough to read for
+hours; a page that stays white.
 
 Two rules:
 
 1. **No raw values outside this file.** A hex code in a component is a bug.
 2. **Contrast is a requirement, not a preference.** Body text meets WCAG AA (4.5:1) against its
    surface in both themes. If a token pair cannot meet it, the pair is wrong.
+
+## The lilac ramp
+
+A single hue, ten steps. Everything purple in the product is one of these; nothing is mixed ad hoc.
+
+| Step | Value | Used for |
+|---|---|---|
+| `--lilac-50` | `#F7F4FC` | panel background, wells |
+| `--lilac-100` | `#EFE9F9` | hover on light rows |
+| `--lilac-200` | `#E8E0F7` | chip fill, selection tint, borders |
+| `--lilac-300` | `#DCCFF3` | focused field border |
+| `--lilac-400` | `#CBB8EC` | **location indicator**: in-page tint, scrollbar markers |
+| `--lilac-500` | `#B49BE2` | disabled primary, decorative rules |
+| `--lilac-600` | `#9A7AD3` | secondary actions |
+| `--lilac-700` | `#7F5CBF` | primary action fill (white text, 5.0:1) |
+| `--lilac-800` | `#5F4697` | primary hover, headings on tint |
+| `--lilac-900` | `#3C2C5E` | text on tint, deep accents |
+
+`#CBB8EC` and `#E8E0F7` are the two the theme is built around: the first is how a location announces
+itself without shouting, the second is how an attachment sits in the composer.
 
 ## Colour
 
@@ -17,16 +36,18 @@ Two rules:
 | Token | Value | Used for |
 |---|---|---|
 | `--surface` | `#FFFFFF` | page canvas, panels |
-| `--surface-muted` | `#F7F4FC` | AI panel background, wells |
-| `--surface-sunken` | `#EFE9F8` | input fields, pressed states |
-| `--border` | `#E6DFF2` | hairlines, chip outlines |
-| `--border-strong` | `#D3C8E8` | focused fields, drag handles |
+| `--surface-muted` | `--lilac-50` | AI panel background |
+| `--surface-sunken` | `--lilac-100` | inputs, pressed states |
+| `--border` | `--lilac-200` | hairlines, chip outlines |
+| `--border-strong` | `--lilac-300` | focused fields, drag handles |
 | `--ink` | `#14101A` | body text |
 | `--ink-muted` | `#6B6378` | secondary text, metadata |
-| `--ink-faint` | `#9A93A6` | placeholders, disabled |
-| `--accent` | `#6F4FBF` | primary actions, active chip border |
-| `--accent-hover` | `#5C3FA6` | hover on primary actions |
-| `--accent-soft` | `#EDE7FA` | chip fill, selection tint |
+| `--ink-faint` | `#9A93A6` | placeholders, disabled, status line |
+| `--accent` | `--lilac-700` | primary actions |
+| `--accent-hover` | `--lilac-800` | hover on primary actions |
+| `--accent-strong` | `--lilac-400` | location tint, scrollbar marker |
+| `--accent-tint` | `--lilac-200` | chip fill, selection tint |
+| `--accent-soft` | `--lilac-50` | quiet purple surfaces |
 | `--accent-ink` | `#FFFFFF` | text on `--accent` |
 | `--danger` | `#B23A4E` | destructive actions, errors |
 | `--warning` | `#8A5A00` | cost warnings |
@@ -42,16 +63,17 @@ Two rules:
 | `--border-strong` | `#3D3350` | focused fields |
 | `--ink` | `#F4F0FA` | body text |
 | `--ink-muted` | `#A79FB5` | secondary text |
-| `--ink-faint` | `#6E6679` | placeholders |
-| `--accent` | `#A98BEF` | primary actions |
-| `--accent-hover` | `#BBA3F5` | hover |
-| `--accent-soft` | `#241B36` | chip fill |
+| `--ink-faint` | `#6E6679` | placeholders, status line |
+| `--accent` | `--lilac-400` | primary actions (dark ink on it) |
+| `--accent-hover` | `--lilac-300` | hover |
+| `--accent-strong` | `--lilac-500` | location tint, scrollbar marker |
+| `--accent-tint` | `#2A2140` | chip fill |
+| `--accent-soft` | `#1A1424` | quiet purple surfaces |
 | `--accent-ink` | `#14101A` | text on `--accent` |
 | `--danger` | `#E4778B` | errors |
 | `--warning` | `#D8A54A` | cost warnings |
 
-The page itself stays white in both themes. A PDF is a printed object; tinting it is not a feature,
-it is a bug report.
+The page itself stays white in both themes. A PDF is a printed object; tinting it is a bug report.
 
 ## Type
 
@@ -69,7 +91,8 @@ it is a bug report.
 | `--weight-medium` | `500` |
 | `--weight-strong` | `600` |
 
-CJK text needs slightly more line height than Latin; `--text-base` is already set for it.
+CJK text needs slightly more line height than Latin; `--text-base` is already set for it. Numerals in
+the status line use `font-variant-numeric: tabular-nums`.
 
 ## Space, radius, elevation
 
@@ -97,17 +120,19 @@ communicate state.
 
 ```css
 :root {
+  --lilac-50: #f7f4fc;
+  --lilac-200: #e8e0f7;
+  --lilac-400: #cbb8ec;
+  --lilac-700: #7f5cbf;
   --surface: #ffffff;
   --ink: #14101a;
-  --accent: #6f4fbf;
-  /* … */
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     --surface: #0f0c14;
     --ink: #f4f0fa;
-    --accent: #a98bef;
+    --accent: var(--lilac-400);
   }
 }
 ```

@@ -7,35 +7,73 @@
 
 ## Goal
 
-A reader can attach **many things at once** to a single question — several passages, several
-screenshots, one or more page ranges — see exactly what is attached before sending, remove any of
-them, and know that the answer is grounded in that set rather than in whichever thing was selected
-last.
+A reader can attach many things to one question — passages, screenshots, page ranges, and pieces of
+earlier answers — see exactly what will be sent, and get any of it back later from a history without
+having to find the place in the book again. Hovering a past reference shows where it lives on the
+page and on the scrollbar, without moving the view.
 
 ## Non-goals
 
-- No modes. The page never enters a state where a drag means something other than "select text".
-- No persistent highlights or annotations. References live in the conversation, not in the file.
+- No modes. A drag on the page always selects text.
+- No persistent highlights written into the PDF. References live in the conversation.
 - No OCR in this slice; a scanned region travels as an image.
-- No cross-page text selection: one passage lives on one page.
-- No preset questions (`解释` / `翻译`). Parked, not rejected.
+- No cross-page text selection.
+- No preset questions (`解释` / `翻译`). Parked.
+- No automatic inclusion of history. A redeemed reference must be chosen deliberately.
 
 ## Behaviour
 
-A question carries a **reference tray**: an ordered list of zero or more references, shown above the
-input and sent with the question.
+Two layers, deliberately distinct:
 
-| Reference kind | How it is added | What is sent |
+| Layer | What it holds | Sent with the next question |
 |---|---|---|
-| Passage | select text, then `加入引用` | The quote, its page, and the paragraph around it |
-| Region | `⌥`-drag a rectangle, or `框选` then drag | A cropped image, its page, and the rectangle |
-| Pages | drag on the page strip, or type in the range field | Each page's text, labelled with its number |
+| **Current references** (`引用栏`) | What this question is about | Yes |
+| **History** (`历史引用`) | Everything referenced earlier in this conversation | **No**, until redeemed |
 
-All three kinds can coexist in one tray, in any order. The tray is the single source of truth for
-"what this question is about" — there is no other scope anywhere in the interface.
+After a send, the current references move into history. They are not silently re-sent: the next
+question starts empty. This is the answer to the stale-tray problem — history is recall, not context.
 
-Nothing is sent until Send. Every reference is visible before it is sent, and can be removed or
-inspected (jump to page, preview image) without removing it.
+### Kinds
+
+| Kind | Added by | Carries |
+|---|---|---|
+| Passage | select text → `加入引用` | quote, page, surrounding paragraph |
+| Region | `⌥`-drag, or `框选` then drag | cropped image, page, rectangle |
+| Pages | drag the page strip, or type `31-45, 60` | each page's text, labelled |
+| Answer | select text in an answer → `引用`, or the answer's `引用整段` | the quoted words and the turn they came from |
+
+An `Answer` reference has no page. It is labelled `AI · 第 3 轮` and is never presented as source
+text: the model is told it is quoting its own earlier output, not the document.
+
+### Redeeming from history
+
+The history is a list under the tray, collapsed to the last three entries with a `全部` disclosure.
+
+- **Hover a row** → the referenced area is tinted on the page with `--accent-strong` at 38%, and a
+  marker appears on the vertical scrollbar at the proportional position. If the area is not on the
+  screen, **the view does not move**; a `p.87 →` pill appears beside the row instead, which jumps on
+  click.
+- **Hover for 600 ms** → a preview card opens beside the row: kind, page, two lines of the quote, or
+  a thumbnail for regions. It never covers the row itself and closes on leave.
+- **Click the row** → redeems into the current tray. The row briefly shows a check. If an identical
+  reference is already in the tray, the click focuses that chip instead of duplicating it.
+- **`Shift` + click**, or the row's `定位` action, jumps to the page.
+- **`Delete`** on a focused row removes it from history, with an undo toast.
+
+History is per conversation. It survives switching pages and documents. It is not written into the
+PDF, and it does not survive deleting the conversation.
+
+### Unbounded count
+
+There is no limit on how many references a question may carry. Layout, not policy, handles volume:
+
+- The tray wraps to at most two rows; beyond that it scrolls vertically inside a fixed height, so
+  the composer never jumps.
+- A chip never shrinks below 96 px and never grows past 220 px; longer quotes are ellipsised with
+  the full text in the hover preview.
+- Above 24 chips, the tray shows a `+N` summary chip that expands the full list.
+- The history list is virtualised; only visible rows are rendered.
+- Region thumbnails are lazy-loaded and released when their row leaves the viewport.
 
 ## Data model
 
@@ -46,110 +84,108 @@ pub enum Reference {
     Passage { id: ReferenceId, anchor: Anchor },
     Region  { id: ReferenceId, page: PageIndex, rect: Rect, image: ImageRef },
     Pages   { id: ReferenceId, spans: Vec<PageSpan> },
+    Answer  { id: ReferenceId, turn: u16, quote: String },
 }
 
 pub struct PageSpan { pub start: PageIndex, pub end: PageIndex }
 ```
 
-The tray is `Vec<Reference>`; order is insertion order. Validation: spans are ordered, inside the
-document, and merged when they overlap; duplicate passages on the same page are allowed (the reader
-may want two different quotes); the tray has a soft cap of 12 references, above which the interface
-warns but still allows sending.
+Validation: spans ordered, inside the document, overlapping spans merged; a quote is non-empty after
+normalisation; an `Answer` reference must point at a turn that exists in this conversation. Duplicate
+references are deduplicated by `(kind, page, normalised text or rect)`.
+
+The tray is `Vec<Reference>` in insertion order; history is the same type, append-only per
+conversation.
 
 ## Interface
 
-`POST /api/v1/ask` with:
-
-```json
-{ "question": "…", "references": [ { "kind": "passage", "page": 30, "quote": "…" }, … ] }
-```
-
-The response reports which reference each citation came from, so the answer can point back at the
-tray entry rather than at an anonymous page.
+`POST /api/v1/ask` carries `{ question, references }`. The response reports, per citation, which
+reference id it came from, so an answer can point at a tray entry rather than an anonymous page.
 
 ## Interaction design
 
 | Control | Label | Location | Enabled when | Pointer | Keyboard | Touch | Result | Cancel / error |
 |---|---|---|---|---|---|---|---|---|
-| Reference tray | `引用` | above the input, in the AI panel | always | click a chip to inspect; `✕` removes | `Tab` cycles chips, `Delete` removes | tap to inspect, long-press to remove | chips list every attached reference with kind icon and page | removing the last chip returns the tray to its empty hint |
-| Add passage | `加入引用` | floating bar on a text selection | a selection exists | click | `⌘⇧A` | tap | a passage chip appears; selection stays visible | `Esc` closes the bar, adds nothing |
-| Add region | `框选` | floating bar, and `⌥`-drag on the page | any page | drag, release | hold `⌥`, drag with pointer | tap `框选`, then drag | an image chip appears with a thumbnail | `Esc` before release cancels |
-| Add pages | range field + page strip | AI panel | a document is open | drag ticks, or type `31-45, 60` | type, `↵` commits; `⌘G` focuses | drag handles | one `Pages` chip per committed span set | invalid text marks the field only; the tray is unchanged |
-| Inspect | — | tray chip | always | click | `↵` on a focused chip | tap | the reader jumps to that page and flashes the area or image | clicking elsewhere returns, nothing is lost |
-| Send | `发送` | input | tray valid and question non-empty | click | `⌘↵` | tap | question and references leave; the tray stays, marked as "will resend" | a failed send keeps the tray and the question intact |
+| Tray | `引用 (N)` | above the input | always | click a chip to inspect; `✕` removes | `Tab` cycles; `Delete` removes | tap inspects, long-press removes | chips in insertion order, two rows max | removing the last returns the empty hint |
+| Add passage | `加入引用` | floating bar on selection | a selection exists | click | `⌘⇧A` | tap | passage chip added; selection stays | `Esc` closes the bar, adds nothing |
+| Add region | `框选` | floating bar and page | any page | drag, release | `⌥` + drag | tap `框选`, then drag | image chip with thumbnail | `Esc` before release cancels |
+| Add pages | strip + field | AI panel | document open | drag ticks or type `31-45, 60` | `↵` commits, `⌘G` focuses | drag handles | one `Pages` chip | invalid text marks the field only; tray unchanged |
+| Add answer | `引用` / `引用整段` | answer bubble, answer footer | an answer exists | click; or select text → bubble | `⌘⇧A` after selecting | tap | `Answer` chip labelled with its turn | quoting an empty selection is refused |
+| History row | — | list under the tray | history non-empty | hover tints page + scrollbar; click redeems; `Shift`+click jumps | arrows move, `↵` redeems, `Delete` removes | tap redeems | row shows a check; chip appears | removing asks nothing but offers undo |
+| Locator pill | `p.87 →` | beside a history row | the reference is off-screen | click jumps | `↵` on the pill | tap | view moves to that page and flashes the area | closing the list leaves the view where it was |
+| Send | `发送` | input | question non-empty and estimate inside the window | click | `⌘↵` | tap | references move to history; tray empties | failure keeps both; nothing is lost |
+
+**Hover indication is three-part and must agree:** the tinted area on the page, the scrollbar marker,
+and the preview card. If the page is not the one being read, only the marker and the pill appear —
+the reader is never yanked away by a hover.
 
 **Alternatives considered.**
 
-- **A — three permanent mode buttons** (`选中` / `框选` / `范围`). Rejected: mutually exclusive by
-  construction, so it cannot express "two passages and a screenshot in one question", which is the
-  actual use.
-- **B — three scope chips, one active** (the earlier draft). Rejected for the same reason: a
-  single-valued scope cannot accumulate.
-- **C — chosen: a tray.** The three ways of pointing become three ways of *adding*, not three states.
-  Nothing about the page changes; the page always does the obvious thing.
+- Three permanent mode buttons. Rejected: mutually exclusive, cannot express a mixed reference set.
+- One active scope chip. Rejected for the same reason.
+- Re-sending the previous references automatically. Rejected: it silently spends money and pollutes
+  the next question; history with explicit redemption is the honest version.
 
-**Discoverability.** The tray's empty state says what can go in it: `选中文字、框选截图，或选择页码范围`.
-The floating bar on a selection shows `加入引用` — the moment a user first selects text is the moment
-they learn the tray exists.
+**Discoverability.** The tray's empty state names the three ways to fill it. The history's
+`全部` disclosure appears as soon as there is history. The answer footer's `引用整段` makes the
+fourth kind visible without documentation.
 
 **States.**
 
-| State | Page drag | Tray | Send |
-|---|---|---|---|
-| Empty | selects text | hint text | disabled |
-| One or more references | still selects text | chips visible | enabled when the question is non-empty |
-| Adding a region | draws a marquee | unchanged until release | disabled while the marquee is open |
-| Sending | allowed | chips disabled, progress shown | becomes Stop |
+| State | Page drag | Tray | History | Send |
+|---|---|---|---|---|
+| Empty | selects text | hint | as-is | disabled |
+| With references | still selects text | chips | as-is | enabled when the question is non-empty |
+| Hovering history | unchanged | unchanged | row highlighted | unchanged |
+| Sending | allowed | disabled, progress shown | disabled | becomes Stop |
 
-**Cost of being wrong.** A stale tray silently included in the next question is the dangerous case:
-the user thinks they asked about one page and sent five. Mitigation: the tray is always visible,
-chips state their page, and the composer shows a one-line summary above Send
-(`将发送：2 段文字 · 1 张截图 · 12 页`). A mis-captured region is recoverable until Send because the
-chip previews its image.
+**Cost of being wrong.** The dangerous case is sending more than intended, so the composer states it
+twice: the tray itself, and a one-line summary above Send (`将发送：2 段文字 · 1 张截图 · 12 页`)
+with an estimated token count. Above 60% of the model's context the summary turns amber; above the
+window, Send is disabled with a specific message rather than a generic failure.
 
 ## Design review
 
 - Reviewed with: z1mLi on 2026-10-21
 - Decisions:
-  - The three kinds are **combinable in one question**, expressed as a tray rather than a scope.
-    (This replaced the earlier "three scopes" draft, and with it the open question about mode
-    buttons.)
-  - Both box triggers ship: `⌥`-drag and a `框选` button.
-  - A page range is set by both a drag on the page strip and a typed field, synchronised in both
-    directions. Invalid text never mutates the strip.
-  - Multi-segment ranges are in the model from the start, so typing `31-45, 60` needs no schema
-    change.
-  - Preset questions are parked.
-- Pending: whether the tray survives a send, and the soft cap. See open questions.
+  - References of all kinds combine in one tray; there are no modes.
+  - After send, references move to history and are **not** re-sent until redeemed.
+  - Hover shows location without jumping; jumping is always a click.
+  - Answer text can become a reference, labelled by turn, never as document text.
+  - No cap on references; overflow is a layout problem, not a policy.
+- Pending: history persistence across sessions (open question 1).
 
 ## Test plan
 
-- Unit: span parsing (`31`, `31-45`, `31-45, 60`, full-width dash), merging, rejection out of range;
-  tray accepts mixed kinds and preserves order; the 12-reference warning triggers at 13.
-- Integration: adding from each of the three paths puts the right kind in the tray; removing a chip
-  removes it from the request body; the send summary counts match the tray.
-- Integration (synchronisation): typing a valid range redraws the strip; invalid text leaves the
-  strip untouched and disables Send; dragging rewrites the field on every tick.
-- End-to-end: one question with a passage, a screenshot and a range arrives as three references with
-  distinct ids, and the answer's citations name the reference they came from.
-- Accessibility: the tray is reachable by keyboard, chips announce their kind and page, removing a
-  chip keeps focus in the tray.
+- Unit: span parsing and merging; dedupe by kind and content; history append moves references out of
+  the tray; AI reference requires a live turn.
+- Integration: each add path produces the right kind; redemption adds to the tray and does not
+  mutate history; removing from the tray does not remove from history; the send summary counts match.
+- Layout: 1, 12, 40 and 120 chips produce no composer jump and no horizontal scrollbar on the panel;
+  the history list renders at most a screenful of rows.
+- Hover: an off-screen reference tints nothing and moves nothing; the marker appears at the right
+  proportion; the preview opens only after the delay and closes on leave.
+- End-to-end: one question with a passage, a screenshot, a range and an answer quote arrives as four
+  references; the answer cites them by id.
+- Accessibility: history is a listbox; focus order is tray → input → history; every hover affordance
+  has a focus equivalent.
 
 ## Risks
 
-- **The tray can become invisible clutter.** Mitigation: the send summary line repeats what will go,
-  so the tray is never the only place the truth lives.
-- **A large tray can be expensive.** Mitigation: the summary includes an estimated token count and
-  turns amber above a threshold; it is a warning, not a block.
-- **"Kept after send" may surprise.** If the tray persists, the first follow-up may resend material
-  the reader had forgotten. Mitigation: the summary stays on screen and the chips show a `将重发`
-  marker.
+- **History becomes a second, invisible truth.** Mitigation: it is never sent implicitly, and its
+  rows state their page and kind at all times.
+- **Hover tint on a dense page is noise.** Mitigation: 38% tint of one accent, no dimming of the rest
+  of the page, and no animation after the first 120 ms.
+- **Scrollbar markers collide** when many references sit on nearby pages. Mitigation: markers merge
+  into a band above three in the same 2% of the track.
+- **Unbounded references can exceed the context window.** Mitigation: the estimate is exact enough to
+  refuse before sending, and the refusal names the count to remove.
 
 ## Assumptions
 
-- A reference's page numbers are stable for the lifetime of the conversation; a replaced document
-  invalidates its tray entries and they are marked as such.
-- Images are stored per conversation and deleted with it; nothing is written next to the PDF.
+- The provider reports cache and token usage; where it does not, the status line shows `—` rather
+  than a fabricated zero.
+- Images are stored per conversation and deleted with it. Nothing is written next to the PDF.
 
 ## Deviations
 
@@ -157,11 +193,7 @@ chip previews its image.
 
 ## Open questions
 
-1. **Does the tray survive a send?** Proposed: yes, with a visible `将重发` marker and a
-   `清空引用` action. Rejected alternative: clear on send, which forces re-selecting a passage for
-   every follow-up.
-2. **Soft cap or hard cap?** Proposed: warn above 12 references, never block; the cost estimate is
-   the real limiter.
-3. **When the configured model has no vision support**, should a region reference be refused at
-   attach time, or sent and fail? Proposed: refuse at attach, with a message naming the setting to
-   change.
+1. **History persistence:** conversation-only (proposed) or written to disk so it survives a restart?
+   Disk adds a privacy surface and a migration path; conversation-only means closing the app loses it.
+2. **Hover delay:** 600 ms proposed. Shorter feels twitchy, longer feels dead — worth confirming on a
+   real page with a trackpad.
