@@ -173,6 +173,10 @@ documents; toasts never block input. A mis-shown banner costs one click, not dat
 - **P5 resets**: 阅读 has 恢复阅读默认 (zoom 100 %, continuous, remember on) and 提示词 has
   恢复默认提示词, which clears the field — saving an empty prompt already falls back to the built-in
   one. Verified: zoom select returns to 100 and the prompt textarea empties.
+- **Keyboard paths**: ⌘⇧C copies the last answer, ⌘⇧R regenerates it, ⌘⇧G continues an interrupted
+  one; all three appear in the 快捷键 tab. Verified with a real key event: the answer exists, ⌘⇧C
+  produces the 已复制 toast. The shortcuts fire globally but only with ⌘/Ctrl+Shift, so typing is
+  unaffected.
 - **P1 audit**: the grep for hard-coded `px` outside the token block stood at **223** declarations.
   This round migrated every spacing, radius, type and offset declaration whose value sits on the
   scale, then snapped off-scale spacing (6/10/14/18/20/22) to the nearest step: **223 → 109**. The

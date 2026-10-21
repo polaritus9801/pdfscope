@@ -55,6 +55,9 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Keyboard paths for the answer actions: ⌘⇧C copy, ⌘⇧R regenerate, ⌘⇧G continue, listed in settings.
+
+
 - 恢复阅读默认 and 恢复默认提示词 in settings, so a section can be put back without hunting values.
 
 

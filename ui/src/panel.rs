@@ -630,6 +630,56 @@ pub fn AiPanel(
         send_text("请从断开处继续写下去，不要重复已经写过的内容。".to_owned());
     };
 
+    // Global shortcuts for the answer actions; they ignore plain typing so the composer is unaffected.
+    Effect::new(move |_| {
+        let Some(window) = web_sys::window() else {
+            return;
+        };
+
+        let handler =
+            Closure::<dyn Fn(web_sys::KeyboardEvent)>::new(move |event: web_sys::KeyboardEvent| {
+                if !(event.meta_key() || event.ctrl_key()) || !event.shift_key() {
+                    return;
+                }
+
+                match event.key().to_ascii_lowercase().as_str() {
+                    "c" => {
+                        let text = turns
+                            .get()
+                            .last()
+                            .map(|turn| turn.answer.clone())
+                            .filter(|text| !text.trim().is_empty())
+                            .unwrap_or_else(|| answer.get());
+                        if text.trim().is_empty() {
+                            return;
+                        }
+                        copy_to_clipboard(&text);
+                        notify.run("已复制".to_owned());
+                        event.prevent_default();
+                    }
+                    "r" => {
+                        let Some(last) = turns.get().last().cloned() else {
+                            return;
+                        };
+                        send_text(last.question);
+                        event.prevent_default();
+                    }
+                    "g" => {
+                        let interrupted = turns.get().last().is_some_and(|turn| turn.interrupted);
+                        if interrupted {
+                            continue_last();
+                            event.prevent_default();
+                        }
+                    }
+                    _ => {}
+                }
+            });
+
+        let _ =
+            window.add_event_listener_with_callback("keydown", handler.as_ref().unchecked_ref());
+        handler.forget();
+    });
+
     let build_payload = move || -> Option<js_sys::Object> {
         let payload = js_sys::Object::new();
         let _ = js_sys::Reflect::set(
@@ -1461,6 +1511,9 @@ pub fn AiPanel(
                                             <dt>"Enter"</dt><dd>"发送问题"</dd>
                                             <dt>"Shift / ⌘ + Enter"</dt><dd>"在问题里换行"</dd>
                                             <dt>"Esc"</dt><dd>"关闭查找或停止回答"</dd>
+                                            <dt>"⌘⇧C"</dt><dd>"复制最后一条回答"</dd>
+                                            <dt>"⌘⇧R"</dt><dd>"重新生成"</dd>
+                                            <dt>"⌘⇧G"</dt><dd>"继续生成（断流后）"</dd>
                                         </dl>
                                     </section>
                                 </Show>
