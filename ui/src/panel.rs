@@ -447,6 +447,11 @@ pub fn AiPanel(
                         }
                     }
                     "text" => {
+                        status.update(|line| {
+                            if line.contains("正在重试") {
+                                line.clear();
+                            }
+                        });
                         if think_seconds.get() == 0.0 && think_started.get() > 0.0 {
                             think_seconds.set((js_sys::Date::now() - think_started.get()) / 1000.0);
                         }
@@ -474,6 +479,11 @@ pub fn AiPanel(
                                 flush.forget();
                             }
                         }
+                    }
+                    "retrying" => {
+                        let attempt = number_of(&event, "attempt").unwrap_or(0.0) as u32;
+                        let of = number_of(&event, "of").unwrap_or(0.0) as u32;
+                        status.set(format!("连接中断，正在重试（{attempt}/{of}）…"));
                     }
                     "usage" => {
                         let prompt = number_of(&event, "prompt").unwrap_or(0.0) as u64;

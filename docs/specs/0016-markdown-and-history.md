@@ -54,7 +54,8 @@ because KaTeX skips `pre`/`code`.
 
 ## Deviations
 
-- A request that fails before any content is retried twice automatically (0.5 s, then 1 s). Once text
+- A request that fails before any content is retried twice automatically (0.5 s, then 1 s), and the
+  status line says `连接中断，正在重试（n/3）…` while it does; the line clears as soon as text arrives. Once text
   has arrived a retry would duplicate it, so that case is handed to 继续生成 instead. Stop is honoured
   between attempts.
 

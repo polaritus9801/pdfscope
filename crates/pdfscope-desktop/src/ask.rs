@@ -79,6 +79,13 @@ pub(crate) enum AskEvent {
     },
     /// The answer was stopped by the reader.
     Stopped,
+    /// The connection failed and another attempt is starting.
+    Retrying {
+        /// Which attempt is about to run, counting from one.
+        attempt: u32,
+        /// How many attempts are allowed in total.
+        of: u32,
+    },
     /// The answer is complete.
     Done,
     /// The request failed.
@@ -288,6 +295,10 @@ pub(crate) async fn ask(
                             });
                             return;
                         }
+                        send(AskEvent::Retrying {
+                            attempt: attempt + 1,
+                            of: ATTEMPTS,
+                        });
                         tokio::time::sleep(std::time::Duration::from_millis(
                             500 * u64::from(attempt),
                         ))
@@ -299,6 +310,10 @@ pub(crate) async fn ask(
 
             // The stream ended without a Done event.
             if !received && attempt < ATTEMPTS {
+                send(AskEvent::Retrying {
+                    attempt: attempt + 1,
+                    of: ATTEMPTS,
+                });
                 tokio::time::sleep(std::time::Duration::from_millis(500 * u64::from(attempt)))
                     .await;
                 continue 'retry;
