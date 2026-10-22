@@ -126,3 +126,134 @@ mod tests {
         assert_eq!(pages, set(&[1, 2]));
     }
 }
+
+/// How much of the document a question may see.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Scope {
+    /// Every page.
+    Document,
+    /// The page in view.
+    Current,
+    /// Only the passages and regions the reader added.
+    References,
+    /// An explicit set of pages.
+    Selected,
+}
+
+impl Scope {
+    /// Maps the interface's byte: 0 document, 1 current, 2 references, anything else selected.
+    pub fn from_byte(mode: u8) -> Self {
+        match mode {
+            0 => Self::Document,
+            1 => Self::Current,
+            2 => Self::References,
+            _ => Self::Selected,
+        }
+    }
+}
+
+/// The pages a request should carry, and how many were wanted before the cap.
+///
+/// Returns `(pages, wanted)`: `wanted` is larger than `pages.len()` when the cap cut the selection,
+/// which is what the composer reports to the reader instead of truncating silently.
+pub fn request_pages(
+    scope: Scope,
+    total: u32,
+    current: u32,
+    selected: &[u32],
+    cap: usize,
+) -> (Vec<u32>, usize) {
+    if total == 0 {
+        return (Vec::new(), 0);
+    }
+
+    let wanted: Vec<u32> = match scope {
+        Scope::Document => (1..=total).collect(),
+        Scope::Current => vec![current.clamp(1, total)],
+        Scope::References => Vec::new(),
+        Scope::Selected => {
+            let mut kept: Vec<u32> = selected
+                .iter()
+                .copied()
+                .filter(|page| (1..=total).contains(page))
+                .collect();
+            kept.sort_unstable();
+            kept.dedup();
+            kept
+        }
+    };
+
+    let wanted_count = wanted.len();
+    (wanted.into_iter().take(cap).collect(), wanted_count)
+}
+
+#[cfg(test)]
+mod request_tests {
+    use super::*;
+
+    #[test]
+    fn the_whole_document_is_capped_and_reported() {
+        let (pages, wanted) = request_pages(Scope::Document, 100, 7, &[], 20);
+        assert_eq!(pages.len(), 20);
+        assert_eq!(pages.first(), Some(&1));
+        assert_eq!(wanted, 100);
+    }
+
+    #[test]
+    fn the_current_page_ignores_the_cap() {
+        let (pages, wanted) = request_pages(Scope::Current, 300, 42, &[], 20);
+        assert_eq!(pages, vec![42]);
+        assert_eq!(wanted, 1);
+    }
+
+    #[test]
+    fn the_current_page_is_clamped_to_the_document() {
+        assert_eq!(request_pages(Scope::Current, 10, 99, &[], 20).0, vec![10]);
+        assert_eq!(request_pages(Scope::Current, 10, 0, &[], 20).0, vec![1]);
+    }
+
+    #[test]
+    fn references_only_sends_nothing() {
+        let (pages, wanted) = request_pages(Scope::References, 50, 3, &[2, 4], 20);
+        assert!(pages.is_empty());
+        assert_eq!(wanted, 0);
+    }
+
+    #[test]
+    fn the_selected_set_is_sorted_deduplicated_and_filtered() {
+        let (pages, wanted) = request_pages(Scope::Selected, 10, 1, &[5, 2, 5, 11, 0], 20);
+        assert_eq!(pages, vec![2, 5]);
+        assert_eq!(wanted, 2);
+    }
+
+    #[test]
+    fn a_large_selection_is_capped_and_reported() {
+        let selected: Vec<u32> = (1..=50).collect();
+        let (pages, wanted) = request_pages(Scope::Selected, 100, 1, &selected, 20);
+        assert_eq!(pages.len(), 20);
+        assert_eq!(wanted, 50);
+    }
+
+    #[test]
+    fn an_empty_document_sends_nothing_in_every_scope() {
+        for scope in [
+            Scope::Document,
+            Scope::Current,
+            Scope::References,
+            Scope::Selected,
+        ] {
+            let (pages, wanted) = request_pages(scope, 0, 1, &[1], 20);
+            assert!(pages.is_empty());
+            assert_eq!(wanted, 0);
+        }
+    }
+
+    #[test]
+    fn the_byte_mapping_is_stable() {
+        assert_eq!(Scope::from_byte(0), Scope::Document);
+        assert_eq!(Scope::from_byte(1), Scope::Current);
+        assert_eq!(Scope::from_byte(2), Scope::References);
+        assert_eq!(Scope::from_byte(3), Scope::Selected);
+        assert_eq!(Scope::from_byte(99), Scope::Selected);
+    }
+}

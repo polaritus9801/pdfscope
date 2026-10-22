@@ -317,6 +317,12 @@ Four defects found by reading the code rather than looking at it:
 
 ## Verification without a browser
 
+- `pdfscope-core::pages::request_pages` — 8 tests for what a question actually carries: whole document
+  capped and reported, current page clamped, references-only empty, explicit set sorted/deduplicated/
+  filtered, a large set capped, an empty document, and the stable byte mapping. The composer calls it;
+  the notice ("names N pages, took the first 20") comes from the same numbers.
+
+
 The two pieces of logic that a screenshot could not check are unit-tested:
 
 - `pdfscope-core::geo::resize_rect` — 8 tests: each edge, each corner, clamping, minimum size,

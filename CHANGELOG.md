@@ -10,6 +10,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Changed
 
+- What a question carries is now `pdfscope-core::pages::request_pages`, with eight tests covering the
+  cap, clamping, filtering and the empty cases.
+
+
 - Page-set merging and subtraction moved to `pdfscope-core::pages` with nine unit tests; the UI calls
   the tested functions.
 

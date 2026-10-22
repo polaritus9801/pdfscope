@@ -396,30 +396,28 @@ pub fn AiPanel(
             // Page text is fetched here, not in Rust: the renderer owns the document.
             let mut context: Vec<(u32, String)> = Vec::new();
 
-            let selected: Vec<u32> = match mode {
-                0 => (1..=total).collect(),
-                1 => vec![current_page],
-                3 => explicit.clone(),
-                _ => Vec::new(),
-            };
+            let (selected, wanted) = pdfscope_core::pages::request_pages(
+                pdfscope_core::pages::Scope::from_byte(mode),
+                total,
+                current_page,
+                &explicit,
+                20,
+            );
 
-            if mode == 3 && selected.is_empty() {
+            if mode == 3 && explicit.is_empty() {
                 notice.set(Some("还没有选择页面，本次只发送引用".to_owned()));
-            } else if mode == 0 && selected.len() > 20 {
-                notice.set(Some(format!(
-                    "整份文档共 {} 页，这次只取了前 20 页",
-                    selected.len()
-                )));
-            } else if mode == 3 && selected.len() > 20 {
-                notice.set(Some(format!(
-                    "已选 {} 页，这次只取了前 20 页",
-                    selected.len()
-                )));
+            } else if wanted > 20 {
+                let label = if mode == 0 {
+                    "整份文档"
+                } else {
+                    "已选页面"
+                };
+                notice.set(Some(format!("{label}共 {wanted} 页，这次只取了前 20 页")));
             } else {
                 notice.set(None);
             }
 
-            for number in selected.iter().take(20) {
+            for number in &selected {
                 context.push((*number, fetch_page_text(*number).await));
             }
 
