@@ -297,6 +297,32 @@ try {
   check(initial.gap === "16px", "pages are separated by the spacing token", initial.gap);
   await shot("reader-01-continuous.png");
 
+  // Single page: one sheet, sitting at the top of the reading area.
+  await evaluate(`window.PDFScope.setPageMode("single")`);
+  await waitFor(
+    `(() => {
+       const pages = [...document.querySelectorAll('.page')].filter(
+         (node) => getComputedStyle(node).display !== 'none',
+       );
+       if (pages.length !== 1) return false;
+       const stage = document.querySelector('.stage').getBoundingClientRect();
+       const top = pages[0].getBoundingClientRect().top;
+       return top >= stage.top - 1 && top <= stage.top + 40;
+     })()`,
+    "one page at the top in single mode",
+  );
+  check(true, "single mode shows one page at the top");
+  await shot("reader-01b-single.png");
+
+  await evaluate(`window.PDFScope.setPageMode("continuous")`);
+  await waitFor(
+    `[...document.querySelectorAll('.page')].filter(
+       (node) => getComputedStyle(node).display !== 'none',
+     ).length > 1`,
+    "the column returns",
+  );
+  check(true, "continuous mode restores the column");
+
   // At 50 %, two pages are visible at once: the column, not a single-page canvas.
   await evaluate(`(() => {
     const minus = [...document.querySelectorAll('.bar-right button')].find((node) => node.textContent.trim() === '−');

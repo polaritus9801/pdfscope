@@ -10,6 +10,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Changed
 
+- The reader smoke suite covers single mode switching: one page at the top, then back to the column
+  (83 checks).
+
+
 - The reader smoke suite can run with extra Chrome flags; with reduced motion forced it still passes
   81/81.
 

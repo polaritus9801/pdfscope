@@ -116,6 +116,9 @@ selection cannot point at a hidden page.
   continuous transform, returns the scroll to zero, and marks the current page. The 阅读 setting
   翻页方式 persists the choice. Measured: page top 80 px (stage top 56 + padding 24), scroll 0, one
   page visible.
+- **Single mode is covered by the smoke suite**: it switches, asserts exactly one page is visible and
+  that its top sits within the reading area, then switches back and asserts the column returns. The
+  suite is now **83 checks**.
 - **Spread** not implemented.
 
 ## Deviations
