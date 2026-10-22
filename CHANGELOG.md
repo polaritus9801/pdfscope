@@ -201,6 +201,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Fixed
 
+- Page selections now switch the request scope; a drag no longer pins a reference, shortcuts stay out
+  of open dialogs, and an empty page scope is reported.
+
+
 - Sticky box mode no longer resets itself after one capture, and undo during a drag cancels that drag.
 
 

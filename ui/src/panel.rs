@@ -401,7 +401,9 @@ pub fn AiPanel(
                 _ => Vec::new(),
             };
 
-            if mode == 0 && selected.len() > 20 {
+            if mode == 3 && selected.is_empty() {
+                notice.set(Some("还没有选择页面，本次只发送引用".to_owned()));
+            } else if mode == 0 && selected.len() > 20 {
                 notice.set(Some(format!(
                     "整份文档共 {} 页，这次只取了前 20 页",
                     selected.len()
@@ -1485,6 +1487,7 @@ pub fn AiPanel(
                                 on:click=move |_| {
                                     undo_push.run(());
                                     page_set.set(Vec::new());
+                                    scope_mode.set(1);
                                 }
                             >
                                 "清空页面引用"

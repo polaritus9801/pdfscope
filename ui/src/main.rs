@@ -172,6 +172,7 @@ fn PageView(
     pinned_ref: RwSignal<Option<(u8, u64)>>,
     edit_epoch: RwSignal<u64>,
     page_set: RwSignal<Vec<u32>>,
+    scope_mode: RwSignal<u8>,
     anchor: RwSignal<Option<(u8, u32)>>,
     hover_page: RwSignal<Option<u32>>,
 ) -> impl IntoView {
@@ -192,10 +193,12 @@ fn PageView(
     );
     let drag = RwSignal::new(Option::<Drag>::None);
     let drag_moved = RwSignal::new(false);
+    let suppress_click = RwSignal::new(false);
     let finish_drag = move |kind: u8, id: u64| {
         let moved = drag_moved.get();
         drag.set(None);
         drag_moved.set(false);
+        suppress_click.set(moved);
         if !moved {
             return;
         }
@@ -415,6 +418,7 @@ fn PageView(
     let commit_range = move |from: u32, to: u32| {
         undo_push.run(());
         page_set.update(|set| pdfscope_core::add_range(set, from, to));
+        scope_mode.set(3);
     };
 
     let choose_start = move |_| {
@@ -438,6 +442,7 @@ fn PageView(
     let toggle_page = move |_| {
         undo_push.run(());
         page_set.update(|set| pdfscope_core::toggle_page(set, number));
+        scope_mode.set(3);
         anchor.set(None);
     };
 
@@ -532,6 +537,10 @@ fn PageView(
                                 on:pointerup=move |_| finish_drag(kind, id)
                                 on:pointercancel=move |_| finish_drag(kind, id)
                                 on:click=move |_| {
+                                    if suppress_click.get() {
+                                        suppress_click.set(false);
+                                        return;
+                                    }
                                     if pinned_ref.get() == Some((kind, id)) {
                                         pinned_ref.set(None);
                                     } else {
@@ -997,9 +1006,9 @@ fn App() -> impl IntoView {
         let typing = event
             .target()
             .and_then(|target| target.dyn_into::<web_sys::HtmlElement>().ok())
-            .map(|element| matches!(element.tag_name().as_str(), "INPUT" | "TEXTAREA"))
+            .map(|element| matches!(element.tag_name().as_str(), "INPUT" | "TEXTAREA" | "SELECT"))
             .unwrap_or(false);
-        if typing {
+        if typing || settings_open.get() {
             return;
         }
 
@@ -1712,6 +1721,7 @@ fn App() -> impl IntoView {
                                         pinned_ref=pinned_ref
                                         edit_epoch=edit_epoch
                                         page_set=page_set
+                                        scope_mode=scope_mode
                                         anchor=anchor
                                         hover_page=hover_page
                                     />

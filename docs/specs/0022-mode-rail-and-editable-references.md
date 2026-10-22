@@ -297,6 +297,15 @@ Four defects found by reading the code rather than looking at it:
 - **Undo during a drag.** A drag recorded the edit epoch it began in; an undo or redo bumps the epoch,
   and a drag from an older epoch stops instead of writing over the restored state.
 
+### Fourth review pass
+
+- **Page edits never switched the scope.** The purple bar and page drag changed the page set, but the
+  request kept whatever icon was active, so the selection was invisible to the model. Both now switch
+  the scope to pages, and clearing the set falls back to the current page.
+- A drag on a reference ended with a click, which toggled pinning; a move now suppresses that click.
+- `V/T/B/D` fired while the settings dialog was open and treated `<select>` as not-typing; both fixed.
+- Sending with the pages scope and an empty set now says so instead of silently sending nothing.
+
 ## Verification without a browser
 
 The two pieces of logic that a screenshot could not check are unit-tested:
