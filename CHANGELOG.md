@@ -70,6 +70,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Dragging a reference handle re-reads a quote's text or re-crops a region's image; the resize geometry
+  is covered by eight core unit tests.
+
+
 - Reference resizing: quote brackets at both ends, eight dots on a region; all clamped and undoable.
 
 

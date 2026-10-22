@@ -1560,6 +1560,34 @@ window.PDFScope = {
     }
   },
 
+  /// Text covered by a normalised rectangle, read from the rendered text layer.
+  async textInRect(pageNumber, rect) {
+    const page = pageElement(pageNumber);
+    if (!page || !rect) return "";
+
+    const box = page.getBoundingClientRect();
+    const left = box.left + rect.x * box.width;
+    const top = box.top + rect.y * box.height;
+    const right = left + rect.width * box.width;
+    const bottom = top + rect.height * box.height;
+
+    const parts = [];
+    for (const span of page.querySelectorAll(".textLayer span")) {
+      const spanRect = span.getBoundingClientRect();
+      if (spanRect.right < left || spanRect.left > right) continue;
+      if (spanRect.bottom < top || spanRect.top > bottom) continue;
+      const text = (span.textContent ?? "").trim();
+      if (text) parts.push(text);
+    }
+
+    return parts.join(" ").replace(/\s+/g, " ").trim();
+  },
+
+  /// Re-crops a region after its rectangle changed.
+  async regionImage(pageNumber, rect) {
+    return renderRegion(pageNumber, rect);
+  },
+
   /// Counts matches for `query` across the document and highlights the rendered pages.
   async find(query) {
     const needle = String(query ?? "").trim();

@@ -177,9 +177,87 @@ fn PageView(
     type Drag = (u8, u64, f64, f64, (f64, f64, f64, f64), f64, f64, bool, u8);
     let drag = RwSignal::new(Option::<Drag>::None);
     let drag_moved = RwSignal::new(false);
-    let finish_drag = move |_| {
+    let finish_drag = move |kind: u8, id: u64| {
+        let moved = drag_moved.get();
         drag.set(None);
         drag_moved.set(false);
+        if !moved {
+            return;
+        }
+
+        let rect = if kind == 0 {
+            passages
+                .get()
+                .iter()
+                .find(|entry| entry.id == id)
+                .map(|entry| entry.rect)
+        } else {
+            regions
+                .get()
+                .iter()
+                .find(|entry| entry.id == id)
+                .map(|entry| entry.rect)
+        };
+        let Some((x, y, width, height)) = rect else {
+            return;
+        };
+
+        let rect_value = js_sys::Object::new();
+        let _ = js_sys::Reflect::set(&rect_value, &JsValue::from_str("x"), &JsValue::from_f64(x));
+        let _ = js_sys::Reflect::set(&rect_value, &JsValue::from_str("y"), &JsValue::from_f64(y));
+        let _ = js_sys::Reflect::set(
+            &rect_value,
+            &JsValue::from_str("width"),
+            &JsValue::from_f64(width),
+        );
+        let _ = js_sys::Reflect::set(
+            &rect_value,
+            &JsValue::from_str("height"),
+            &JsValue::from_f64(height),
+        );
+
+        if kind == 0 {
+            // A quote's text follows its rectangle; re-read it from the text layer.
+            let Some(handle) = call(
+                "textInRect",
+                &[JsValue::from_f64(f64::from(number)), rect_value.into()],
+            ) else {
+                return;
+            };
+            spawn_local(async move {
+                if let Ok(value) = settle(handle).await {
+                    if let Some(text) = value.as_string() {
+                        if !text.trim().is_empty() {
+                            passages.update(|list| {
+                                if let Some(entry) = list.iter_mut().find(|entry| entry.id == id) {
+                                    entry.quote = text;
+                                }
+                            });
+                        }
+                    }
+                }
+            });
+        } else {
+            let Some(handle) = call(
+                "regionImage",
+                &[JsValue::from_f64(f64::from(number)), rect_value.into()],
+            ) else {
+                return;
+            };
+            spawn_local(async move {
+                if let Ok(value) = settle(handle).await {
+                    if let Some(image) = value.as_string() {
+                        if image.starts_with("data:image/") {
+                            regions.update(|list| {
+                                if let Some(entry) = list.iter_mut().find(|entry| entry.id == id) {
+                                    entry.image = image;
+                                }
+                            });
+                        }
+                    }
+                }
+            });
+        }
     };
 
     let begin_drag = move |event: web_sys::PointerEvent,
@@ -240,39 +318,13 @@ fn PageView(
 
         let dx = (event.client_x() as f64 - start_x) / page_w;
         let dy = (event.client_y() as f64 - start_y) / page_h;
-        let (start_x_rect, start_y_rect, start_w, start_h) = start;
-        let minimum = 0.01_f64;
-
-        let mut x = start_x_rect;
-        let mut y = start_y_rect;
-        let mut width = start_w;
-        let mut height = start_h;
-
-        let left = matches!(mode, 1 | 5 | 7);
-        let right = matches!(mode, 2 | 6 | 8);
-        let top = matches!(mode, 3 | 5 | 6);
-        let bottom = matches!(mode, 4 | 7 | 8);
-
-        if left {
-            let edge = (start_x_rect + dx).clamp(0.0, start_x_rect + start_w - minimum);
-            width = start_w + (start_x_rect - edge);
-            x = edge;
-        }
-        if right {
-            width = (start_w + dx).clamp(minimum, 1.0 - start_x_rect);
-        }
-        if top {
-            let edge = (start_y_rect + dy).clamp(0.0, start_y_rect + start_h - minimum);
-            height = start_h + (start_y_rect - edge);
-            y = edge;
-        }
-        if bottom {
-            height = (start_h + dy).clamp(minimum, 1.0 - start_y_rect);
-        }
-        if mode == 0 {
-            x = (start_x_rect + dx).clamp(0.0, 1.0 - start_w);
-            y = (start_y_rect + dy).clamp(0.0, 1.0 - start_h);
-        }
+        let (x, y, width, height) = pdfscope_core::geo::resize_rect(
+            start,
+            dx,
+            dy,
+            pdfscope_core::geo::ResizeMode::from_byte(mode),
+            0.01,
+        );
 
         if kind == 0 {
             passages.update(|list| {
@@ -368,8 +420,8 @@ fn PageView(
                                     begin_drag(event, kind, id, rect, 0);
                                 }
                                 on:pointermove=drag_move
-                                on:pointerup=move |_| finish_drag(())
-                                on:pointercancel=move |_| finish_drag(())
+                                on:pointerup=move |_| finish_drag(kind, id)
+                                on:pointercancel=move |_| finish_drag(kind, id)
                                 on:click=move |_| {
                                     if pinned_ref.get() == Some((kind, id)) {
                                         pinned_ref.set(None);

@@ -241,15 +241,19 @@ gesture changed from *replace* to *add* as part of that redesign, because replac
   6 px of movement records one undo entry.
 - **B. Resizing landed.** A quote shows `[` and `]` on its ends; a region shows eight dots (corners and
   edges). Dragging either resizes in that direction, clamped to the page with a 1 % minimum; the first
-  6 px records one undo entry, shared with moving. Text re-anchoring (re-reading the quote after the
-  handles move) remains.
+  6 px records one undo entry, shared with moving.
+- **Text and images follow their geometry.** On drop, a quote is re-read from the text layer
+  (`PDFScope.textInRect`) and a region is re-cropped (`PDFScope.regionImage`), both undoable through
+  the same snapshot. The resize maths lives in `pdfscope-core::geo::resize_rect` with **eight unit
+  tests** (each edge, each corner, clamping, minimum size, unknown mode), so the geometry is verified
+  without a browser.
 
 ## Deviations
 
 - The frame itself is the move surface; the region's circular handle is an affordance, not a separate
   drag target.
-- Resizing a quote changes its rectangle but not yet its text; the quote is re-read from the text layer
-  in the next slice.
+- The re-read text joins whatever text-layer spans intersect the rectangle; a reader who drags a
+  handle across a line break gets the words but not the original spacing.
 
 - Dragging in page mode adds rather than replaces. This supersedes the earlier replace-by-default
   answer, because replace made the middle-range case destructive; 清空 is the only replace gesture.
