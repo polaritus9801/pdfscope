@@ -231,6 +231,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Fixed
 
+- 仅引用 now sends the pages marked with the purple bars as well as the quote/region references; the
+  hidden fourth scope state is gone.
+
+
 - LaTeX formulas are no longer mangled: math is protected from Markdown before parsing, so `_`, `*`,
   backslashes and `[p.n]` inside a formula survive and KaTeX renders it.
 

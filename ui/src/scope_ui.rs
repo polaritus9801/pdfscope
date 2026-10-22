@@ -79,7 +79,7 @@ pub(crate) fn PageManager(
                                                         }
                                                     });
                                                 }
-                                                scope_mode.set(3);
+                                                scope_mode.set(2);
                                             }
                                         >
                                             <span class="thumb-number">{number}</span>

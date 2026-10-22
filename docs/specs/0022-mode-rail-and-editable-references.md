@@ -422,6 +422,16 @@ The user's read is right: a question about the document should carry the documen
 `page_limit` in the desktop settings (zero means all), and the composer still says when a limit cut
 the request.
 
+## Field fix: references include the page bars
+
+A reader marked pages with the purple bars, chose 仅引用, and the model saw nothing of those pages.
+The four-scope model had a hidden "selected pages" state with no icon, so a page selection and the
+references icon disagreed about what "references" meant.
+
+Now there are only three scopes. The page bars, page drags and the manager all switch to **仅引用**, and
+that scope sends the selected pages **and** the quote/region references. With no pages and no
+references, the composer says so before asking. The hidden fourth state is gone from the interface.
+
 ## Deviations
 
 - The reference undo stack is cleared when a question is sent: references become part of that turn's

@@ -267,7 +267,7 @@ pub(crate) fn PageView(
     let commit_range = move |from: u32, to: u32| {
         undo_push.run(());
         page_set.update(|set| pdfscope_core::add_range(set, from, to));
-        scope_mode.set(3);
+        scope_mode.set(2);
     };
 
     let choose_start = move |_| {
@@ -291,7 +291,7 @@ pub(crate) fn PageView(
     let toggle_page = move |_| {
         undo_push.run(());
         page_set.update(|set| pdfscope_core::toggle_page(set, number));
-        scope_mode.set(3);
+        scope_mode.set(2);
         anchor.set(None);
     };
 

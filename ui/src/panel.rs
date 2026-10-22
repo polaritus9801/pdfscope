@@ -320,16 +320,18 @@ pub fn AiPanel(
                 0 => None,
                 limit => Some(limit as usize),
             };
-            let (selected, wanted) = pdfscope_core::pages::request_pages(
-                pdfscope_core::pages::Scope::from_byte(mode),
-                total,
-                current_page,
-                &explicit,
-                cap,
-            );
+            // "References" means everything the reader marked: page bars as well as quotes and boxes.
+            let scope = match mode {
+                0 => pdfscope_core::pages::Scope::Document,
+                1 => pdfscope_core::pages::Scope::Current,
+                _ => pdfscope_core::pages::Scope::Selected,
+            };
+            let (selected, wanted) =
+                pdfscope_core::pages::request_pages(scope, total, current_page, &explicit, cap);
 
-            if mode == 3 && explicit.is_empty() {
-                notice.set(Some("还没有选择页面，本次只发送引用".to_owned()));
+            if mode == 2 && explicit.is_empty() && passages_now.is_empty() && regions_now.is_empty()
+            {
+                notice.set(Some("还没有引用：这次只问问题，不发送页面".to_owned()));
             } else if wanted > selected.len() {
                 let label = if mode == 0 {
                     "整份文档"
@@ -1107,7 +1109,7 @@ pub fn AiPanel(
                         <button
                             class="scope-icon"
                             class:active=move || scope_mode.get() == 2
-                            title="仅引用的内容"
+                            title="仅引用：选中的页面与文字/框选内容"
                             on:click=move |_| {
                                 undo_push.run(());
                                 scope_mode.set(2);
@@ -1120,7 +1122,7 @@ pub fn AiPanel(
                     </div>
                     <span class="scope-count">
                         {move || {
-                            if scope_mode.get() == 3 {
+                            if scope_mode.get() == 2 && !page_set.get().is_empty() {
                                 format!("已选 {} 页", page_set.get().len())
                             } else {
                                 String::new()

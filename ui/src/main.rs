@@ -601,19 +601,14 @@ fn App() -> impl IntoView {
                     return;
                 }
                 undo_push.run(());
-                let (low, high) = (from.min(to), from.max(to));
                 page_set.update(|set| {
                     if subtract != 0.0 {
-                        set.retain(|page| *page < low || *page > high);
+                        pdfscope_core::subtract_range(set, from, to);
                     } else {
-                        for page in low..=high {
-                            if !set.contains(&page) {
-                                set.push(page);
-                            }
-                        }
-                        set.sort_unstable();
+                        pdfscope_core::add_range(set, from, to);
                     }
                 });
+                scope_mode.set(2);
                 anchor.set(None);
             });
         if let Some(window) = web_sys::window() {
