@@ -116,6 +116,9 @@ selection cannot point at a hidden page.
   continuous transform, returns the scroll to zero, and marks the current page. The 阅读 setting
   翻页方式 persists the choice. Measured: page top 80 px (stage top 56 + padding 24), scroll 0, one
   page visible.
+- **Single mode fits the page**: entering it computes a fit-page ratio and drives the existing zoom
+  transform, anchored at the top. Measured with the sample on an 800 px window: page 609 px tall in a
+  657 px stage, 54 %, scroll 0, top 80.
 - **Single mode is covered by the smoke suite**: it switches, asserts exactly one page is visible and
   that its top sits within the reading area, then switches back and asserts the column returns. The
   suite is now **83 checks**.
@@ -123,9 +126,9 @@ selection cannot point at a hidden page.
 
 ## Deviations
 
-- Single mode is **fit width with vertical scroll**, not fit page. The whole page does not fit the
-  viewport; making it fit needs the page rendered at a paged scale rather than scaled down from the
-  continuous canvas. Recorded for the next slice.
+- Fit page reuses the continuous zoom transform (anchored `top center`) rather than a separate
+  render scale; the canvas is rendered at the zoomed size through the existing machinery, so text
+  stays sharp. The spread mode will need the same trick with two sheets.
 - Mode changes reset the scroll; a finer anchor (keep the same paragraph) is not implemented.
 
 ## Open questions

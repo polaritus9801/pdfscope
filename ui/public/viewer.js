@@ -1347,6 +1347,20 @@ window.PDFScope = {
   setPageMode(mode) {
     pagedMode = mode === "single";
     applyPageMode();
+
+    if (pagedMode) {
+      // Fit the whole sheet: entering single mode should show a page, not its top third.
+      requestAnimationFrame(() => {
+        const page = document.querySelector('.page[data-current="true"]');
+        const stage = document.querySelector('.stage');
+        if (!page || !stage) return;
+        const available = stage.clientHeight - 48;
+        const ratio = Math.min(1, available / Math.max(1, page.offsetHeight));
+        if (ratio < 0.995) {
+          setZoomTarget(ratio, { direct: true });
+        }
+      });
+    }
   },
 
   /// The zoom a freshly opened document starts at, as a percentage of fit width.

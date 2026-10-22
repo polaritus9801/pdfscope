@@ -10,6 +10,9 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Changed
 
+- Single-page mode fits the whole page to the window instead of showing its top third.
+
+
 - The reader smoke suite covers single mode switching: one page at the top, then back to the column
   (83 checks).
 

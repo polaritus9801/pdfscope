@@ -1976,7 +1976,8 @@ mark.find-hit {
 
 /* Single page: the hidden sheets collapse, so the one on show starts at the top. */
 .pages.paged {
-  transform: none;
+  /* The zoom transform is the only thing that scales a sheet; it must stay, anchored at the top. */
+  transform-origin: top center;
   width: 100%;
   max-width: 900px;  /* size */
   margin: 0 auto;
