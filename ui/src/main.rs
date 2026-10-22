@@ -170,6 +170,7 @@ fn PageView(
     undo_push: Callback<()>,
     active_ref: RwSignal<Option<(u8, u64)>>,
     pinned_ref: RwSignal<Option<(u8, u64)>>,
+    edit_epoch: RwSignal<u64>,
     page_set: RwSignal<Vec<u32>>,
     anchor: RwSignal<Option<(u8, u32)>>,
     hover_page: RwSignal<Option<u32>>,
@@ -204,6 +205,8 @@ fn PageView(
         let Some((x, y, width, height)) = rect else {
             return;
         };
+        let epoch = edit_epoch.get() + 1;
+        edit_epoch.set(epoch);
 
         let rect_value = js_sys::Object::new();
         let _ = js_sys::Reflect::set(&rect_value, &JsValue::from_str("x"), &JsValue::from_f64(x));
@@ -229,6 +232,9 @@ fn PageView(
             };
             spawn_local(async move {
                 if let Ok(value) = settle(handle).await {
+                    if edit_epoch.get() != epoch {
+                        return;
+                    }
                     if let Some(text) = value.as_string() {
                         if !text.trim().is_empty() {
                             passages.update(|list| {
@@ -249,6 +255,9 @@ fn PageView(
             };
             spawn_local(async move {
                 if let Ok(value) = settle(handle).await {
+                    if edit_epoch.get() != epoch {
+                        return;
+                    }
                     if let Some(image) = value.as_string() {
                         if image.starts_with("data:image/") {
                             regions.update(|list| {
@@ -634,6 +643,8 @@ fn App() -> impl IntoView {
     // 0 pointer, 1 text, 2 box, 3 pages: the rail's active tool.
     let tool = RwSignal::new(0_u8);
     let page_set = RwSignal::new(Vec::<u32>::new());
+    // Bumped on every finished edit; an async re-read may only apply if nothing newer happened.
+    let edit_epoch = RwSignal::new(0_u64);
     let scope_mode = RwSignal::new(0_u8);
     // kind 0 = start anchor, 1 = end anchor; the hovered page completes the preview.
     let anchor = RwSignal::new(Option::<(u8, u32)>::None);
@@ -1677,6 +1688,7 @@ fn App() -> impl IntoView {
                                         undo_push=undo_push
                                         active_ref=active_ref
                                         pinned_ref=pinned_ref
+                                        edit_epoch=edit_epoch
                                         page_set=page_set
                                         anchor=anchor
                                         hover_page=hover_page

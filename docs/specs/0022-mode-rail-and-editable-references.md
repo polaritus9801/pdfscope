@@ -281,6 +281,14 @@ Four defects found by reading the code rather than looking at it:
   document also clears the history, the ids and the scope, so nothing from an old file can be undone
   into a new one.
 
+### Second review pass
+
+- The Shift borrow lasted until the next pointerdown, so a shift-drag followed by a keyboard selection
+  could add a reference nobody asked for. It now resets when the selection payload is sent.
+- Alt is read when a page drag *ends*, so pressing it mid-drag subtracts correctly.
+- A text or image re-read is now guarded by an edit epoch: a slow `textInRect` answering after a newer
+  drag can no longer overwrite the quote with stale text.
+
 ## Verification without a browser
 
 The two pieces of logic that a screenshot could not check are unit-tested:

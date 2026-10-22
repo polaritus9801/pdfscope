@@ -1271,6 +1271,7 @@ function reportSelection() {
       ...payload,
       auto: toolMode === "text" || gestureShift,
     });
+    gestureShift = false;
   }, 120);
 }
 
@@ -1283,10 +1284,7 @@ document.addEventListener(
     if (event.target.closest(".page-bar-actions, .page-bar, .ref-frame, .ref-handle")) return;
     const page = pageShellOf(event.target);
     if (!page) return;
-    pageGesture = {
-      page: Number(page.dataset.page),
-      subtract: event.altKey,
-    };
+    pageGesture = { page: Number(page.dataset.page) };
   },
   true,
 );
@@ -1295,8 +1293,9 @@ document.addEventListener(
   "pointerup",
   (event) => {
     if (!pageGesture) return;
-    const { page: from, subtract } = pageGesture;
+    const { page: from } = pageGesture;
     pageGesture = null;
+    const subtract = event.altKey;
 
     const hit = document.elementFromPoint(event.clientX, event.clientY);
     const target = pageShellOf(hit);

@@ -201,6 +201,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Fixed
 
+- Stale async re-reads can no longer overwrite a newer reference edit; the Shift borrow resets after
+  one selection, and Alt is honoured when a page drag is released.
+
+
 - Reference overlays clear on leave, Escape clears a pending page endpoint, scope changes undo, and
   page gestures ignore the bar/overlay controls; a new document resets history and scope.
 
