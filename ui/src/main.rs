@@ -410,9 +410,7 @@ fn PageView(
         let Some(hovered) = hover_page.get() else {
             return false;
         };
-        let far = if kind == 0 { hovered } else { endpoint };
-        let near = if kind == 0 { endpoint } else { hovered };
-        number >= far.min(near) && number <= far.max(near)
+        pdfscope_core::pages::in_preview(number, kind == 0, endpoint, hovered)
     };
 
     let commit_range = move |from: u32, to: u32| {
@@ -790,64 +788,48 @@ fn App() -> impl IntoView {
     let regions = RwSignal::new(Vec::<Region>::new());
     let next_ref = RwSignal::new(0_u64);
     type Snapshot = (Vec<Passage>, Vec<Region>, Vec<u32>, u8);
-    let undo_stack = RwSignal::new(Vec::<Snapshot>::new());
-    let redo_stack = RwSignal::new(Vec::<Snapshot>::new());
+    let history = RwSignal::new(pdfscope_core::history::History::<Snapshot>::new(50));
 
-    // A snapshot before every reference change; undo restores it and redo puts it back.
-    let undo_push = Callback::new(move |_: ()| {
-        let state = (
+    let current_state = move || {
+        (
             passages.get(),
             regions.get(),
             page_set.get(),
             scope_mode.get(),
-        );
-        undo_stack.update(|stack| {
-            stack.push(state);
-            while stack.len() > 50 {
-                stack.remove(0);
-            }
-        });
-        redo_stack.set(Vec::new());
+        )
+    };
+
+    let apply_state = move |state: Snapshot| {
+        passages.set(state.0);
+        regions.set(state.1);
+        page_set.set(state.2);
+        scope_mode.set(state.3);
+        selection.set(None);
+    };
+
+    let undo_push = Callback::new(move |_: ()| {
+        let state = current_state();
+        history.update(|history| history.push(state));
     });
 
     let undo_reference = move || {
         edit_epoch.update(|epoch| *epoch += 1);
-        let Some(previous) = undo_stack.get().pop() else {
-            return;
-        };
-        redo_stack.update(|stack| {
-            stack.push((
-                passages.get(),
-                regions.get(),
-                page_set.get(),
-                scope_mode.get(),
-            ))
-        });
-        passages.set(previous.0);
-        regions.set(previous.1);
-        page_set.set(previous.2);
-        scope_mode.set(previous.3);
-        selection.set(None);
+        let current = current_state();
+        let mut stack = history.get();
+        if let Some(previous) = stack.undo(current) {
+            history.set(stack);
+            apply_state(previous);
+        }
     };
 
     let redo_reference = move || {
         edit_epoch.update(|epoch| *epoch += 1);
-        let Some(next) = redo_stack.get().pop() else {
-            return;
-        };
-        undo_stack.update(|stack| {
-            stack.push((
-                passages.get(),
-                regions.get(),
-                page_set.get(),
-                scope_mode.get(),
-            ))
-        });
-        passages.set(next.0);
-        regions.set(next.1);
-        page_set.set(next.2);
-        scope_mode.set(next.3);
-        selection.set(None);
+        let current = current_state();
+        let mut stack = history.get();
+        if let Some(next) = stack.redo(current) {
+            history.set(stack);
+            apply_state(next);
+        }
     };
     let hovered = RwSignal::new(None::<(u32, (f64, f64, f64, f64))>);
 
@@ -905,8 +887,7 @@ fn App() -> impl IntoView {
         regions.set(Vec::new());
         selection.set(None);
         // A new document owns a new history and scope; nothing from the old one may be undone into it.
-        undo_stack.set(Vec::new());
-        redo_stack.set(Vec::new());
+        history.set(pdfscope_core::history::History::new(50));
         next_ref.set(0);
         page_set.set(Vec::new());
         scope_mode.set(0);
@@ -1878,8 +1859,7 @@ fn App() -> impl IntoView {
                 configured=configured
                 undo_push=undo_push
                 reset_history=Callback::new(move |_| {
-                    undo_stack.set(Vec::new());
-                    redo_stack.set(Vec::new());
+                    history.set(pdfscope_core::history::History::new(50));
                 })
                 scope_mode=scope_mode
                 page_set=page_set

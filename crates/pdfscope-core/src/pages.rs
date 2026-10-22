@@ -257,3 +257,50 @@ mod request_tests {
         assert_eq!(Scope::from_byte(99), Scope::Selected);
     }
 }
+
+/// Whether a page belongs to the dashed preview between a pending endpoint and the hovered page.
+///
+/// `anchor_is_start` describes which button was pressed first; the range is the same either way,
+/// which is what makes "end then start" work symmetrically.
+pub fn in_preview(page: u32, anchor_is_start: bool, anchor: u32, hover: u32) -> bool {
+    let (low, high) = if anchor_is_start {
+        (anchor.min(hover), anchor.max(hover))
+    } else {
+        (hover.min(anchor), hover.max(anchor))
+    };
+    page >= low && page <= high
+}
+
+#[cfg(test)]
+mod preview_tests {
+    use super::*;
+
+    #[test]
+    fn a_start_anchor_previews_towards_the_hovered_page() {
+        assert!(in_preview(6, true, 3, 8));
+        assert!(in_preview(8, true, 3, 8));
+        assert!(!in_preview(9, true, 3, 8));
+        assert!(!in_preview(2, true, 3, 8));
+    }
+
+    #[test]
+    fn hovering_before_the_anchor_previews_backwards() {
+        assert!(in_preview(4, true, 8, 3));
+        assert!(in_preview(8, true, 8, 3));
+        assert!(!in_preview(2, true, 8, 3));
+    }
+
+    #[test]
+    fn an_end_anchor_behaves_the_same_with_roles_swapped() {
+        assert!(in_preview(5, false, 8, 3));
+        assert!(!in_preview(9, false, 8, 3));
+        assert!(in_preview(7, false, 3, 8));
+    }
+
+    #[test]
+    fn hovering_the_anchor_previews_only_that_page() {
+        assert!(in_preview(5, true, 5, 5));
+        assert!(!in_preview(4, true, 5, 5));
+        assert!(!in_preview(6, true, 5, 5));
+    }
+}

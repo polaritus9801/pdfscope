@@ -12,6 +12,7 @@ pub mod anchor;
 pub mod citation;
 pub mod error;
 pub mod geo;
+pub mod history;
 pub mod ids;
 pub mod markdown;
 pub mod pages;

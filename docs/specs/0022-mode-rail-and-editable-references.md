@@ -317,6 +317,12 @@ Four defects found by reading the code rather than looking at it:
 
 ## Verification without a browser
 
+- `pdfscope-core::history::History` — 6 tests: undo returns the previous state, redo returns the
+  undone one, a new edit truncates the redo branch, the limit drops the oldest state, undo and redo
+  walk the same states, and an empty history reports nothing to do. The UI stores one `History` of
+  snapshots instead of two vectors.
+
+
 - `pdfscope-core::pages::request_pages` — 8 tests for what a question actually carries: whole document
   capped and reported, current page clamped, references-only empty, explicit set sorted/deduplicated/
   filtered, a large set capped, an empty document, and the stable byte mapping. The composer calls it;

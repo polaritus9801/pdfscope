@@ -10,6 +10,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Changed
 
+- Undo/redo moved to `pdfscope-core::history`, with six tests for truncation, the depth limit and the
+  round trip.
+
+
 - What a question carries is now `pdfscope-core::pages::request_pages`, with eight tests covering the
   cap, clamping, filtering and the empty cases.
 
