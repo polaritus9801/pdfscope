@@ -2012,3 +2012,76 @@ mark.find-hit {
   align-items: flex-start;
   gap: var(--space-4);
 }
+
+/* A reference frame sits exactly on the reference; a transparent ::after extends the hit area by
+   12 px, which is the bridge that makes the outside controls reachable from the selection. */
+.ref-frame {
+  position: absolute;
+  z-index: 4;
+  border-radius: 2px;  /* size */
+  outline: 1px solid transparent;  /* size */
+  cursor: grab;
+}
+
+.ref-frame::after {
+  content: "";
+  position: absolute;
+  inset: -12px;  /* size */
+}
+
+.ref-frame:hover {
+  outline-color: color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+.ref-frame.active {
+  outline: 1px solid var(--accent);
+}
+
+.ref-handle {
+  position: absolute;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 18px;  /* size */
+  height: 18px;  /* size */
+  padding: 0;
+  font: inherit;
+  font-size: var(--text-xs);
+  color: var(--ink-muted);
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  box-shadow: var(--shadow-1);
+  cursor: pointer;
+  z-index: 5;
+}
+
+.ref-frame.active .ref-handle {
+  display: flex;
+}
+
+.ref-handle-x {
+  top: 0;
+  right: 0;
+  color: var(--ink);
+}
+
+.ref-handle-x:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.ref-handle-move {
+  top: 22px;  /* size */
+  right: 0;
+  cursor: move;
+}
+
+.ref-handle-move:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.ref-frame.active {
+  cursor: grab;
+}

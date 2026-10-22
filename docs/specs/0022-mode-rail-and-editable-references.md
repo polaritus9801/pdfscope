@@ -233,9 +233,18 @@ gesture changed from *replace* to *add* as part of that redesign, because replac
   it, `⌥`/`Alt` borrows a marquee for one gesture. The page set is collected but not yet drawn.
 - **B. References — first layer landed.** References carry stable ids; a snapshot stack records every
   add/delete and `⌘Z` / `⌘⇧Z` restores it (fifty steps, cleared on a new edit). Deleting from the
-  composer is the same operation and is undoable. Hover/pin overlays and geometry handles remain.
+  composer is the same operation and is undoable.
+- **B. Overlay landed.** Every reference draws a frame with a transparent 12 px bridge; hovering it
+  marks it active, clicking pins it (a 1 px accent outline shows why it persists). The white circular
+  ✕ sits at the top-right with its top edge on the reference's top edge and deletes (undoable); regions
+  also show a move handle. Dragging the frame moves the reference, clamped to the page, and the first
+  6 px of movement records one undo entry. Resizing and text re-anchoring remain, as do the region's
+  eight edge handles.
 
 ## Deviations
+
+- The frame itself is the move surface; the region's circular handle is an affordance, not a separate
+  drag target. Resizing handles are not built yet.
 
 - Dragging in page mode adds rather than replaces. This supersedes the earlier replace-by-default
   answer, because replace made the middle-range case destructive; 清空 is the only replace gesture.

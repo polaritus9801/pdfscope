@@ -70,6 +70,9 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Reference frames on the page: hover highlights, click pins, ✕ deletes, drag moves; all undoable.
+
+
 - Reference undo/redo: adding or deleting a reference is one ⌘Z away, with redo on ⌘⇧Z.
 
 

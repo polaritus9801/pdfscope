@@ -168,7 +168,82 @@ fn PageView(
     hovered: RwSignal<Option<(u32, (f64, f64, f64, f64))>>,
     next_ref: RwSignal<u64>,
     undo_push: Callback<()>,
+    active_ref: RwSignal<Option<(u8, u64)>>,
+    pinned_ref: RwSignal<Option<(u8, u64)>>,
 ) -> impl IntoView {
+    // kind, id, start x/y, start rect, page width/height, whether undo was recorded
+    type Drag = (u8, u64, f64, f64, (f64, f64, f64, f64), f64, f64, bool);
+    let drag = RwSignal::new(Option::<Drag>::None);
+    let drag_moved = RwSignal::new(false);
+    let finish_drag = move |_| {
+        drag.set(None);
+        drag_moved.set(false);
+    };
+
+    let move_frame =
+        move |event: web_sys::PointerEvent, kind: u8, id: u64, start: (f64, f64, f64, f64)| {
+            let Some(target) = event
+                .current_target()
+                .and_then(|target| target.dyn_into::<web_sys::Element>().ok())
+            else {
+                return;
+            };
+            let Some(page) = target.parent_element() else {
+                return;
+            };
+            let box_rect = page.get_bounding_client_rect();
+            if box_rect.width() <= 0.0 || box_rect.height() <= 0.0 {
+                return;
+            }
+            drag_moved.set(false);
+            drag.update(|current| {
+                *current = Some((
+                    kind,
+                    id,
+                    event.client_x() as f64,
+                    event.client_y() as f64,
+                    start,
+                    box_rect.width(),
+                    box_rect.height(),
+                    false,
+                ))
+            });
+            event.prevent_default();
+        };
+
+    let drag_move = move |event: web_sys::PointerEvent| {
+        let Some((kind, id, start_x, start_y, start, page_w, page_h, _)) = drag.get() else {
+            return;
+        };
+        if !drag_moved.get() {
+            let moved = (event.client_x() as f64 - start_x).abs()
+                + (event.client_y() as f64 - start_y).abs();
+            if moved < 6.0 {
+                return;
+            }
+            undo_push.run(());
+            drag_moved.set(true);
+        }
+        let dx = (event.client_x() as f64 - start_x) / page_w;
+        let dy = (event.client_y() as f64 - start_y) / page_h;
+        let (mut x, mut y, width, height) = start;
+        x = (x + dx).clamp(0.0, 1.0 - width);
+        y = (y + dy).clamp(0.0, 1.0 - height);
+        if kind == 0 {
+            passages.update(|list| {
+                if let Some(entry) = list.iter_mut().find(|entry| entry.id == id) {
+                    entry.rect = (x, y, width, height);
+                }
+            });
+        } else {
+            regions.update(|list| {
+                if let Some(entry) = list.iter_mut().find(|entry| entry.id == id) {
+                    entry.rect = (x, y, width, height);
+                }
+            });
+        }
+    };
+
     let add_reference = Callback::new(move |_: ()| {
         if let Some(current) = selection.get() {
             undo_push.run(());
@@ -204,20 +279,82 @@ fn PageView(
             <div class="page-layer"></div>
 
             {move || {
-                let mut tints = Vec::new();
+                let mut frames = Vec::new();
                 for passage in passages.get() {
                     if passage.page == number {
-                        tints.push(passage.rect);
+                        frames.push((0_u8, passage.id, passage.rect));
                     }
                 }
                 for region in regions.get() {
                     if region.page == number {
-                        tints.push(region.rect);
+                        frames.push((1_u8, region.id, region.rect));
                     }
                 }
-                tints
+                frames
                     .into_iter()
-                    .map(|rect| view! { <div class="ref-tint" style=rect_style(rect)></div> })
+                    .map(|(kind, id, rect)| {
+                        let is_active = move || {
+                            active_ref.get() == Some((kind, id))
+                                || pinned_ref.get() == Some((kind, id))
+                        };
+                        let move_handle = (kind == 1).then(|| {
+                            view! {
+                                <div class="ref-handle ref-handle-move" title="移动">
+                                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                                        <path d="M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3" />
+                                    </svg>
+                                </div>
+                            }
+                        });
+                        view! {
+                            <div
+                                class="ref-frame"
+                                class:active=is_active
+                                style=rect_style(rect)
+                                on:mouseenter=move |_| active_ref.set(Some((kind, id)))
+                                on:pointerdown=move |event: web_sys::PointerEvent| {
+                                    let Some(target) = event
+                                        .current_target()
+                                        .and_then(|target| target.dyn_into::<web_sys::HtmlElement>().ok())
+                                    else {
+                                        return;
+                                    };
+                                    let _ = target.set_pointer_capture(event.pointer_id());
+                                    move_frame(event, kind, id, rect);
+                                }
+                                on:pointermove=drag_move
+                                on:pointerup=move |_| finish_drag(())
+                                on:pointercancel=move |_| finish_drag(())
+                                on:click=move |_| {
+                                    if pinned_ref.get() == Some((kind, id)) {
+                                        pinned_ref.set(None);
+                                    } else {
+                                        pinned_ref.set(Some((kind, id)));
+                                    }
+                                }
+                            >
+                                <button
+                                    class="ref-handle ref-handle-x"
+                                    title="删除引用"
+                                    on:pointerdown=move |event: web_sys::PointerEvent| event.stop_propagation()
+                                    on:click=move |event: web_sys::MouseEvent| {
+                                        event.stop_propagation();
+                                        undo_push.run(());
+                                        if kind == 0 {
+                                            passages.update(|list| list.retain(|entry| entry.id != id));
+                                        } else {
+                                            regions.update(|list| list.retain(|entry| entry.id != id));
+                                        }
+                                        pinned_ref.set(None);
+                                        active_ref.set(None);
+                                    }
+                                >
+                                    "✕"
+                                </button>
+                                {move_handle}
+                            </div>
+                        }
+                    })
                     .collect_view()
             }}
 
@@ -281,6 +418,8 @@ fn App() -> impl IntoView {
     // 0 pointer, 1 text, 2 box, 3 pages: the rail's active tool.
     let tool = RwSignal::new(0_u8);
     let page_set = RwSignal::new(Vec::<u32>::new());
+    let active_ref = RwSignal::new(Option::<(u8, u64)>::None);
+    let pinned_ref = RwSignal::new(Option::<(u8, u64)>::None);
 
     let choose_tool = move |next: u8| {
         tool.set(next);
@@ -575,6 +714,42 @@ fn App() -> impl IntoView {
             .unwrap_or(false);
         if typing {
             return;
+        }
+
+        if (event.meta_key() || event.ctrl_key()) && event.key().eq_ignore_ascii_case("z") {
+            event.prevent_default();
+            if event.shift_key() {
+                redo_reference();
+            } else {
+                undo_reference();
+            }
+            return;
+        }
+
+        if !event.meta_key() && !event.ctrl_key() && !event.alt_key() {
+            match event.key().to_ascii_lowercase().as_str() {
+                "v" => {
+                    choose_tool(0);
+                    event.prevent_default();
+                    return;
+                }
+                "t" => {
+                    choose_tool(1);
+                    event.prevent_default();
+                    return;
+                }
+                "b" => {
+                    choose_tool(2);
+                    event.prevent_default();
+                    return;
+                }
+                "d" => {
+                    choose_tool(3);
+                    event.prevent_default();
+                    return;
+                }
+                _ => {}
+            }
         }
 
         if (event.meta_key() || event.ctrl_key())
@@ -1216,6 +1391,8 @@ fn App() -> impl IntoView {
                                         hovered=hovered
                                         next_ref=next_ref
                                         undo_push=undo_push
+                                        active_ref=active_ref
+                                        pinned_ref=pinned_ref
                                     />
                                 }
                             })
