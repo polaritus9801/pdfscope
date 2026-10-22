@@ -34,6 +34,20 @@ feature needs its own layout model, described here.
 - Opening a document restores the mode last used for that document, when "remember position" is on.
 - Errors: a spread at the last page shows the single remaining page centred, never a blank half.
 
+## Layout model (decided)
+
+The page box keeps its own geometry; the **layer** inside it (canvas + text layer) is scaled as one
+unit, and the box is resized to the scaled size. This is the only arrangement where selection and
+capture stay aligned: text layer and canvas scale together, and rectangles normalised against the
+page box remain correct.
+
+- `single`: scale `s = min(1, (stageHeight − 48) / pageHeight)`.
+- `spread`: scale `s = min((stageWidth − 48 − gap) / (2 × pageWidth), (stageHeight − 48) / pageHeight)`.
+- Pairing: page 1 alone; page `n` even pairs with `n + 1`; page `n` odd (n > 1) pairs with `n − 1`;
+  a trailing unpaired page is centred.
+- The zoom transform is not used for paging; the zoom control only affects the continuous column, and
+  is reported as `fit page` while in paged modes.
+
 ## Data model
 
 `settings.json` gains `page_mode: "continuous" | "single" | "spread"` (already scaffolded in 0020 for
@@ -125,6 +139,16 @@ selection cannot point at a hidden page.
 - **Spread** not implemented.
 
 ## Deviations
+
+- **Spread was attempted and reverted.** The layer-scaling model above works for a single sheet and
+  centred page 1 correctly (392 × 555 in a spread row), but it conflicted with the zoom-transform
+  fit-page that single mode already uses: with the column transform removed, single mode stopped
+  fitting (800 × 1132 instead of ~464 × 657). Two mechanisms cannot own the same page. The code was
+  reverted; single mode stays on its verified path.
+- **Next step is unification, not another attempt**: move single mode onto the layer-scaling model
+  (fit is computed, not via the zoom transform), then spread is the same code with a pair window. The
+  smoke suite already covers single, so the migration is checkable.
+
 
 - Fit page reuses the continuous zoom transform (anchored `top center`) rather than a separate
   render scale; the canvas is rendered at the zoomed size through the existing machinery, so text
