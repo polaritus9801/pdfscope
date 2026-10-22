@@ -484,6 +484,11 @@ fn PageView(
                                 class:active=is_active
                                 style=rect_style(rect)
                                 on:mouseenter=move |_| active_ref.set(Some((kind, id)))
+                                on:mouseleave=move |_| {
+                                    if pinned_ref.get() != Some((kind, id)) {
+                                        active_ref.set(None);
+                                    }
+                                }
                                 on:pointerdown=move |event: web_sys::PointerEvent| {
                                     let Some(target) = event
                                         .current_target()
@@ -744,13 +749,18 @@ fn App() -> impl IntoView {
     let passages = RwSignal::new(Vec::<Passage>::new());
     let regions = RwSignal::new(Vec::<Region>::new());
     let next_ref = RwSignal::new(0_u64);
-    type Snapshot = (Vec<Passage>, Vec<Region>, Vec<u32>);
+    type Snapshot = (Vec<Passage>, Vec<Region>, Vec<u32>, u8);
     let undo_stack = RwSignal::new(Vec::<Snapshot>::new());
     let redo_stack = RwSignal::new(Vec::<Snapshot>::new());
 
     // A snapshot before every reference change; undo restores it and redo puts it back.
     let undo_push = Callback::new(move |_: ()| {
-        let state = (passages.get(), regions.get(), page_set.get());
+        let state = (
+            passages.get(),
+            regions.get(),
+            page_set.get(),
+            scope_mode.get(),
+        );
         undo_stack.update(|stack| {
             stack.push(state);
             while stack.len() > 50 {
@@ -764,10 +774,18 @@ fn App() -> impl IntoView {
         let Some(previous) = undo_stack.get().pop() else {
             return;
         };
-        redo_stack.update(|stack| stack.push((passages.get(), regions.get(), page_set.get())));
+        redo_stack.update(|stack| {
+            stack.push((
+                passages.get(),
+                regions.get(),
+                page_set.get(),
+                scope_mode.get(),
+            ))
+        });
         passages.set(previous.0);
         regions.set(previous.1);
         page_set.set(previous.2);
+        scope_mode.set(previous.3);
         selection.set(None);
     };
 
@@ -775,10 +793,18 @@ fn App() -> impl IntoView {
         let Some(next) = redo_stack.get().pop() else {
             return;
         };
-        undo_stack.update(|stack| stack.push((passages.get(), regions.get(), page_set.get())));
+        undo_stack.update(|stack| {
+            stack.push((
+                passages.get(),
+                regions.get(),
+                page_set.get(),
+                scope_mode.get(),
+            ))
+        });
         passages.set(next.0);
         regions.set(next.1);
         page_set.set(next.2);
+        scope_mode.set(next.3);
         selection.set(None);
     };
     let hovered = RwSignal::new(None::<(u32, (f64, f64, f64, f64))>);
@@ -836,6 +862,16 @@ fn App() -> impl IntoView {
         passages.set(Vec::new());
         regions.set(Vec::new());
         selection.set(None);
+        // A new document owns a new history and scope; nothing from the old one may be undone into it.
+        undo_stack.set(Vec::new());
+        redo_stack.set(Vec::new());
+        next_ref.set(0);
+        page_set.set(Vec::new());
+        scope_mode.set(0);
+        anchor.set(None);
+        hover_page.set(None);
+        active_ref.set(None);
+        pinned_ref.set(None);
 
         spawn_local(async move {
             let Ok(buffer) = JsFuture::from(file.array_buffer()).await else {
@@ -995,7 +1031,9 @@ fn App() -> impl IntoView {
             return;
         }
 
-        if event.key() == "Escape" && tool.get() != 0 {
+        if event.key() == "Escape" && (tool.get() != 0 || anchor.get().is_some()) {
+            anchor.set(None);
+            hover_page.set(None);
             choose_tool(0);
             return;
         }

@@ -1299,7 +1299,10 @@ pub fn AiPanel(
                             class="scope-icon"
                             class:active=move || scope_mode.get() == 0
                             title="整份文档"
-                            on:click=move |_| scope_mode.set(0)
+                            on:click=move |_| {
+                                undo_push.run(());
+                                scope_mode.set(0);
+                            }
                         >
                             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
                                 <rect x="4" y="3" width="12" height="16" rx="1.5" />
@@ -1310,7 +1313,10 @@ pub fn AiPanel(
                             class="scope-icon"
                             class:active=move || scope_mode.get() == 1
                             title="仅当前页"
-                            on:click=move |_| scope_mode.set(1)
+                            on:click=move |_| {
+                                undo_push.run(());
+                                scope_mode.set(1);
+                            }
                         >
                             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
                                 <rect x="5" y="3" width="14" height="18" rx="1.5" />
@@ -1320,7 +1326,10 @@ pub fn AiPanel(
                             class="scope-icon"
                             class:active=move || scope_mode.get() == 2
                             title="仅引用的内容"
-                            on:click=move |_| scope_mode.set(2)
+                            on:click=move |_| {
+                                undo_push.run(());
+                                scope_mode.set(2);
+                            }
                         >
                             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M7 7h6a4 4 0 0 1 0 8H7zM17 7h2M17 15h2" />

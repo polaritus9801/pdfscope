@@ -268,6 +268,19 @@ gesture changed from *replace* to *add* as part of that redesign, because replac
 - **A, B and C are implemented.** What is missing is human visual verification (no browser was used),
   and the deviations below.
 
+## Review pass
+
+Four defects found by reading the code rather than looking at it:
+
+- A reference frame never cleared its hover highlight on leave, so the overlay would have stayed on
+  screen. It now clears unless pinned.
+- Escape reset the tool but not a pending page endpoint; it now clears both.
+- Scope-icon changes were outside the undo snapshot; the snapshot carries the scope now, so ⌘Z puts
+  the icon back.
+- The page gesture fired on the page-bar buttons and on reference frames; it now ignores both. A new
+  document also clears the history, the ids and the scope, so nothing from an old file can be undone
+  into a new one.
+
 ## Verification without a browser
 
 The two pieces of logic that a screenshot could not check are unit-tested:

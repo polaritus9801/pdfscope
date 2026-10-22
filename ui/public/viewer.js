@@ -1280,6 +1280,7 @@ document.addEventListener(
   "pointerdown",
   (event) => {
     if (toolMode !== "pages" && !event.metaKey && !event.ctrlKey) return;
+    if (event.target.closest(".page-bar-actions, .page-bar, .ref-frame, .ref-handle")) return;
     const page = pageShellOf(event.target);
     if (!page) return;
     pageGesture = {

@@ -201,6 +201,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Fixed
 
+- Reference overlays clear on leave, Escape clears a pending page endpoint, scope changes undo, and
+  page gestures ignore the bar/overlay controls; a new document resets history and scope.
+
+
 - Toasts stay while hovered, and the tool rail is part of the layout so pages stay centred when
   zoomed out.
 
