@@ -2132,3 +2132,64 @@ mark.find-hit {
 .dot-sw { bottom: -5px; left: -5px; cursor: nesw-resize; }  /* size */
 .dot-s  { bottom: -5px; left: 50%; transform: translateX(-50%); cursor: ns-resize; }  /* size */
 .dot-se { bottom: -5px; right: -5px; cursor: nwse-resize; }  /* size */
+
+/* Page scope: a purple outer bar marks committed pages, dashed marks a pending preview. */
+.page.in-scope {
+  outline: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.page.preview {
+  outline: 1px dashed var(--accent);
+}
+
+.page-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -10px;  /* size */
+  width: 3px;  /* size */
+  background: var(--accent);
+  border-radius: var(--radius-full);
+  display: none;
+}
+
+.page.in-scope .page-bar {
+  display: block;
+}
+
+.page-bar-actions {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -40px;  /* size */
+  display: none;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: var(--space-2) 0;
+  z-index: 6;
+}
+
+.page:hover .page-bar-actions {
+  display: flex;
+}
+
+.page-bar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;  /* size */
+  height: 24px;  /* size */
+  padding: 0;
+  color: var(--accent);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  box-shadow: var(--shadow-1);
+  cursor: pointer;
+}
+
+.page-bar-btn:hover {
+  color: var(--surface);
+  background: var(--accent);
+  border-color: var(--accent);
+}

@@ -248,6 +248,17 @@ gesture changed from *replace* to *add* as part of that redesign, because replac
   tests** (each edge, each corner, clamping, minimum size, unknown mode), so the geometry is verified
   without a browser.
 
+## Progress — page scope
+
+- **C. Page set, bars and endpoints landed.** Selected pages get an accent outline and a purple outer
+  bar; hovering a page reveals three actions — start, this page, end. Endpoints are neutral: start
+  places a marker, hovering any page previews the dashed span, and end commits the range. Dragging
+  across pages adds the range (Alt subtracts); a click toggles one page. The page set joined the undo
+  snapshot, so page edits undo with ⌘Z.
+- The bar sits on the **left** in every mode for now; spread places the right page's bar on the right
+  in the design and that is not built.
+- Scope icons, the manager dialog and the whole-document/current-page request modes remain.
+
 ## Deviations
 
 - The frame itself is the move surface; the region's circular handle is an affordance, not a separate

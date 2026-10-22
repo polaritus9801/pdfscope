@@ -1260,12 +1260,41 @@ function reportSelection() {
   }, 120);
 }
 
-document.addEventListener("click", (event) => {
-  if (toolMode !== "pages") return;
-  const page = pageShellOf(event.target);
-  if (!page) return;
-  window.__pdfscopeTogglePage?.(Number(page.dataset.page));
-});
+let pageGesture = null;
+
+document.addEventListener(
+  "pointerdown",
+  (event) => {
+    if (toolMode !== "pages" && !event.metaKey && !event.ctrlKey) return;
+    const page = pageShellOf(event.target);
+    if (!page) return;
+    pageGesture = {
+      page: Number(page.dataset.page),
+      subtract: event.altKey,
+    };
+  },
+  true,
+);
+
+document.addEventListener(
+  "pointerup",
+  (event) => {
+    if (!pageGesture) return;
+    const { page: from, subtract } = pageGesture;
+    pageGesture = null;
+
+    const hit = document.elementFromPoint(event.clientX, event.clientY);
+    const target = pageShellOf(hit);
+    const to = target ? Number(target.dataset.page) : from;
+
+    if (to === from) {
+      window.__pdfscopeTogglePage?.(from);
+    } else {
+      window.__pdfscopePageRange?.(from, to, subtract ? 1 : 0);
+    }
+  },
+  true,
+);
 
 document.addEventListener("selectionchange", reportSelection);
 document.addEventListener("mouseup", reportSelection);
@@ -1368,21 +1397,6 @@ document.addEventListener(
       if (page) beginCapture();
     }
 
-    if (event.metaKey || event.ctrlKey) {
-      const page = pageShellOf(event.target);
-      if (page) {
-        const number = Number(page.dataset.page);
-        const startX = event.clientX;
-        const startY = event.clientY;
-        const once = (up) => {
-          document.removeEventListener("pointerup", once);
-          if (Math.hypot(up.clientX - startX, up.clientY - startY) < 4) {
-            window.__pdfscopeTogglePage?.(number);
-          }
-        };
-        document.addEventListener("pointerup", once);
-      }
-    }
   },
   true,
 );

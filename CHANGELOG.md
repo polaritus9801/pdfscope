@@ -70,6 +70,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Page scope: purple bars and three page actions (start / this page / end), neutral pending endpoints
+  with a hover preview, additive drag selection with Alt subtract, all undoable.
+
+
 - Dragging a reference handle re-reads a quote's text or re-crops a region's image; the resize geometry
   is covered by eight core unit tests.
 

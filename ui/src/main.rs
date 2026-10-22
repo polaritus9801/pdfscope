@@ -170,6 +170,9 @@ fn PageView(
     undo_push: Callback<()>,
     active_ref: RwSignal<Option<(u8, u64)>>,
     pinned_ref: RwSignal<Option<(u8, u64)>>,
+    page_set: RwSignal<Vec<u32>>,
+    anchor: RwSignal<Option<(u8, u32)>>,
+    hover_page: RwSignal<Option<u32>>,
 ) -> impl IntoView {
     // kind, id, start x/y, start rect, page width/height, whether undo was recorded
     // kind, id, start x/y, start rect, page w/h, undo recorded, mode (0 move, 1 left, 2 right,
@@ -367,13 +370,100 @@ fn PageView(
         }
     });
 
+    let in_scope = move || page_set.get().contains(&number);
+    let in_preview = move || {
+        let Some((kind, endpoint)) = anchor.get() else {
+            return false;
+        };
+        let Some(hovered) = hover_page.get() else {
+            return false;
+        };
+        let far = if kind == 0 { hovered } else { endpoint };
+        let near = if kind == 0 { endpoint } else { hovered };
+        number >= far.min(near) && number <= far.max(near)
+    };
+
+    let commit_range = move |from: u32, to: u32| {
+        undo_push.run(());
+        let (low, high) = (from.min(to), from.max(to));
+        page_set.update(|set| {
+            for page in low..=high {
+                if !set.contains(&page) {
+                    set.push(page);
+                }
+            }
+            set.sort_unstable();
+        });
+    };
+
+    let choose_start = move |_| {
+        anchor.set(Some((0, number)));
+        hover_page.set(Some(number));
+    };
+    let choose_end = move |_| {
+        match anchor.get() {
+            Some((0, start)) => {
+                commit_range(start, number);
+                anchor.set(None);
+            }
+            Some((1, end)) => {
+                commit_range(end, number);
+                anchor.set(None);
+            }
+            _ => anchor.set(Some((1, number))),
+        }
+        hover_page.set(None);
+    };
+    let toggle_page = move |_| {
+        undo_push.run(());
+        page_set.update(|set| {
+            if let Some(index) = set.iter().position(|entry| *entry == number) {
+                set.remove(index);
+            } else {
+                set.push(number);
+                set.sort_unstable();
+            }
+        });
+        anchor.set(None);
+    };
+
     let id = format!("page-{number}");
     let style = format!("aspect-ratio: {width} / {height};");
     let page_attribute = number.to_string();
 
     view! {
-        <div class="page" id=id data-page=page_attribute style=style>
+        <div
+            class="page"
+            class:in-scope=in_scope
+            class:preview=in_preview
+            id=id
+            data-page=page_attribute
+            style=style
+        >
             <div class="page-layer"></div>
+
+            <div class="page-bar" aria-hidden="true"></div>
+            <div
+                class="page-bar-actions"
+                on:mouseenter=move |_| hover_page.set(Some(number))
+                on:mouseleave=move |_| hover_page.set(None)
+            >
+                <button class="page-bar-btn" title="从这里开始" on:click=choose_start>
+                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M5 12h13M9 6l-6 6 6 6" />
+                    </svg>
+                </button>
+                <button class="page-bar-btn" title="单独这一页" on:click=toggle_page>
+                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="5" y="4" width="14" height="16" rx="1.5" />
+                    </svg>
+                </button>
+                <button class="page-bar-btn" title="到这里结束" on:click=choose_end>
+                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M19 12H6M15 6l6 6-6 6" />
+                    </svg>
+                </button>
+            </div>
 
             {move || {
                 let mut frames = Vec::new();
@@ -554,6 +644,9 @@ fn App() -> impl IntoView {
     // 0 pointer, 1 text, 2 box, 3 pages: the rail's active tool.
     let tool = RwSignal::new(0_u8);
     let page_set = RwSignal::new(Vec::<u32>::new());
+    // kind 0 = start anchor, 1 = end anchor; the hovered page completes the preview.
+    let anchor = RwSignal::new(Option::<(u8, u32)>::None);
+    let hover_page = RwSignal::new(Option::<u32>::None);
     let active_ref = RwSignal::new(Option::<(u8, u64)>::None);
     let pinned_ref = RwSignal::new(Option::<(u8, u64)>::None);
 
@@ -665,12 +758,13 @@ fn App() -> impl IntoView {
     let passages = RwSignal::new(Vec::<Passage>::new());
     let regions = RwSignal::new(Vec::<Region>::new());
     let next_ref = RwSignal::new(0_u64);
-    let undo_stack = RwSignal::new(Vec::<(Vec<Passage>, Vec<Region>)>::new());
-    let redo_stack = RwSignal::new(Vec::<(Vec<Passage>, Vec<Region>)>::new());
+    type Snapshot = (Vec<Passage>, Vec<Region>, Vec<u32>);
+    let undo_stack = RwSignal::new(Vec::<Snapshot>::new());
+    let redo_stack = RwSignal::new(Vec::<Snapshot>::new());
 
     // A snapshot before every reference change; undo restores it and redo puts it back.
     let undo_push = Callback::new(move |_: ()| {
-        let state = (passages.get(), regions.get());
+        let state = (passages.get(), regions.get(), page_set.get());
         undo_stack.update(|stack| {
             stack.push(state);
             while stack.len() > 50 {
@@ -684,9 +778,10 @@ fn App() -> impl IntoView {
         let Some(previous) = undo_stack.get().pop() else {
             return;
         };
-        redo_stack.update(|stack| stack.push((passages.get(), regions.get())));
+        redo_stack.update(|stack| stack.push((passages.get(), regions.get(), page_set.get())));
         passages.set(previous.0);
         regions.set(previous.1);
+        page_set.set(previous.2);
         selection.set(None);
     };
 
@@ -694,9 +789,10 @@ fn App() -> impl IntoView {
         let Some(next) = redo_stack.get().pop() else {
             return;
         };
-        undo_stack.update(|stack| stack.push((passages.get(), regions.get())));
+        undo_stack.update(|stack| stack.push((passages.get(), regions.get(), page_set.get())));
         passages.set(next.0);
         regions.set(next.1);
+        page_set.set(next.2);
         selection.set(None);
     };
     let hovered = RwSignal::new(None::<(u32, (f64, f64, f64, f64))>);
@@ -1011,6 +1107,7 @@ fn App() -> impl IntoView {
             if page == 0 {
                 return;
             }
+            undo_push.run(());
             page_set.update(|set| {
                 if let Some(index) = set.iter().position(|entry| *entry == page) {
                     set.remove(index);
@@ -1024,6 +1121,40 @@ fn App() -> impl IntoView {
             let _ = js_sys::Reflect::set(
                 &window,
                 &JsValue::from_str("__pdfscopeTogglePage"),
+                callback.as_ref(),
+            );
+        }
+        callback.forget();
+    });
+
+    // A drag across pages adds (or, with Alt, subtracts) the covered range.
+    Effect::new(move |_| {
+        let callback =
+            Closure::<dyn Fn(f64, f64, f64)>::new(move |from: f64, to: f64, subtract: f64| {
+                let (from, to) = (from as u32, to as u32);
+                if from == 0 || to == 0 {
+                    return;
+                }
+                undo_push.run(());
+                let (low, high) = (from.min(to), from.max(to));
+                page_set.update(|set| {
+                    if subtract != 0.0 {
+                        set.retain(|page| *page < low || *page > high);
+                    } else {
+                        for page in low..=high {
+                            if !set.contains(&page) {
+                                set.push(page);
+                            }
+                        }
+                        set.sort_unstable();
+                    }
+                });
+                anchor.set(None);
+            });
+        if let Some(window) = web_sys::window() {
+            let _ = js_sys::Reflect::set(
+                &window,
+                &JsValue::from_str("__pdfscopePageRange"),
                 callback.as_ref(),
             );
         }
@@ -1529,6 +1660,9 @@ fn App() -> impl IntoView {
                                         undo_push=undo_push
                                         active_ref=active_ref
                                         pinned_ref=pinned_ref
+                                        page_set=page_set
+                                        anchor=anchor
+                                        hover_page=hover_page
                                     />
                                 }
                             })
