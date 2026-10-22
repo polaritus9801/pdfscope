@@ -173,6 +173,7 @@ pub fn AiPanel(
     open: RwSignal<bool>,
     notify: Callback<String>,
     configured: RwSignal<bool>,
+    undo_push: Callback<()>,
 ) -> impl IntoView {
     let model = RwSignal::new("未配置".to_owned());
     let answer = RwSignal::new(String::new());
@@ -1221,6 +1222,7 @@ pub fn AiPanel(
                                         class="ref-remove"
                                         title="移除"
                                         on:click=move |_| {
+                                            undo_push.run(());
                                             passages
                                                 .update(|list| {
                                                     if index < list.len() {
@@ -1251,6 +1253,7 @@ pub fn AiPanel(
                                         class="ref-remove"
                                         title="移除"
                                         on:click=move |_| {
+                                            undo_push.run(());
                                             regions
                                                 .update(|list| {
                                                     if index < list.len() {

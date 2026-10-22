@@ -70,6 +70,9 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Reference undo/redo: adding or deleting a reference is one ⌘Z away, with redo on ⌘⇧Z.
+
+
 - The four-tool rail: pointer plus a sticky text/box/pages capsule, `V/T/B/D` shortcuts, `Esc` back to
   pointer, and modifier borrowing (Shift text, Alt box, Cmd/Ctrl page toggle).
 

@@ -46,6 +46,7 @@ struct Selection {
 /// A rectangle the reader captured, as a PNG data URL.
 #[derive(Clone, PartialEq)]
 pub(crate) struct Region {
+    pub(crate) id: u64,
     pub(crate) page: u32,
     pub(crate) image: String,
     pub(crate) rect: (f64, f64, f64, f64),
@@ -54,6 +55,7 @@ pub(crate) struct Region {
 /// A passage the reader added to the tray.
 #[derive(Clone, PartialEq)]
 pub(crate) struct Passage {
+    pub(crate) id: u64,
     pub(crate) page: u32,
     pub(crate) quote: String,
     pub(crate) rect: (f64, f64, f64, f64),
@@ -164,11 +166,19 @@ fn PageView(
     regions: RwSignal<Vec<Region>>,
     selection: RwSignal<Option<Selection>>,
     hovered: RwSignal<Option<(u32, (f64, f64, f64, f64))>>,
+    next_ref: RwSignal<u64>,
+    undo_push: Callback<()>,
 ) -> impl IntoView {
     let add_reference = Callback::new(move |_: ()| {
         if let Some(current) = selection.get() {
+            undo_push.run(());
             passages.update(|list| {
                 list.push(Passage {
+                    id: {
+                        let id = next_ref.get() + 1;
+                        next_ref.set(id);
+                        id
+                    },
                     page: current.page,
                     quote: current.text.clone(),
                     rect: current.rect,
@@ -379,6 +389,41 @@ fn App() -> impl IntoView {
     let selection = RwSignal::new(Option::<Selection>::None);
     let passages = RwSignal::new(Vec::<Passage>::new());
     let regions = RwSignal::new(Vec::<Region>::new());
+    let next_ref = RwSignal::new(0_u64);
+    let undo_stack = RwSignal::new(Vec::<(Vec<Passage>, Vec<Region>)>::new());
+    let redo_stack = RwSignal::new(Vec::<(Vec<Passage>, Vec<Region>)>::new());
+
+    // A snapshot before every reference change; undo restores it and redo puts it back.
+    let undo_push = Callback::new(move |_: ()| {
+        let state = (passages.get(), regions.get());
+        undo_stack.update(|stack| {
+            stack.push(state);
+            while stack.len() > 50 {
+                stack.remove(0);
+            }
+        });
+        redo_stack.set(Vec::new());
+    });
+
+    let undo_reference = move || {
+        let Some(previous) = undo_stack.get().pop() else {
+            return;
+        };
+        redo_stack.update(|stack| stack.push((passages.get(), regions.get())));
+        passages.set(previous.0);
+        regions.set(previous.1);
+        selection.set(None);
+    };
+
+    let redo_reference = move || {
+        let Some(next) = redo_stack.get().pop() else {
+            return;
+        };
+        undo_stack.update(|stack| stack.push((passages.get(), regions.get())));
+        passages.set(next.0);
+        regions.set(next.1);
+        selection.set(None);
+    };
     let hovered = RwSignal::new(None::<(u32, (f64, f64, f64, f64))>);
 
     // Explicit navigation dismisses what was selected on the old page. Scroll-driven page updates
@@ -619,8 +664,14 @@ fn App() -> impl IntoView {
             };
             let auto = read_flag(&value, "auto").unwrap_or(false);
             if auto {
+                undo_push.run(());
                 passages.update(|list| {
                     list.push(Passage {
+                        id: {
+                            let id = next_ref.get() + 1;
+                            next_ref.set(id);
+                            id
+                        },
                         page: parsed.page,
                         quote: parsed.text.clone(),
                         rect: parsed.rect,
@@ -681,8 +732,14 @@ fn App() -> impl IntoView {
                 return;
             }
             if image.starts_with("data:image/") {
+                undo_push.run(());
                 regions.update(|list| {
                     list.push(Region {
+                        id: {
+                            let id = next_ref.get() + 1;
+                            next_ref.set(id);
+                            id
+                        },
                         page,
                         image,
                         rect: (x, y, width, height),
@@ -1157,6 +1214,8 @@ fn App() -> impl IntoView {
                                         regions=regions
                                         selection=selection
                                         hovered=hovered
+                                        next_ref=next_ref
+                                        undo_push=undo_push
                                     />
                                 }
                             })
@@ -1309,6 +1368,7 @@ fn App() -> impl IntoView {
                 open=settings_open
                 notify=notify
                 configured=configured
+                undo_push=undo_push
             />
             </div>
         </div>

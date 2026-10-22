@@ -231,7 +231,9 @@ gesture changed from *replace* to *add* as part of that redesign, because replac
   to pointer. Box mode is sticky (re-arms after each capture); text mode auto-adds a passage instead of
   showing the bar, and holding Shift does the same for one gesture. `⌘`/`Ctrl` clicks a page to toggle
   it, `⌥`/`Alt` borrows a marquee for one gesture. The page set is collected but not yet drawn.
-- **B. Editable references** and **C. page scope visuals** remain.
+- **B. References — first layer landed.** References carry stable ids; a snapshot stack records every
+  add/delete and `⌘Z` / `⌘⇧Z` restores it (fifty steps, cleared on a new edit). Deleting from the
+  composer is the same operation and is undoable. Hover/pin overlays and geometry handles remain.
 
 ## Deviations
 
