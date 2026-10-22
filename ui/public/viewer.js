@@ -1574,6 +1574,13 @@ window.PDFScope = {
     }
   },
 
+  /// Scrolls a page thumbnail to the middle of its container, naturally clamped at the ends.
+  centerThumb(containerId, pageNumber) {
+    const container = document.getElementById(containerId);
+    const target = container?.querySelector(`[data-page="${pageNumber}"]`);
+    target?.scrollIntoView({ block: "center", inline: "nearest" });
+  },
+
   /// Text covered by a normalised rectangle, read from the rendered text layer.
   async textInRect(pageNumber, rect) {
     const page = pageElement(pageNumber);

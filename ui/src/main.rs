@@ -644,6 +644,7 @@ fn App() -> impl IntoView {
     // 0 pointer, 1 text, 2 box, 3 pages: the rail's active tool.
     let tool = RwSignal::new(0_u8);
     let page_set = RwSignal::new(Vec::<u32>::new());
+    let scope_mode = RwSignal::new(0_u8);
     // kind 0 = start anchor, 1 = end anchor; the hovered page completes the preview.
     let anchor = RwSignal::new(Option::<(u8, u32)>::None);
     let hover_page = RwSignal::new(Option::<u32>::None);
@@ -1816,6 +1817,8 @@ fn App() -> impl IntoView {
                 notify=notify
                 configured=configured
                 undo_push=undo_push
+                scope_mode=scope_mode
+                page_set=page_set
             />
             </div>
         </div>

@@ -70,6 +70,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Three scope icons (whole document / current page / references) replace the page-range field, plus a
+  page-manager dialog with thumbnails centred on the current page and a clear action.
+
+
 - Page scope: purple bars and three page actions (start / this page / end), neutral pending endpoints
   with a hover preview, additive drag selection with Alt subtract, all undoable.
 

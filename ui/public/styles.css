@@ -2193,3 +2193,83 @@ mark.find-hit {
   background: var(--accent);
   border-color: var(--accent);
 }
+
+/* Scope row: three icons on the left, the manager on the right. */
+.scope-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+}
+
+.scope-icons {
+  display: flex;
+  gap: 2px;  /* size */
+  padding: 2px;  /* size */
+  background: var(--surface-sunken);
+  border-radius: var(--radius-full);
+}
+
+.scope-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;  /* size */
+  height: 26px;  /* size */
+  padding: 0;
+  color: var(--ink-muted);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+}
+
+.scope-icon:hover {
+  color: var(--accent);
+}
+
+.scope-icon.active {
+  color: var(--accent);
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+}
+
+.scope-count {
+  font-size: var(--text-xs);
+  color: var(--ink-muted);
+}
+
+.scope-manage {
+  margin-left: auto;
+  font-size: var(--text-xs);
+}
+
+.page-manager {
+  width: min(760px, 100%);  /* size */
+}
+
+.manager-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));  /* size */
+  gap: var(--space-2);
+  overflow: auto;
+  padding: var(--space-3);
+}
+
+.manager-thumb {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+}
+
+.manager-thumb.selected {
+  outline: 2px solid var(--accent);  /* size */
+  background: var(--accent-soft);
+}
+
+.manager-thumb.selected .thumb-number {
+  color: var(--accent);
+}

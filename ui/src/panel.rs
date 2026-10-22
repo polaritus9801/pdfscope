@@ -6,7 +6,7 @@ use wasm_bindgen::closure::Closure;
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 
-use pdfscope_core::{Segment, parse_ranges, segments};
+use pdfscope_core::{Segment, segments};
 
 use crate::{Passage, Region, truncate};
 
@@ -174,6 +174,8 @@ pub fn AiPanel(
     notify: Callback<String>,
     configured: RwSignal<bool>,
     undo_push: Callback<()>,
+    scope_mode: RwSignal<u8>,
+    page_set: RwSignal<Vec<u32>>,
 ) -> impl IntoView {
     let model = RwSignal::new("未配置".to_owned());
     let answer = RwSignal::new(String::new());
@@ -188,9 +190,6 @@ pub fn AiPanel(
     let streaming = RwSignal::new(false);
     let question = RwSignal::new(String::new());
     let failed = RwSignal::new(false);
-    let ranges = RwSignal::new(Vec::<pdfscope_core::PageSpan>::new());
-    let range_input = RwSignal::new(String::new());
-    let range_error = RwSignal::new(Option::<String>::None);
     let history = RwSignal::new(Vec::<Stored>::new());
     let show_all = RwSignal::new(false);
     let notice = RwSignal::new(Option::<String>::None);
@@ -226,6 +225,7 @@ pub fn AiPanel(
     let form_remember = RwSignal::new(true);
     let form_zoom = RwSignal::new("100".to_owned());
     let form_mode = RwSignal::new("continuous".to_owned());
+    let manager_open = RwSignal::new(false);
     let form_spread_offset = RwSignal::new(false);
     let tab = RwSignal::new(0_u8);
     let form_error = RwSignal::new(Option::<String>::None);
@@ -292,14 +292,6 @@ pub fn AiPanel(
             });
         }
     });
-
-    let add_range = move |_| match parse_ranges(&range_input.get(), pages.get().max(1)) {
-        Ok(spans) => {
-            ranges.set(spans);
-            range_error.set(None);
-        }
-        Err(error) => range_error.set(Some(error.to_string())),
-    };
 
     let redeem = move |index: usize| {
         if let Some(entry) = history.get().get(index).cloned() {
@@ -391,31 +383,38 @@ pub fn AiPanel(
             passages.set(Vec::new());
             regions.set(Vec::new());
         }
-        let ranges_now = ranges.get();
         let current_page = page.get();
+        let total = pages.get();
+        let mode = scope_mode.get();
+        let explicit = page_set.get();
 
         spawn_local(async move {
             // Page text is fetched here, not in Rust: the renderer owns the document.
             let mut context: Vec<(u32, String)> = Vec::new();
-            let requested: u32 = ranges_now.iter().map(|span| span.pages()).sum();
 
-            if !ranges_now.is_empty() {
-                if requested > 20 {
-                    notice.set(Some(format!("范围共 {requested} 页，这次只取了前 20 页")));
-                } else {
-                    notice.set(None);
-                }
+            let selected: Vec<u32> = match mode {
+                0 => (1..=total).collect(),
+                1 => vec![current_page],
+                3 => explicit.clone(),
+                _ => Vec::new(),
+            };
 
-                'outer: for span in &ranges_now {
-                    for number in span.start..=span.end {
-                        if context.len() >= 20 {
-                            break 'outer;
-                        }
-                        context.push((number, fetch_page_text(number).await));
-                    }
-                }
-            } else if passages_now.is_empty() && regions_now.is_empty() {
-                context.push((current_page, fetch_page_text(current_page).await));
+            if mode == 0 && selected.len() > 20 {
+                notice.set(Some(format!(
+                    "整份文档共 {} 页，这次只取了前 20 页",
+                    selected.len()
+                )));
+            } else if mode == 3 && selected.len() > 20 {
+                notice.set(Some(format!(
+                    "已选 {} 页，这次只取了前 20 页",
+                    selected.len()
+                )));
+            } else {
+                notice.set(None);
+            }
+
+            for number in selected.iter().take(20) {
+                context.push((*number, fetch_page_text(*number).await));
             }
 
             let references = js_sys::Array::new();
@@ -624,6 +623,29 @@ pub fn AiPanel(
             callback.forget();
         });
     };
+
+    Effect::new(move |_| {
+        if !manager_open.get() {
+            return;
+        }
+        if let Some(window) = web_sys::window() {
+            let here = page.get();
+            let schedule = Closure::once_into_js(move || {
+                let _ = crate::call("thumbnails", &[]);
+                let _ = crate::call(
+                    "centerThumb",
+                    &[
+                        JsValue::from_str("manager-grid"),
+                        JsValue::from_f64(f64::from(here)),
+                    ],
+                );
+            });
+            let _ = window.set_timeout_with_callback_and_timeout_and_arguments_0(
+                schedule.unchecked_ref(),
+                80,
+            );
+        }
+    });
 
     let send = move |_| send_text(question.get());
 
@@ -1269,49 +1291,57 @@ pub fn AiPanel(
                         })
                         .collect_view()
                 }}
-                <div class="range-row">
-                    <input
-                        id="range-input"
-                        class="range-input"
-                        type="text"
-                        placeholder="页码范围 31-45, 60"
-                        prop:value=move || range_input.get()
-                        on:input=move |event| range_input.set(event_target_value(&event))
-                    />
-                    <button class="button" on:click=add_range>
-                        "加入"
+                <div class="scope-row">
+                    <div class="scope-icons" role="group" aria-label="提问范围">
+                        <button
+                            class="scope-icon"
+                            class:active=move || scope_mode.get() == 0
+                            title="整份文档"
+                            on:click=move |_| scope_mode.set(0)
+                        >
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="4" y="3" width="12" height="16" rx="1.5" />
+                                <path d="M8 21h8a2 2 0 0 0 2-2V8" />
+                            </svg>
+                        </button>
+                        <button
+                            class="scope-icon"
+                            class:active=move || scope_mode.get() == 1
+                            title="仅当前页"
+                            on:click=move |_| scope_mode.set(1)
+                        >
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="5" y="3" width="14" height="18" rx="1.5" />
+                            </svg>
+                        </button>
+                        <button
+                            class="scope-icon"
+                            class:active=move || scope_mode.get() == 2
+                            title="仅引用的内容"
+                            on:click=move |_| scope_mode.set(2)
+                        >
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M7 7h6a4 4 0 0 1 0 8H7zM17 7h2M17 15h2" />
+                            </svg>
+                        </button>
+                    </div>
+                    <span class="scope-count">
+                        {move || {
+                            if scope_mode.get() == 3 {
+                                format!("已选 {} 页", page_set.get().len())
+                            } else {
+                                String::new()
+                            }
+                        }}
+                    </span>
+                    <button class="button scope-manage" on:click=move |_| manager_open.set(true)>
+                        "管理页面引用"
                     </button>
                 </div>
-                {move || {
-                    range_error
-                        .get()
-                        .map(|message| {
-                            view! { <p class="range-summary range-error">{message}</p> }
-                        })
-                }}
                 {move || {
                     notice
                         .get()
                         .map(|message| view! { <p class="range-summary range-error">{message}</p> })
-                }}
-                {move || {
-                    if ranges.get().is_empty() {
-                        ().into_any()
-                    } else {
-                        let label = ranges
-                            .get()
-                            .iter()
-                            .map(|span| {
-                                if span.start == span.end {
-                                    format!("p.{}", span.start)
-                                } else {
-                                    format!("p.{}-{}", span.start, span.end)
-                                }
-                            })
-                            .collect::<Vec<_>>()
-                            .join(" · ");
-                        view! { <p class="range-summary">{label}</p> }.into_any()
-                    }
                 }}
                 <textarea
                     class="ask"
@@ -1366,6 +1396,68 @@ pub fn AiPanel(
                     </button>
                 </div>
             </div>
+
+            <Show when=move || manager_open.get()>
+                <div class="settings-overlay" on:click=move |event: web_sys::MouseEvent| {
+                    if event.target() == event.current_target() {
+                        manager_open.set(false);
+                    }
+                }>
+                    <div class="settings-dialog page-manager">
+                        <header class="settings-head">
+                            <h2>"页面引用"</h2>
+                            <button class="icon-button" title="关闭" on:click=move |_| manager_open.set(false)>
+                                "✕"
+                            </button>
+                        </header>
+                        <div class="manager-grid" id="manager-grid">
+                            {(1..=pages.get().max(1))
+                                .map(|number| {
+                                    view! {
+                                        <button
+                                            class="thumb manager-thumb"
+                                            data-page=number
+                                            class:selected=move || page_set.get().contains(&number)
+                                            on:click=move |event: web_sys::MouseEvent| {
+                                                undo_push.run(());
+                                                let subtract = event.alt_key();
+                                                page_set.update(|set| {
+                                                    if subtract {
+                                                        set.retain(|page| *page != number);
+                                                    } else if let Some(index) = set.iter().position(|page| *page == number) {
+                                                        set.remove(index);
+                                                    } else {
+                                                        set.push(number);
+                                                        set.sort_unstable();
+                                                    }
+                                                });
+                                                scope_mode.set(3);
+                                            }
+                                        >
+                                            <span class="thumb-number">{number}</span>
+                                        </button>
+                                    }
+                                })
+                                .collect_view()}
+                        </div>
+                        <footer class="settings-foot">
+                            <button
+                                class="button"
+                                on:click=move |_| {
+                                    undo_push.run(());
+                                    page_set.set(Vec::new());
+                                }
+                            >
+                                "清空页面引用"
+                            </button>
+                            <span class="settings-path">{move || format!("已选 {} 页", page_set.get().len())}</span>
+                            <button class="button button-primary" on:click=move |_| manager_open.set(false)>
+                                "完成"
+                            </button>
+                        </footer>
+                    </div>
+                </div>
+            </Show>
 
             <Show when=move || open.get()>
                 <div

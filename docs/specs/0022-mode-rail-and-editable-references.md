@@ -257,7 +257,12 @@ gesture changed from *replace* to *add* as part of that redesign, because replac
   snapshot, so page edits undo with ⌘Z.
 - The bar sits on the **left** in every mode for now; spread places the right page's bar on the right
   in the design and that is not built.
-- Scope icons, the manager dialog and the whole-document/current-page request modes remain.
+- **Scope icons and the manager.** The range field is gone: three icons choose 整份文档 / 仅当前页 /
+  仅引用, and the request now selects pages from that mode (whole document and explicit pages are both
+  capped at 20, with a notice saying so instead of truncating silently). 管理页面引用 opens a dialog of
+  thumbnails that scrolls the current page to the middle via `scrollIntoView({ block: "center" })`;
+  clicking toggles a page (Alt subtracts), 清空 empties the set, and every change is undoable.
+  Drag-and-modifier range selection inside the manager is not built.
 
 ## Deviations
 
