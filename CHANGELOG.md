@@ -85,6 +85,9 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Navigation and zoom buttons have labels, and the spec carries a 19-step manual acceptance list.
+
+
 - Drag a range in the page manager; in a spread, the right sheet's bar sits on the right edge.
 
 

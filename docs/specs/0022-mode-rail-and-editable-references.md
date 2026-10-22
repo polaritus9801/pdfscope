@@ -338,6 +338,39 @@ The two pieces of logic that a screenshot could not check are unit-tested:
 
 Both are the functions the interface actually calls; the UI holds no second copy.
 
+## Manual acceptance
+
+Run these in order; each says what should happen. Anything else is a bug.
+
+**Rail**
+1. `V`, `T`, `B`, `D` switch tools; the capsule shows the active one. Typing in the question box does
+   not switch tools.
+2. Box mode survives several captures in a row; the rail still shows box, not pointer.
+3. `Esc` returns to the pointer, and clears a pending page endpoint.
+4. Hold `⇧` and swipe text with the pointer tool: the quote is added without the floating bar.
+5. Hold `⌥` and drag a box with the pointer tool: the region is added.
+6. Hold `⌘` (Ctrl) and click a page: it joins the page set.
+
+**References**
+7. Hover a reference: outline, ✕ at the top-right with its top on the reference's top edge. Move from
+   the reference to the ✕ without leaving the highlight (the 12 px bridge).
+8. Click the reference: it pins (1 px accent outline) and stays while the pointer leaves.
+9. Drag `[`/`]`: the quote resizes; on release its text re-reads from the page.
+10. Drag a region corner or edge: it resizes; on release the thumbnail re-crops.
+11. Drag the frame body: it moves; a drag under 6 px changes nothing.
+12. `⌘Z` undoes add, delete, move, resize and the text/image re-read; `⌘⇧Z` redoes.
+
+**Page scope**
+13. Hover a page: three buttons appear on the left bar (start / this page / end).
+14. Click start on page 3, hover page 5: a dashed preview covers 3–5; click end on 5: the range is
+    committed and the dashed preview disappears.
+15. With pages 1–3 and 9–11 selected, click start on 6 and end on 7: the result is 1–3, 6–7, 9–11.
+16. Drag from page 6 to 7 with Alt held: 6–7 are removed; without Alt they are added.
+17. The scope row shows 整份文档 / 仅当前页 / 仅引用; the third sends no page text.
+18. 管理页面引用 opens the manager, current page centred; clicking a thumbnail toggles, dragging
+    selects a range, Alt subtracts, 清空 empties, `Esc` closes.
+19. In a spread, the right page's bar and buttons sit on its right edge.
+
 ## Cleanup
 
 Fourteen style blocks that nothing referenced (the old page-range row, tray chips, the old sheet and

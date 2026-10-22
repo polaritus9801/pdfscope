@@ -1360,6 +1360,7 @@ fn App() -> impl IntoView {
                 <div class="bar-center">
                     <button
                         class="button"
+                        title="上一页"
                         prop:disabled=move || { page.get() <= 1 }
                         on:click=move |_| go(-1)
                     >
@@ -1380,6 +1381,7 @@ fn App() -> impl IntoView {
                     </span>
                     <button
                         class="button"
+                        title="下一页"
                         prop:disabled=move || { pages.get() == 0 || page.get() >= pages.get() }
                         on:click=move |_| go(1)
                     >
@@ -1400,6 +1402,7 @@ fn App() -> impl IntoView {
                     </button>
                     <button
                         class="button"
+                        title="缩小"
                         prop:disabled=move || { !ready.get() || zoom.get() <= 50 }
                         on:click=move |_| zoom_by(-1)
                     >
@@ -1408,6 +1411,7 @@ fn App() -> impl IntoView {
                     <span class="zoom">{move || format!("{}%", zoom.get())}</span>
                     <button
                         class="button"
+                        title="放大"
                         prop:disabled=move || { !ready.get() || zoom.get() >= 400 }
                         on:click=move |_| zoom_by(1)
                     >
