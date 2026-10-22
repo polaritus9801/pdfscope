@@ -396,6 +396,18 @@ The first real session found four regressions:
   page and hid them. They are now always hit-testable, fade in when the page **or the buttons
   themselves** are hovered, and the scope outline is 2 px solid instead of a faint hairline.
 
+## Structure
+
+`ui/src/main.rs` had grown to 1900 lines with a single 1250-line `App`. The first split, behaviour
+unchanged:
+
+- `model.rs` (123) — `Passage`, `Region`, `Selection`, `PageSize`, the `window.__pdfscope*` payload
+  parsers and `rect_style` / `truncate`.
+- `page.rs` (509) — the page shell, reference frames, drag maths, page bar and their pointer handling.
+- `main.rs` (1300) — the shell: state, callbacks, header, rail, stage.
+
+`just check` green after the move. The composer/settings split and the renderer's module split remain.
+
 ## Deviations
 
 - The reference undo stack is cleared when a question is sent: references become part of that turn's

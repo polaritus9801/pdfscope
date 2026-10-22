@@ -10,6 +10,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Changed
 
+- Split the interface into `model.rs` and `page.rs`: the data model and the page shell are no longer
+  inside the 1900-line `main.rs`.
+
+
 - Removed fourteen dead style blocks from the stylesheet and styled the icon-only header button.
 
 
