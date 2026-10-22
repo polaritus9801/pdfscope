@@ -215,6 +215,11 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Fixed
 
+- Box capture arms again, selections no longer break mid-drag, passages highlight the actual text with
+  `[`/`]` at its start and end, page buttons are reachable from outside the page, and scope outlines
+  are visible.
+
+
 - Reference rows delete by id, Escape closes the page manager, and sending no longer leaves an undo
   state that could duplicate the references.
 

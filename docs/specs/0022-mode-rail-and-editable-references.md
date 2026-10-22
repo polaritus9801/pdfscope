@@ -377,6 +377,25 @@ Fourteen style blocks that nothing referenced (the old page-range row, tray chip
 thinking styles, the previous reference tint) were deleted, and an audit for classes used without a
 rule found the icon-only header button, which now has one.
 
+## Field report fixes
+
+The first real session found four regressions:
+
+- **Box capture was dead.** `beginCapture` existed only as a method, while the tool switch and the Alt
+  borrow called a bare `beginCapture()` — a runtime error, so nothing armed. The body moved into a
+  module-level `armCapture()` that both call.
+- **Selections broke mid-drag.** The settle timer reported (and, in text mode, added and cleared) a
+  selection after 120 ms of quiet, even with the pointer still down — slow drags were cut short, fast
+  ones lost their tail. Reporting now waits for pointerup.
+- **References were rectangles.** The rectangle frame replaces the old tint, so a passage lost its
+  highlight. Passages are now painted on the **text spans** under their rectangle
+  (`highlightPassages`, re-applied after every page render); the frame carries no fill and no outline,
+  and the `[` / `]` handles sit at the top-left and bottom-right of the text flow, where a selection
+  starts and ends.
+- **Page buttons were unreachable.** They only appeared on page hover, so moving toward them left the
+  page and hid them. They are now always hit-testable, fade in when the page **or the buttons
+  themselves** are hovered, and the scope outline is 2 px solid instead of a faint hairline.
+
 ## Deviations
 
 - The reference undo stack is cleared when a question is sent: references become part of that turn's

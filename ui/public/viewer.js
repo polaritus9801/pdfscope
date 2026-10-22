@@ -33,6 +33,7 @@ let defaultZoom = 100;
 let pageMode = "continuous";
 let toolMode = "pointer";
 let gestureShift = false;
+let pointerHeld = false;
 let spreadOffset = false;
 let pendingDefaultZoom = 0;
 let restorePage = 0;
@@ -264,6 +265,30 @@ function markCurrentPage() {
   }
 }
 
+function applyPassageHighlights() {
+  for (const span of document.querySelectorAll(".textLayer span.ref-highlight")) {
+    span.classList.remove("ref-highlight");
+  }
+  if (!Array.isArray(passageHighlights)) return;
+
+  for (const entry of passageHighlights) {
+    const page = pageElement(entry.page);
+    if (!page || !entry.rect) continue;
+    const box = page.getBoundingClientRect();
+    const left = box.left + entry.rect.x * box.width;
+    const top = box.top + entry.rect.y * box.height;
+    const right = left + entry.rect.width * box.width;
+    const bottom = top + entry.rect.height * box.height;
+
+    for (const span of page.querySelectorAll(".textLayer span")) {
+      const r = span.getBoundingClientRect();
+      if (r.right < left || r.left > right) continue;
+      if (r.bottom < top || r.top > bottom) continue;
+      span.classList.add("ref-highlight");
+    }
+  }
+}
+
 function storageKey() {
   return documentName ? `pdfscope:pos:${documentName}` : "";
 }
@@ -294,6 +319,7 @@ function rememberPage(page) {
 
 // ── Find in document ────────────────────────────────────────────────────────────────────────────
 let findQuery = "";
+let passageHighlights = [];
 
 function clearHighlights(root) {
   for (const mark of root.querySelectorAll("mark.find-hit")) {
@@ -948,6 +974,7 @@ async function mountPage(number, state) {
   layer.replaceChildren(prepared.canvas, textLayer);
   if (pageMode !== "continuous") pagedLayout();
   if (findQuery) highlightSpans(layer, findQuery);
+  applyPassageHighlights();
   state.mounted = true;
   state.baseEpoch = epoch;
   state.canvasScale = canvasScale;
@@ -1261,6 +1288,8 @@ function clearReportedSelection() {
 function reportSelection() {
   clearTimeout(settleSelectionTimer);
   settleSelectionTimer = setTimeout(() => {
+    // A selection settles on release, not while the reader is still dragging.
+    if (pointerHeld) return;
     const payload = normalisedSelectionRect();
     if (!payload) {
       clearReportedSelection();
@@ -1306,6 +1335,22 @@ document.addEventListener(
     } else {
       window.__pdfscopePageRange?.(from, to, subtract ? 1 : 0);
     }
+  },
+  true,
+);
+
+document.addEventListener(
+  "pointerdown",
+  () => {
+    pointerHeld = true;
+  },
+  true,
+);
+document.addEventListener(
+  "pointerup",
+  () => {
+    pointerHeld = false;
+    reportSelection();
   },
   true,
 );
@@ -1391,6 +1436,24 @@ function reportCapture() {
   window.__pdfscopeCapture?.(captureArmed);
 }
 
+function armCapture() {
+  if (!document_) return;
+  if (zooming || gesture) {
+    if (zoomFrame) cancelAnimationFrame(zoomFrame);
+    zoomFrame = 0;
+    clearSettle();
+    targetScale = displayScale;
+    zooming = false;
+    gesture = null;
+    pagesElement()?.classList.remove("zooming");
+  }
+  captureArmed = true;
+  reportCapture();
+  stageElement()?.classList.add("capturing");
+  window.getSelection()?.removeAllRanges();
+  window.__pdfscopeCleared?.();
+}
+
 function disarmCapture() {
   captureArmed = false;
   reportCapture();
@@ -1408,7 +1471,7 @@ document.addEventListener(
     // Modifier borrowing: Alt draws a box, Cmd/Ctrl clicks a page, without changing the tool.
     if (event.altKey && toolMode === "pointer") {
       const page = pageShellOf(event.target);
-      if (page) beginCapture();
+      if (page) armCapture();
     }
 
   },
@@ -1545,7 +1608,7 @@ window.PDFScope = {
   setTool(name) {
     toolMode = ["text", "box", "pages"].includes(name) ? name : "pointer";
     if (toolMode === "box") {
-      beginCapture();
+      armCapture();
     } else {
       disarmCapture();
     }
@@ -1595,6 +1658,15 @@ window.PDFScope = {
     const container = document.getElementById(containerId);
     const target = container?.querySelector(`[data-page="${pageNumber}"]`);
     target?.scrollIntoView({ block: "center", inline: "nearest" });
+  },
+
+  /// Marks the text under each passage rectangle, so a reference shows as highlighted words.
+  highlightPassages(list) {
+    for (const span of document.querySelectorAll(".textLayer span.ref-highlight")) {
+      span.classList.remove("ref-highlight");
+    }
+    passageHighlights = Array.isArray(list) ? list : [];
+    applyPassageHighlights();
   },
 
   /// Text covered by a normalised rectangle, read from the rendered text layer.
@@ -1782,21 +1854,7 @@ window.PDFScope = {
   },
 
   beginCapture() {
-    if (!document_) return;
-    if (zooming || gesture) {
-      if (zoomFrame) cancelAnimationFrame(zoomFrame);
-      zoomFrame = 0;
-      clearSettle();
-      targetScale = displayScale;
-      zooming = false;
-      gesture = null;
-      pagesElement()?.classList.remove("zooming");
-    }
-    captureArmed = true;
-    reportCapture();
-    stageElement()?.classList.add("capturing");
-    window.getSelection()?.removeAllRanges();
-    window.__pdfscopeCleared?.();
+    armCapture();
   },
 
   disarmCapture() {

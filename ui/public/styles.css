@@ -1930,6 +1930,25 @@ mark.find-hit {
   outline-color: color-mix(in srgb, var(--accent) 40%, transparent);
 }
 
+/* A passage is shown by the highlighted words themselves; only a region needs a filled box. */
+.ref-frame[data-kind="passage"] {
+  outline: none;
+  background: transparent;
+}
+
+.ref-frame[data-kind="passage"]:hover {
+  outline: none;
+}
+
+.ref-frame[data-kind="region"] {
+  background: rgb(203 184 236 / 22%);
+}
+
+.textLayer span.ref-highlight {
+  background: rgb(203 184 236 / 45%);
+  border-radius: 2px;  /* size */
+}
+
 .ref-frame.active {
   outline: 1px solid var(--accent);
 }
@@ -2032,11 +2051,11 @@ mark.find-hit {
 
 /* Page scope: a purple outer bar marks committed pages, dashed marks a pending preview. */
 .page.in-scope {
-  outline: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  outline: 2px solid var(--accent);  /* size */
 }
 
 .page.preview {
-  outline: 1px dashed var(--accent);
+  outline: 2px dashed color-mix(in srgb, var(--accent) 70%, transparent);  /* size */
 }
 
 .page-bar {
@@ -2059,15 +2078,21 @@ mark.find-hit {
   top: 0;
   bottom: 0;
   left: -40px;  /* size */
-  display: none;
+  display: flex;
   flex-direction: column;
   justify-content: space-between;
   padding: var(--space-2) 0;
   z-index: 6;
+  /* Always hit-testable, only visible when the pointer is on the page or on these buttons, so the
+     reader can travel from the page to the buttons without them vanishing on the way. */
+  opacity: 0;
+  transition: opacity var(--duration) var(--ease);
 }
 
-.page:hover .page-bar-actions {
-  display: flex;
+.page:hover .page-bar-actions,
+.page-bar-actions:hover,
+.page-bar-actions:focus-within {
+  opacity: 1;
 }
 
 .page-bar-btn {

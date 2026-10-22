@@ -513,6 +513,7 @@ fn PageView(
                         view! {
                             <div
                                 class="ref-frame"
+                                data-kind=if kind == 0 { "passage" } else { "region" }
                                 class:active=is_active
                                 style=rect_style(rect)
                                 on:mouseenter=move |_| active_ref.set(Some((kind, id)))
@@ -786,6 +787,42 @@ fn App() -> impl IntoView {
     let selection = RwSignal::new(Option::<Selection>::None);
     let passages = RwSignal::new(Vec::<Passage>::new());
     let regions = RwSignal::new(Vec::<Region>::new());
+
+    Effect::new(move |_| {
+        let list = js_sys::Array::new();
+        for passage in passages.get() {
+            let item = js_sys::Object::new();
+            let rect = js_sys::Object::new();
+            let _ = js_sys::Reflect::set(
+                &rect,
+                &JsValue::from_str("x"),
+                &JsValue::from_f64(passage.rect.0),
+            );
+            let _ = js_sys::Reflect::set(
+                &rect,
+                &JsValue::from_str("y"),
+                &JsValue::from_f64(passage.rect.1),
+            );
+            let _ = js_sys::Reflect::set(
+                &rect,
+                &JsValue::from_str("width"),
+                &JsValue::from_f64(passage.rect.2),
+            );
+            let _ = js_sys::Reflect::set(
+                &rect,
+                &JsValue::from_str("height"),
+                &JsValue::from_f64(passage.rect.3),
+            );
+            let _ = js_sys::Reflect::set(
+                &item,
+                &JsValue::from_str("page"),
+                &JsValue::from_f64(f64::from(passage.page)),
+            );
+            let _ = js_sys::Reflect::set(&item, &JsValue::from_str("rect"), &rect);
+            list.push(&item);
+        }
+        let _ = call("highlightPassages", &[list.into()]);
+    });
     let next_ref = RwSignal::new(0_u64);
     type Snapshot = (Vec<Passage>, Vec<Region>, Vec<u32>, u8);
     let history = RwSignal::new(pdfscope_core::history::History::<Snapshot>::new(50));
