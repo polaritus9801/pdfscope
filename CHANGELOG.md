@@ -10,6 +10,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Changed
 
+- Page-set merging and subtraction moved to `pdfscope-core::pages` with nine unit tests; the UI calls
+  the tested functions.
+
+
 - In paged modes the zoom readout reports the share of a full page on screen (54 % single, 50 %
   spread) instead of the column's percentage.
 

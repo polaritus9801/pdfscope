@@ -268,6 +268,17 @@ gesture changed from *replace* to *add* as part of that redesign, because replac
 - **A, B and C are implemented.** What is missing is human visual verification (no browser was used),
   and the deviations below.
 
+## Verification without a browser
+
+The two pieces of logic that a screenshot could not check are unit-tested:
+
+- `pdfscope-core::geo::resize_rect` — 8 tests: each edge, each corner, clamping, minimum size,
+  unknown mode.
+- `pdfscope-core::pages` — 9 tests: toggle, merging, reversed ranges, nesting and duplicates,
+  subtraction that splits a set, zero clamping, sorted-and-unique invariants.
+
+Both are the functions the interface actually calls; the UI holds no second copy.
+
 ## Deviations
 
 - The frame itself is the move surface; the region's circular handle is an affordance, not a separate

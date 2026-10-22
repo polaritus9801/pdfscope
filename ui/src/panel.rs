@@ -1447,26 +1447,17 @@ pub fn AiPanel(
                                                 if moved < 4.0 || target == start {
                                                     page_set.update(|set| {
                                                         if subtract {
-                                                            set.retain(|page| *page != start);
-                                                        } else if let Some(index) = set.iter().position(|page| *page == start) {
-                                                            set.remove(index);
+                                                            pdfscope_core::remove_page(set, start);
                                                         } else {
-                                                            set.push(start);
-                                                            set.sort_unstable();
+                                                            pdfscope_core::toggle_page(set, start);
                                                         }
                                                     });
                                                 } else {
-                                                    let (low, high) = (start.min(target), start.max(target));
                                                     page_set.update(|set| {
                                                         if subtract {
-                                                            set.retain(|page| *page < low || *page > high);
+                                                            pdfscope_core::subtract_range(set, start, target);
                                                         } else {
-                                                            for page in low..=high {
-                                                                if !set.contains(&page) {
-                                                                    set.push(page);
-                                                                }
-                                                            }
-                                                            set.sort_unstable();
+                                                            pdfscope_core::add_range(set, start, target);
                                                         }
                                                     });
                                                 }

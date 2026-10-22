@@ -385,15 +385,7 @@ fn PageView(
 
     let commit_range = move |from: u32, to: u32| {
         undo_push.run(());
-        let (low, high) = (from.min(to), from.max(to));
-        page_set.update(|set| {
-            for page in low..=high {
-                if !set.contains(&page) {
-                    set.push(page);
-                }
-            }
-            set.sort_unstable();
-        });
+        page_set.update(|set| pdfscope_core::add_range(set, from, to));
     };
 
     let choose_start = move |_| {
@@ -416,14 +408,7 @@ fn PageView(
     };
     let toggle_page = move |_| {
         undo_push.run(());
-        page_set.update(|set| {
-            if let Some(index) = set.iter().position(|entry| *entry == number) {
-                set.remove(index);
-            } else {
-                set.push(number);
-                set.sort_unstable();
-            }
-        });
+        page_set.update(|set| pdfscope_core::toggle_page(set, number));
         anchor.set(None);
     };
 
@@ -1109,14 +1094,7 @@ fn App() -> impl IntoView {
                 return;
             }
             undo_push.run(());
-            page_set.update(|set| {
-                if let Some(index) = set.iter().position(|entry| *entry == page) {
-                    set.remove(index);
-                } else {
-                    set.push(page);
-                    set.sort_unstable();
-                }
-            });
+            page_set.update(|set| pdfscope_core::toggle_page(set, page));
         });
         if let Some(window) = web_sys::window() {
             let _ = js_sys::Reflect::set(

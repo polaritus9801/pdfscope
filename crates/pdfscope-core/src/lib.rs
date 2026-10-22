@@ -14,6 +14,7 @@ pub mod error;
 pub mod geo;
 pub mod ids;
 pub mod markdown;
+pub mod pages;
 pub mod ranges;
 
 pub use anchor::{
@@ -24,4 +25,5 @@ pub use error::{CoreError, CoreResult};
 pub use geo::Rect;
 pub use ids::{BookId, PageIndex};
 pub use markdown::to_html;
+pub use pages::{add_range, remove_page, subtract_range, toggle_page};
 pub use ranges::{PageSpan, RangeError, parse_ranges};
