@@ -10,6 +10,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Changed
 
+- Split the panel: the page manager and the settings sheet are their own modules, and the architecture
+  doc lists what each interface module owns.
+
+
 - Split the interface into `model.rs` and `page.rs`: the data model and the page shell are no longer
   inside the 1900-line `main.rs`.
 

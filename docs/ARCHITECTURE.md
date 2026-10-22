@@ -158,8 +158,22 @@ Rules:
 - No component library is vendored wholesale; primitives are copied in and owned.
 - The visual language is calm and dense: this is a reading tool, not a dashboard.
 
-The front end arrives with its own spec. Until then the workspace contains no UI crate, and CI does
-not pretend otherwise.
+### Interface modules (`ui/src`)
+
+One module, one reason to change:
+
+| Module | Owns |
+|---|---|
+| `main.rs` | The shell: application state, the renderer callbacks, header, rail, stage. |
+| `model.rs` | `Passage`, `Region`, `Selection`, `PageSize`, the `window.__pdfscope*` payload parsers. |
+| `page.rs` | One page shell: reference frames, drag maths, page bar, pointer handling. |
+| `scope_ui.rs` | The page-manager dialog: thumbnails, range drags, clear. |
+| `settings.rs` | The settings sheet: form state, load once, save, test. |
+| `panel.rs` | The conversation: transcript, reasoning, composer, history, answer actions. |
+| `viewer.js` | PDF.js behind `window.PDFScope`: rendering, zoom, selection, capture, find, thumbnails. |
+
+`main.rs` composes the modules; it does not own their state. The renderer boundary is the same in
+both directions: calls go through `window.PDFScope`, reports come back as `window.__pdfscope*`.
 
 ---
 

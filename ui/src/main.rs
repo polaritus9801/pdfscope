@@ -16,6 +16,8 @@ use web_sys::HtmlInputElement;
 mod model;
 mod page;
 mod panel;
+mod scope_ui;
+mod settings;
 
 pub(crate) use model::{PageSize, Passage, Region, Selection, truncate};
 pub(crate) use page::PageView;

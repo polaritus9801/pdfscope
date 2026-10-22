@@ -406,7 +406,12 @@ unchanged:
 - `page.rs` (509) — the page shell, reference frames, drag maths, page bar and their pointer handling.
 - `main.rs` (1300) — the shell: state, callbacks, header, rail, stage.
 
-`just check` green after the move. The composer/settings split and the renderer's module split remain.
+- `scope_ui.rs` (112) — the page-manager dialog, with its own drag state.
+- `settings.rs` (642) — the settings sheet: form state, the load-once effect, save, test.
+- `panel.rs` (1881 → 1203) — the conversation only.
+
+`docs/ARCHITECTURE.md` now carries the module map. The renderer (`viewer.js`, ~1900 lines) is the
+remaining monolith and is the next split.
 
 ## Deviations
 
