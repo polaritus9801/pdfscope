@@ -136,7 +136,11 @@ selection cannot point at a hidden page.
 - **Single mode is covered by the smoke suite**: it switches, asserts exactly one page is visible and
   that its top sits within the reading area, then switches back and asserts the column returns. The
   suite is now **83 checks**.
-- **Spread** not implemented.
+- **Spread implemented**: page 1 alone, then (2, 3), (4, 5)…; at page 2 the pair renders side by side
+  (388 × 549 each in an 800 px stage). Both sheets render through an explicit window: in paged modes
+  the scroll no longer decides the page, so entering the mode cannot jump to the last page.
+- **Coverage**: the smoke suite switches to single (one page at the top), back to continuous, then to
+  spread at page 2 and asserts pages 2 and 3 sit side by side. **84 checks**.
 
 ## Deviations
 
@@ -150,9 +154,11 @@ selection cannot point at a hidden page.
   smoke suite already covers single, so the migration is checkable.
 
 
-- Fit page reuses the continuous zoom transform (anchored `top center`) rather than a separate
-  render scale; the canvas is rendered at the zoomed size through the existing machinery, so text
-  stays sharp. The spread mode will need the same trick with two sheets.
+- Both modes now scale the page **layer** (canvas + text layer together) and resize the box to match;
+  the continuous zoom transform is not used while paged. The zoom readout still shows the column's
+  zoom, not the paged fit ratio.
+- Paging is by page, not by spread: the pair window changes when the current page crosses a pair
+  boundary. The pairing offset control from the design is not built.
 - Mode changes reset the scroll; a finer anchor (keep the same paragraph) is not implemented.
 
 ## Open questions

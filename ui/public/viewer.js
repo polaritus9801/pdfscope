@@ -30,7 +30,7 @@ let currentPage = 1;
 let documentName = "";
 let rememberPosition = true;
 let defaultZoom = 100;
-let pagedMode = false;
+let pageMode = "continuous";
 let pendingDefaultZoom = 0;
 let restorePage = 0;
 let initialized = false;
@@ -139,20 +139,100 @@ async function renderThumbnail(element) {
 
 function applyPageMode() {
   const pages = pagesElement();
-  pages?.classList.toggle("paged", pagedMode);
+  const paged = pageMode !== "continuous";
+  pages?.classList.toggle("paged", paged);
+  pages?.classList.toggle("spread", pageMode === "spread");
   markCurrentPage();
+
+  metricsDirty = true;
+  if (!paged) {
+    resetPageLayers();
+  }
 
   // Both differ only in layout, so the visual scroll must be re-established after the switch.
   requestAnimationFrame(() => {
-    const stage = document.querySelector(".stage");
-    if (!stage) return;
-    stage.scrollTo({ top: 0 });
+    document.querySelector(".stage")?.scrollTo({ top: 0 });
+    if (paged) pagedLayout();
   });
 }
 
-function markCurrentPage() {
+/// Page 1 alone; even pages pair right, odd pages pair left.
+function visiblePages() {
+  const total = document_?.numPages ?? 0;
+  const current = Math.min(Math.max(currentPage, 1), total || 1);
+  if (pageMode === "single") return new Set([current]);
+  if (current === 1) return new Set([1]);
+  if (current % 2 === 0) return new Set([current, Math.min(current + 1, total)]);
+  return new Set([current - 1, current]);
+}
+
+/// Scales canvas and text layer as one unit, then resizes the box to match.
+///
+/// Sizes come from the PDF's own proportions, never from measuring the DOM: a page that was hidden or
+/// already scaled would otherwise teach the layout the wrong base.
+function pagedLayout() {
+  const stage = document.querySelector(".stage");
+  if (!stage || pageSizes.length === 0) return;
+
+  const visible = visiblePages();
+  const shown = [...document.querySelectorAll(".page[data-page]")].filter((element) =>
+    visible.has(Number(element.dataset.page)),
+  );
+  if (shown.length === 0) return;
+
+  const gap = 24;
+  const columns = shown.length;
+  const availableWidth = stage.clientWidth - 48;
+  const availableHeight = stage.clientHeight - 48;
+  const slotWidth = (availableWidth - (columns - 1) * gap) / columns;
+
+  for (const element of shown) {
+    const number = Number(element.dataset.page);
+    const size = pageSizes[number - 1];
+    if (!size) continue;
+
+    const ratio = size.height / size.width;
+    const baseWidth = slotWidth;
+    const baseHeight = baseWidth * ratio;
+    const scale = Math.max(0.1, Math.min(1, availableHeight / baseHeight));
+
+    element.style.width = `${Math.round(baseWidth * scale)}px`;
+    element.style.height = `${Math.round(baseHeight * scale)}px`;
+
+    const layer = element.querySelector(".page-layer");
+    if (!layer) continue;
+    layer.style.width = `${Math.round(baseWidth)}px`;
+    layer.style.height = `${Math.round(baseHeight)}px`;
+    layer.style.transformOrigin = "top left";
+    layer.style.transform = `scale(${scale})`;
+
+    window.__pagedDebug = { scale, baseWidth, baseHeight, columns, availableWidth, availableHeight };
+  }
+}
+
+function resetPageLayers() {
   for (const element of document.querySelectorAll(".page[data-page]")) {
-    element.dataset.current = String(Number(element.dataset.page) === currentPage);
+    element.style.width = "";
+    element.style.height = "";
+    element.dataset.visible = "";
+    const layer = element.querySelector(".page-layer");
+    if (layer) {
+      layer.style.transform = "";
+      layer.style.width = "";
+      layer.style.height = "";
+    }
+  }
+}
+
+function markCurrentPage() {
+  const visible = visiblePages();
+  for (const element of document.querySelectorAll(".page[data-page]")) {
+    const page = Number(element.dataset.page);
+    element.dataset.current = String(page === currentPage);
+    element.dataset.visible = String(visible.has(page));
+  }
+  if (pageMode !== "continuous") {
+    pagedLayout();
   }
 }
 
@@ -366,6 +446,9 @@ function readAnchor() {
 
 function syncCurrentPage() {
   if (!document_) return;
+  // In paged modes the page is chosen by navigation, never inferred from a scroll position that the
+  // paged layout does not use.
+  if (pageMode !== "continuous") return;
   const page = pageAtFocus();
   if (page !== currentPage) {
     currentPage = page;
@@ -641,6 +724,27 @@ async function updateWindowOnce(render) {
   const stage = stageElement();
   const pages = pagesElement();
   if (!stage || !pages) return;
+
+  // Paged modes do not scroll: render exactly the sheets on show, whatever the column metrics say.
+  if (pageMode !== "continuous") {
+    const visible = visiblePages();
+    desired = new Set(visible);
+    for (const number of [...rendered.keys()]) {
+      if (!visible.has(number)) releasePage(number);
+    }
+    await Promise.all(
+      [...visible].map((number) =>
+        ensurePage(number, render).catch((error) => {
+          if (error?.name !== "RenderingCancelledException") {
+            console.error("PDFScope: page render failed", number, error);
+          }
+        }),
+      ),
+    );
+    pagedLayout();
+    return;
+  }
+
   if (metricsDirty) rebuildMetrics();
   if (metrics.length === 0) {
     desired.clear();
@@ -814,6 +918,7 @@ async function mountPage(number, state) {
   }
 
   layer.replaceChildren(prepared.canvas, textLayer);
+  if (pageMode !== "continuous") pagedLayout();
   if (findQuery) highlightSpans(layer, findQuery);
   state.mounted = true;
   state.baseEpoch = epoch;
@@ -1345,22 +1450,8 @@ window.PDFScope = {
 
   /// `single` shows one page at a time; anything else keeps the continuous column.
   setPageMode(mode) {
-    pagedMode = mode === "single";
+    pageMode = ["single", "spread"].includes(mode) ? mode : "continuous";
     applyPageMode();
-
-    if (pagedMode) {
-      // Fit the whole sheet: entering single mode should show a page, not its top third.
-      requestAnimationFrame(() => {
-        const page = document.querySelector('.page[data-current="true"]');
-        const stage = document.querySelector('.stage');
-        if (!page || !stage) return;
-        const available = stage.clientHeight - 48;
-        const ratio = Math.min(1, available / Math.max(1, page.offsetHeight));
-        if (ratio < 0.995) {
-          setZoomTarget(ratio, { direct: true });
-        }
-      });
-    }
   },
 
   /// The zoom a freshly opened document starts at, as a percentage of fit width.

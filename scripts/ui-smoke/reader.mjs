@@ -323,6 +323,27 @@ try {
   );
   check(true, "continuous mode restores the column");
 
+  // Spread: at page 2 the facing pair (2, 3) is on show, side by side.
+  await evaluate(`window.PDFScope.setPageMode("spread")`);
+  await evaluate(`window.PDFScope.render(2)`);
+  await waitFor(
+    `(() => {
+       const shown = [...document.querySelectorAll('.page')].filter(
+         (node) => getComputedStyle(node).display !== 'none',
+       );
+       if (shown.length !== 2) return false;
+       const [left, right] = shown
+         .map((node) => ({ page: Number(node.dataset.page), rect: node.getBoundingClientRect() }))
+         .sort((a, b) => a.rect.x - b.rect.x);
+       return left.page === 2 && right.page === 3 && right.rect.x > left.rect.x;
+     })()`,
+    "the facing pair at page 2",
+  );
+  check(true, "spread shows pages 2 and 3 side by side");
+  await shot("reader-01c-spread.png");
+
+  await evaluate(`window.PDFScope.setPageMode("continuous")`);
+
   // At 50 %, two pages are visible at once: the column, not a single-page canvas.
   await evaluate(`(() => {
     const minus = [...document.querySelectorAll('.bar-right button')].find((node) => node.textContent.trim() === '−');

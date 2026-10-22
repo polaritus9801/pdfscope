@@ -66,6 +66,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- 双页对开: page 1 alone, then facing pairs, each sheet scaled as one unit; single mode now fits the
+  whole page through the same mechanism.
+
+
 - Single-page reading mode, chosen in 阅读 → 翻页方式; the other sheets stay hidden and the current
   page returns to the top.
 

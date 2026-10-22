@@ -222,7 +222,8 @@ as Preview does; the paper is the document, not the interface.
 
 ## Deviations
 
-- Page modes are specified in 0021 and single mode is now implemented; spread remains. The CSS-only attempt is
+- Page modes are specified in 0021; both single and spread are implemented and covered by the smoke
+  suite. The CSS-only attempt is
   recorded above as reverted; the layout model they need is specified separately in
   [`0021-page-modes.md`](0021-page-modes.md), which is draft and awaits approval.
 

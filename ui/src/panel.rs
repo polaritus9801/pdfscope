@@ -1472,6 +1472,9 @@ pub fn AiPanel(
                                                 <option value="single" selected=move || form_mode.get() == "single">
                                                     "单页"
                                                 </option>
+                                                <option value="spread" selected=move || form_mode.get() == "spread">
+                                                    "双页"
+                                                </option>
                                             </select>
                                         </label>
 

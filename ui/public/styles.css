@@ -1974,12 +1974,10 @@ mark.find-hit {
   border-radius: var(--radius-md);
 }
 
-/* Single page: the hidden sheets collapse, so the one on show starts at the top. */
+/* Paged modes: the viewer sizes and scales each sheet itself. */
 .pages.paged {
-  /* The zoom transform is the only thing that scales a sheet; it must stay, anchored at the top. */
-  transform-origin: top center;
+  transform: none;
   width: 100%;
-  max-width: 900px;  /* size */
   margin: 0 auto;
 }
 
@@ -1987,7 +1985,13 @@ mark.find-hit {
   display: none;
 }
 
-.pages.paged .page[data-current="true"] {
+.pages.paged .page[data-visible="true"] {
   display: flex;
-  margin: 0 auto;
+}
+
+.pages.spread {
+  flex-direction: row;
+  justify-content: center;
+  align-items: flex-start;
+  gap: var(--space-4);
 }
