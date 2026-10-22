@@ -1442,9 +1442,11 @@ document.addEventListener("pointerup", async (event) => {
   const pageNumber = capturePage;
   marqueeStart = null;
   clearMarquee();
-  disarmCapture();
+  // The box tool is sticky: stay armed instead of disarm/re-arm, which would tell Rust to drop the tool.
   if (toolMode === "box") {
-    beginCapture();
+    capturePage = 0;
+  } else {
+    disarmCapture();
   }
 
   if (!page || !end || !start) return;

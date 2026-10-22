@@ -201,6 +201,9 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Fixed
 
+- Sticky box mode no longer resets itself after one capture, and undo during a drag cancels that drag.
+
+
 - Stale async re-reads can no longer overwrite a newer reference edit; the Shift borrow resets after
   one selection, and Alt is honoured when a page drag is released.
 

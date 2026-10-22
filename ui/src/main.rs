@@ -178,7 +178,18 @@ fn PageView(
     // kind, id, start x/y, start rect, page width/height, whether undo was recorded
     // kind, id, start x/y, start rect, page w/h, undo recorded, mode (0 move, 1 left, 2 right,
     // 3 top, 4 bottom, 5 top-left, 6 top-right, 7 bottom-left, 8 bottom-right)
-    type Drag = (u8, u64, f64, f64, (f64, f64, f64, f64), f64, f64, bool, u8);
+    type Drag = (
+        u8,
+        u64,
+        f64,
+        f64,
+        (f64, f64, f64, f64),
+        f64,
+        f64,
+        bool,
+        u8,
+        u64,
+    );
     let drag = RwSignal::new(Option::<Drag>::None);
     let drag_moved = RwSignal::new(false);
     let finish_drag = move |kind: u8, id: u64| {
@@ -310,14 +321,23 @@ fn PageView(
             box_rect.height(),
             false,
             mode,
+            edit_epoch.get(),
         )));
         event.prevent_default();
     };
 
     let drag_move = move |event: web_sys::PointerEvent| {
-        let Some((kind, id, start_x, start_y, start, page_w, page_h, _, mode)) = drag.get() else {
+        let Some((kind, id, start_x, start_y, start, page_w, page_h, _, mode, epoch)) = drag.get()
+        else {
             return;
         };
+        if edit_epoch.get() != epoch {
+            // An undo or a newer edit happened mid-drag; stop rather than fight it.
+            drag.set(None);
+            drag_moved.set(false);
+            return;
+        }
+
         if !drag_moved.get() {
             let moved = (event.client_x() as f64 - start_x).abs()
                 + (event.client_y() as f64 - start_y).abs();
@@ -782,6 +802,7 @@ fn App() -> impl IntoView {
     });
 
     let undo_reference = move || {
+        edit_epoch.update(|epoch| *epoch += 1);
         let Some(previous) = undo_stack.get().pop() else {
             return;
         };
@@ -801,6 +822,7 @@ fn App() -> impl IntoView {
     };
 
     let redo_reference = move || {
+        edit_epoch.update(|epoch| *epoch += 1);
         let Some(next) = redo_stack.get().pop() else {
             return;
         };

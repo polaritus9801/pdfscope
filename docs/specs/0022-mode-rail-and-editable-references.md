@@ -289,6 +289,14 @@ Four defects found by reading the code rather than looking at it:
 - A text or image re-read is now guarded by an edit epoch: a slow `textInRect` answering after a newer
   drag can no longer overwrite the quote with stale text.
 
+### Third review pass
+
+- **The box tool silently dropped itself.** Every capture disarmed and re-armed, and the disarm was
+  reported to Rust, which reset the tool to pointer — so after one box the rail said pointer while
+  capture was armed. Sticky box now stays armed without a disarm/re-arm round trip.
+- **Undo during a drag.** A drag recorded the edit epoch it began in; an undo or redo bumps the epoch,
+  and a drag from an older epoch stops instead of writing over the restored state.
+
 ## Verification without a browser
 
 The two pieces of logic that a screenshot could not check are unit-tested:
