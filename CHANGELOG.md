@@ -227,6 +227,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Fixed
 
+- LaTeX formulas are no longer mangled: math is protected from Markdown before parsing, so `_`, `*`,
+  backslashes and `[p.n]` inside a formula survive and KaTeX renders it.
+
+
 - Box capture arms again, selections no longer break mid-drag, passages highlight the actual text with
   `[`/`]` at its start and end, page buttons are reachable from outside the page, and scope outlines
   are visible.

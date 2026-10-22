@@ -52,6 +52,17 @@ disconnects the observer while KaTeX mutates the DOM so its own insertions canno
 Only the WOFF2 fonts are vendored (596 KB for the whole KaTeX directory); code fences are untouched
 because KaTeX skips `pre`/`code`.
 
+## Fix: formulas survive Markdown
+
+Reported from a real session: formulas appeared as raw LaTeX, often with `_` and `\` eaten. The cause
+was ordering — Markdown parsed the formula before KaTeX saw it, so `v_{rel}` became emphasis and
+`[p.3]` inside math became a citation.
+
+`to_html` now lifts `$$…$$` and `$…$` out **before** parsing, leaves inert ASCII tokens in their place,
+and puts the escaped formula back afterwards; KaTeX's auto-render then finds intact delimiters.
+Six tests cover underscores and asterisks, multi-line display math, citations inside math, escaped
+dollars, unpaired dollars, and HTML characters.
+
 ## Deviations
 
 - A request that fails before any content is retried twice automatically (0.5 s, then 1 s), and the

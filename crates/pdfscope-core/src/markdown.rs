@@ -9,8 +9,13 @@ use pulldown_cmark::{Event, Options, Parser, Tag, TagEnd, html};
 use crate::citation::{Segment, segments};
 
 /// Renders Markdown to HTML. The input is untrusted; raw HTML in it is escaped, never emitted.
+///
+/// Display and inline math are lifted out before parsing. Markdown would otherwise read `_` as
+/// emphasis, eat backslashes and turn `[p.3]` into a citation **inside** a formula, and KaTeX can no
+/// longer match the delimiters once tags sit between them.
 pub fn to_html(input: &str) -> String {
-    let input = normalise(input);
+    let (input, maths) = protect_math(input);
+    let input = normalise(&input);
     let mut options = Options::empty();
     options.insert(Options::ENABLE_TABLES);
     options.insert(Options::ENABLE_STRIKETHROUGH);
@@ -61,7 +66,101 @@ pub fn to_html(input: &str) -> String {
     let mut output = String::new();
     html::push_html(&mut output, events.into_iter());
 
+    restore_math(output, &maths)
+}
+
+const MATH_PLACEHOLDER: &str = "PDFSCOPEMATHFORMULA";
+
+/// Replaces `$$…$$` and `$…$` with inert tokens and returns the formulas.
+///
+/// A token is plain ASCII, so Markdown leaves it alone; the formula itself never passes through the
+/// parser.
+fn protect_math(input: &str) -> (String, Vec<String>) {
+    let mut output = String::with_capacity(input.len());
+    let mut formulas = Vec::new();
+    let bytes = input.as_bytes();
+    let mut index = 0;
+
+    while index < bytes.len() {
+        if bytes[index] == b'\\' && index + 1 < bytes.len() && bytes[index + 1] == b'$' {
+            // An escaped dollar is literal text, not a delimiter.
+            output.push_str("\\$");
+            index += 2;
+            continue;
+        }
+
+        if bytes[index] == b'$' {
+            let display = index + 1 < bytes.len() && bytes[index + 1] == b'$';
+            let start = if display { index + 2 } else { index + 1 };
+
+            if display {
+                if let Some(offset) = input[start..].find("$$") {
+                    let end = start + offset + 2;
+                    let token = format!("{MATH_PLACEHOLDER}{}X", formulas.len());
+                    output.push_str(&token);
+                    formulas.push(input[index..end].to_owned());
+                    index = end;
+                    continue;
+                }
+            } else if let Some(close) = inline_math_end(bytes, start) {
+                let content = &input[start..close];
+                let balanced = !content.is_empty()
+                    && !content.starts_with(char::is_whitespace)
+                    && !content.ends_with(char::is_whitespace);
+                if balanced {
+                    let token = format!("{MATH_PLACEHOLDER}{}X", formulas.len());
+                    output.push_str(&token);
+                    formulas.push(input[index..=close].to_owned());
+                    index = close + 1;
+                    continue;
+                }
+            }
+        }
+
+        let character = input[index..].chars().next().unwrap_or('$');
+        output.push(character);
+        index += character.len_utf8();
+    }
+
+    (output, formulas)
+}
+
+/// The byte index of the `$` closing an inline formula, staying on one line.
+fn inline_math_end(bytes: &[u8], start: usize) -> Option<usize> {
+    let mut index = start;
+    while index < bytes.len() {
+        match bytes[index] {
+            b'\n' => return None,
+            b'\\' => index += 2,
+            b'$' => return Some(index),
+            _ => index += 1,
+        }
+    }
+    None
+}
+
+/// Puts the formulas back, escaped for HTML but otherwise untouched, so KaTeX sees the delimiters.
+fn restore_math(html: String, formulas: &[String]) -> String {
+    let mut output = html;
+    for (index, formula) in formulas.iter().enumerate() {
+        let token = format!("{MATH_PLACEHOLDER}{index}X");
+        output = output.replace(&token, &escape_text(formula));
+    }
     output
+}
+
+fn escape_text(text: &str) -> String {
+    let mut escaped = String::with_capacity(text.len());
+    for character in text.chars() {
+        match character {
+            '&' => escaped.push_str("&amp;"),
+            '<' => escaped.push_str("&lt;"),
+            '>' => escaped.push_str("&gt;"),
+            '"' => escaped.push_str("&quot;"),
+            other => escaped.push(other),
+        }
+    }
+    escaped
 }
 
 /// Keeps links with a safe scheme, and refuses the rest by dropping the destination.
@@ -160,6 +259,46 @@ fn is_safe_url(url: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn inline_math_keeps_underscores_and_asterisks() {
+        let html = to_html("设 $v_{rel}$ 与 $a*b$ 成正比");
+        assert!(html.contains("$v_{rel}$"), "got: {html}");
+        assert!(html.contains("$a*b$"), "got: {html}");
+        assert!(!html.contains("<em>"), "got: {html}");
+    }
+
+    #[test]
+    fn display_math_keeps_braces_and_newlines() {
+        let html = to_html("$$\n\\frac{a}{b}\n$$");
+        assert!(html.contains("$$\n\\frac{a}{b}\n$$"), "got: {html}");
+    }
+
+    #[test]
+    fn math_is_not_scanned_for_citations() {
+        let html = to_html("$x^{[p.3]}$");
+        assert!(!html.contains("class=\"citation\""), "got: {html}");
+        assert!(html.contains("$x^{[p.3]}$"), "got: {html}");
+    }
+
+    #[test]
+    fn an_escaped_dollar_stays_literal() {
+        let html = to_html("costs \\$5 today");
+        assert!(html.contains("$5 today"), "got: {html}");
+    }
+
+    #[test]
+    fn an_unpaired_dollar_is_plain_text() {
+        let html = to_html("costs $5 today");
+        assert!(html.contains("$5 today"), "got: {html}");
+        assert!(!html.contains("MATH"), "got: {html}");
+    }
+
+    #[test]
+    fn html_inside_math_is_escaped() {
+        let html = to_html("$a<b & c$");
+        assert!(html.contains("$a&lt;b &amp; c$"), "got: {html}");
+    }
 
     #[test]
     fn escapes_raw_html() {
