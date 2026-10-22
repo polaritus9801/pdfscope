@@ -10,6 +10,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Changed
 
+- Whole-document questions now carry the whole document; the page cap moved to 设置 → 阅读
+  (每次最多发送页数, 全部 by default).
+
+
 - Split the panel: the page manager and the settings sheet are their own modules, and the architecture
   doc lists what each interface module owns.
 

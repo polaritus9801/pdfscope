@@ -161,7 +161,7 @@ pub fn request_pages(
     total: u32,
     current: u32,
     selected: &[u32],
-    cap: usize,
+    cap: Option<usize>,
 ) -> (Vec<u32>, usize) {
     if total == 0 {
         return (Vec::new(), 0);
@@ -184,7 +184,10 @@ pub fn request_pages(
     };
 
     let wanted_count = wanted.len();
-    (wanted.into_iter().take(cap).collect(), wanted_count)
+    (
+        wanted.into_iter().take(cap.unwrap_or(usize::MAX)).collect(),
+        wanted_count,
+    )
 }
 
 #[cfg(test)]
@@ -193,7 +196,7 @@ mod request_tests {
 
     #[test]
     fn the_whole_document_is_capped_and_reported() {
-        let (pages, wanted) = request_pages(Scope::Document, 100, 7, &[], 20);
+        let (pages, wanted) = request_pages(Scope::Document, 100, 7, &[], Some(20));
         assert_eq!(pages.len(), 20);
         assert_eq!(pages.first(), Some(&1));
         assert_eq!(wanted, 100);
@@ -201,27 +204,33 @@ mod request_tests {
 
     #[test]
     fn the_current_page_ignores_the_cap() {
-        let (pages, wanted) = request_pages(Scope::Current, 300, 42, &[], 20);
+        let (pages, wanted) = request_pages(Scope::Current, 300, 42, &[], Some(20));
         assert_eq!(pages, vec![42]);
         assert_eq!(wanted, 1);
     }
 
     #[test]
     fn the_current_page_is_clamped_to_the_document() {
-        assert_eq!(request_pages(Scope::Current, 10, 99, &[], 20).0, vec![10]);
-        assert_eq!(request_pages(Scope::Current, 10, 0, &[], 20).0, vec![1]);
+        assert_eq!(
+            request_pages(Scope::Current, 10, 99, &[], Some(20)).0,
+            vec![10]
+        );
+        assert_eq!(
+            request_pages(Scope::Current, 10, 0, &[], Some(20)).0,
+            vec![1]
+        );
     }
 
     #[test]
     fn references_only_sends_nothing() {
-        let (pages, wanted) = request_pages(Scope::References, 50, 3, &[2, 4], 20);
+        let (pages, wanted) = request_pages(Scope::References, 50, 3, &[2, 4], Some(20));
         assert!(pages.is_empty());
         assert_eq!(wanted, 0);
     }
 
     #[test]
     fn the_selected_set_is_sorted_deduplicated_and_filtered() {
-        let (pages, wanted) = request_pages(Scope::Selected, 10, 1, &[5, 2, 5, 11, 0], 20);
+        let (pages, wanted) = request_pages(Scope::Selected, 10, 1, &[5, 2, 5, 11, 0], Some(20));
         assert_eq!(pages, vec![2, 5]);
         assert_eq!(wanted, 2);
     }
@@ -229,7 +238,7 @@ mod request_tests {
     #[test]
     fn a_large_selection_is_capped_and_reported() {
         let selected: Vec<u32> = (1..=50).collect();
-        let (pages, wanted) = request_pages(Scope::Selected, 100, 1, &selected, 20);
+        let (pages, wanted) = request_pages(Scope::Selected, 100, 1, &selected, Some(20));
         assert_eq!(pages.len(), 20);
         assert_eq!(wanted, 50);
     }
@@ -242,10 +251,18 @@ mod request_tests {
             Scope::References,
             Scope::Selected,
         ] {
-            let (pages, wanted) = request_pages(scope, 0, 1, &[1], 20);
+            let (pages, wanted) = request_pages(scope, 0, 1, &[1], Some(20));
             assert!(pages.is_empty());
             assert_eq!(wanted, 0);
         }
+    }
+
+    #[test]
+    fn no_cap_sends_the_whole_document() {
+        let (pages, wanted) = request_pages(Scope::Document, 240, 1, &[], None);
+        assert_eq!(pages.len(), 240);
+        assert_eq!(pages.last(), Some(&240));
+        assert_eq!(wanted, 240);
     }
 
     #[test]

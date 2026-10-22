@@ -179,6 +179,7 @@ pub fn AiPanel(
     reset_history: Callback<()>,
     scope_mode: RwSignal<u8>,
     page_set: RwSignal<Vec<u32>>,
+    page_limit: RwSignal<u32>,
 ) -> impl IntoView {
     let model = RwSignal::new("未配置".to_owned());
     let answer = RwSignal::new(String::new());
@@ -315,23 +316,30 @@ pub fn AiPanel(
             // Page text is fetched here, not in Rust: the renderer owns the document.
             let mut context: Vec<(u32, String)> = Vec::new();
 
+            let cap = match page_limit.get() {
+                0 => None,
+                limit => Some(limit as usize),
+            };
             let (selected, wanted) = pdfscope_core::pages::request_pages(
                 pdfscope_core::pages::Scope::from_byte(mode),
                 total,
                 current_page,
                 &explicit,
-                20,
+                cap,
             );
 
             if mode == 3 && explicit.is_empty() {
                 notice.set(Some("还没有选择页面，本次只发送引用".to_owned()));
-            } else if wanted > 20 {
+            } else if wanted > selected.len() {
                 let label = if mode == 0 {
                     "整份文档"
                 } else {
                     "已选页面"
                 };
-                notice.set(Some(format!("{label}共 {wanted} 页，这次只取了前 20 页")));
+                notice.set(Some(format!(
+                    "{label}共 {wanted} 页，本次只发送前 {} 页（可在设置里调大）",
+                    selected.len()
+                )));
             } else {
                 notice.set(None);
             }
@@ -1196,6 +1204,7 @@ pub fn AiPanel(
                 configured=configured
                 notify=notify
                 model=model
+                page_limit=page_limit
             />
 
         </aside>

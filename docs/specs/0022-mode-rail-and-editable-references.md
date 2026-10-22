@@ -214,7 +214,8 @@ ranges merge by set semantics so a wrong range can be corrected page by page.
 ## Assumptions
 
 - References and page scope remain session-only.
-- The 20-page cap stays for "whole document" until the provider-side limit is revisited.
+- The page cap is a setting, not a constant: 每次最多发送页数 is 全部 by default; 20 / 50 / 100 / 200
+  are offered for readers who want to spend fewer tokens. Truncation is reported, never silent.
 - Page-mode drag replaces unless a modifier says otherwise.
 
 ## Open questions
@@ -259,7 +260,7 @@ gesture changed from *replace* to *add* as part of that redesign, because replac
   in the design and that is not built.
 - **Scope icons and the manager.** The range field is gone: three icons choose 整份文档 / 仅当前页 /
   仅引用, and the request now selects pages from that mode (whole document and explicit pages are both
-  capped at 20, with a notice saying so instead of truncating silently). 管理页面引用 opens a dialog of
+  limited only by the configured 每次最多发送页数 (全部 by default), with a notice when it truncates). 管理页面引用 opens a dialog of
   thumbnails that scrolls the current page to the middle via `scrollIntoView({ block: "center" })`;
   clicking toggles a page (Alt subtracts), 清空 empties the set, and every change is undoable.
   Dragging from one thumbnail to another selects the range; Alt subtracts it.
@@ -412,6 +413,14 @@ unchanged:
 
 `docs/ARCHITECTURE.md` now carries the module map. The renderer (`viewer.js`, ~1900 lines) is the
 remaining monolith and is the next split.
+
+## Field fix: send the whole document
+
+The user's read is right: a question about the document should carry the document. The hard-coded
+20-page cap is gone. The concern it encoded (tokens, latency, cost) now lives in 设置 → 阅读 →
+每次最多发送页数, default 全部, with 20 / 50 / 100 / 200 as opt-in limits. The value persists through
+`page_limit` in the desktop settings (zero means all), and the composer still says when a limit cut
+the request.
 
 ## Deviations
 

@@ -15,6 +15,7 @@ pub(crate) fn SettingsSheet(
     configured: RwSignal<bool>,
     notify: Callback<String>,
     model: RwSignal<String>,
+    page_limit: RwSignal<u32>,
 ) -> impl IntoView {
     let testing = RwSignal::new(false);
 
@@ -45,6 +46,7 @@ pub(crate) fn SettingsSheet(
     let form_zoom = RwSignal::new("100".to_owned());
 
     let form_mode = RwSignal::new("continuous".to_owned());
+    let form_page_limit = RwSignal::new(0_u32);
 
     let form_spread_offset = RwSignal::new(false);
 
@@ -93,6 +95,12 @@ pub(crate) fn SettingsSheet(
                 );
                 form_mode
                     .set(text_of(&value, "page_mode").unwrap_or_else(|| "continuous".to_owned()));
+                form_page_limit.set(
+                    number_of(&value, "page_limit")
+                        .map(|limit| limit as u32)
+                        .unwrap_or(0),
+                );
+                page_limit.set(form_page_limit.get());
                 let _ = crate::call("setPageMode", &[JsValue::from_str(&form_mode.get())]);
                 let _ = crate::call(
                     "setDefaultZoom",
@@ -182,6 +190,11 @@ pub(crate) fn SettingsSheet(
         );
         let _ = js_sys::Reflect::set(
             &payload,
+            &JsValue::from_str("page_limit"),
+            &JsValue::from_f64(f64::from(form_page_limit.get())),
+        );
+        let _ = js_sys::Reflect::set(
+            &payload,
             &JsValue::from_str("default_zoom"),
             &JsValue::from_f64(form_zoom.get().parse::<f64>().unwrap_or(100.0)),
         );
@@ -213,6 +226,7 @@ pub(crate) fn SettingsSheet(
                         model.set(form_model.get());
                         apply_theme(&form_theme.get());
                         apply_font_size(&form_font_size.get());
+                        page_limit.set(form_page_limit.get());
                         let _ = crate::call(
                             "setRememberPosition",
                             &[JsValue::from_bool(form_remember.get())],
@@ -386,6 +400,33 @@ pub(crate) fn SettingsSheet(
                                                 </option>
                                             </select>
                                         </label>
+
+                                        <label class="settings-row">
+                                            <span>"每次最多发送页数"</span>
+                                            <select on:change=move |event| {
+                                                form_page_limit
+                                                    .set(event_target_value(&event).parse().unwrap_or(0))
+                                            }>
+                                                <option value="0" selected=move || form_page_limit.get() == 0>
+                                                    "全部"
+                                                </option>
+                                                <option value="20" selected=move || form_page_limit.get() == 20>
+                                                    "20 页"
+                                                </option>
+                                                <option value="50" selected=move || form_page_limit.get() == 50>
+                                                    "50 页"
+                                                </option>
+                                                <option value="100" selected=move || form_page_limit.get() == 100>
+                                                    "100 页"
+                                                </option>
+                                                <option value="200" selected=move || form_page_limit.get() == 200>
+                                                    "200 页"
+                                                </option>
+                                            </select>
+                                        </label>
+                                        <p class="settings-hint">
+                                            "整份文档提问时，超过上限只发送前面的页；设小可以省 token。"
+                                        </p>
 
                                         <label class="settings-row">
                                             <span>"双页奇偶偏移"</span>

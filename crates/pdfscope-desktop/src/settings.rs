@@ -80,6 +80,9 @@ pub(crate) struct Settings {
     /// Shift the spread pairing by one page.
     #[serde(default)]
     pub(crate) spread_offset: bool,
+    /// Most pages one question may carry; zero means the whole document.
+    #[serde(default)]
+    pub(crate) page_limit: u32,
     /// Last window geometry, when the shell has recorded one.
     #[serde(default)]
     pub(crate) window: Option<WindowState>,
@@ -124,6 +127,7 @@ impl Default for Settings {
             default_zoom: default_zoom(),
             page_mode: default_mode(),
             spread_offset: false,
+            page_limit: 0,
             window: None,
         }
     }
@@ -164,6 +168,9 @@ pub(crate) struct SettingsInput {
     /// Shift the spread pairing by one page.
     #[serde(default)]
     pub(crate) spread_offset: Option<bool>,
+    /// Most pages one question may carry; zero or absent means the whole document.
+    #[serde(default)]
+    pub(crate) page_limit: Option<u32>,
     /// A new key, when the user typed one. `None` keeps the stored key.
     pub(crate) api_key: Option<String>,
 }
@@ -195,6 +202,8 @@ pub(crate) struct SettingsView {
     pub(crate) page_mode: String,
     /// Shift the spread pairing by one page.
     pub(crate) spread_offset: bool,
+    /// Most pages one question may carry; zero means the whole document.
+    pub(crate) page_limit: u32,
     /// Whether a key is stored. The key itself never crosses this boundary.
     pub(crate) has_key: bool,
 }
@@ -284,6 +293,7 @@ pub(crate) fn load_settings(app: tauri::AppHandle) -> Result<SettingsView, Strin
         default_zoom: settings.default_zoom,
         page_mode: settings.page_mode,
         spread_offset: settings.spread_offset,
+        page_limit: settings.page_limit,
         has_key: has_key(&app),
     })
 }
@@ -321,6 +331,7 @@ pub(crate) fn save_settings(app: tauri::AppHandle, settings: SettingsInput) -> R
         default_zoom: settings.default_zoom.unwrap_or_else(default_zoom),
         page_mode: settings.page_mode.unwrap_or_else(default_mode),
         spread_offset: settings.spread_offset.unwrap_or(false),
+        page_limit: settings.page_limit.unwrap_or(0),
         window: stored_window,
     };
 
