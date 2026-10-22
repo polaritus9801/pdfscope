@@ -172,7 +172,9 @@ fn PageView(
     pinned_ref: RwSignal<Option<(u8, u64)>>,
 ) -> impl IntoView {
     // kind, id, start x/y, start rect, page width/height, whether undo was recorded
-    type Drag = (u8, u64, f64, f64, (f64, f64, f64, f64), f64, f64, bool);
+    // kind, id, start x/y, start rect, page w/h, undo recorded, mode (0 move, 1 left, 2 right,
+    // 3 top, 4 bottom, 5 top-left, 6 top-right, 7 bottom-left, 8 bottom-right)
+    type Drag = (u8, u64, f64, f64, (f64, f64, f64, f64), f64, f64, bool, u8);
     let drag = RwSignal::new(Option::<Drag>::None);
     let drag_moved = RwSignal::new(false);
     let finish_drag = move |_| {
@@ -180,39 +182,50 @@ fn PageView(
         drag_moved.set(false);
     };
 
-    let move_frame =
-        move |event: web_sys::PointerEvent, kind: u8, id: u64, start: (f64, f64, f64, f64)| {
-            let Some(target) = event
-                .current_target()
-                .and_then(|target| target.dyn_into::<web_sys::Element>().ok())
-            else {
-                return;
-            };
-            let Some(page) = target.parent_element() else {
-                return;
-            };
-            let box_rect = page.get_bounding_client_rect();
-            if box_rect.width() <= 0.0 || box_rect.height() <= 0.0 {
-                return;
-            }
-            drag_moved.set(false);
-            drag.update(|current| {
-                *current = Some((
-                    kind,
-                    id,
-                    event.client_x() as f64,
-                    event.client_y() as f64,
-                    start,
-                    box_rect.width(),
-                    box_rect.height(),
-                    false,
-                ))
-            });
-            event.prevent_default();
+    let begin_drag = move |event: web_sys::PointerEvent,
+                           kind: u8,
+                           id: u64,
+                           start: (f64, f64, f64, f64),
+                           mode: u8| {
+        let Some(target) = event
+            .current_target()
+            .and_then(|target| target.dyn_into::<web_sys::Element>().ok())
+        else {
+            return;
         };
+        // Capture on the frame, not the handle: one set of move/up handlers serves every handle.
+        let frame = if mode == 0 {
+            target.clone()
+        } else {
+            target.parent_element().unwrap_or(target.clone())
+        };
+        let Some(page) = frame.parent_element() else {
+            return;
+        };
+        let box_rect = page.get_bounding_client_rect();
+        if box_rect.width() <= 0.0 || box_rect.height() <= 0.0 {
+            return;
+        }
+        if let Some(element) = frame.dyn_into::<web_sys::HtmlElement>().ok() {
+            let _ = element.set_pointer_capture(event.pointer_id());
+        }
+        drag_moved.set(false);
+        drag.set(Some((
+            kind,
+            id,
+            event.client_x() as f64,
+            event.client_y() as f64,
+            start,
+            box_rect.width(),
+            box_rect.height(),
+            false,
+            mode,
+        )));
+        event.prevent_default();
+    };
 
     let drag_move = move |event: web_sys::PointerEvent| {
-        let Some((kind, id, start_x, start_y, start, page_w, page_h, _)) = drag.get() else {
+        let Some((kind, id, start_x, start_y, start, page_w, page_h, _, mode)) = drag.get() else {
             return;
         };
         if !drag_moved.get() {
@@ -224,11 +237,43 @@ fn PageView(
             undo_push.run(());
             drag_moved.set(true);
         }
+
         let dx = (event.client_x() as f64 - start_x) / page_w;
         let dy = (event.client_y() as f64 - start_y) / page_h;
-        let (mut x, mut y, width, height) = start;
-        x = (x + dx).clamp(0.0, 1.0 - width);
-        y = (y + dy).clamp(0.0, 1.0 - height);
+        let (start_x_rect, start_y_rect, start_w, start_h) = start;
+        let minimum = 0.01_f64;
+
+        let mut x = start_x_rect;
+        let mut y = start_y_rect;
+        let mut width = start_w;
+        let mut height = start_h;
+
+        let left = matches!(mode, 1 | 5 | 7);
+        let right = matches!(mode, 2 | 6 | 8);
+        let top = matches!(mode, 3 | 5 | 6);
+        let bottom = matches!(mode, 4 | 7 | 8);
+
+        if left {
+            let edge = (start_x_rect + dx).clamp(0.0, start_x_rect + start_w - minimum);
+            width = start_w + (start_x_rect - edge);
+            x = edge;
+        }
+        if right {
+            width = (start_w + dx).clamp(minimum, 1.0 - start_x_rect);
+        }
+        if top {
+            let edge = (start_y_rect + dy).clamp(0.0, start_y_rect + start_h - minimum);
+            height = start_h + (start_y_rect - edge);
+            y = edge;
+        }
+        if bottom {
+            height = (start_h + dy).clamp(minimum, 1.0 - start_y_rect);
+        }
+        if mode == 0 {
+            x = (start_x_rect + dx).clamp(0.0, 1.0 - start_w);
+            y = (start_y_rect + dy).clamp(0.0, 1.0 - start_h);
+        }
+
         if kind == 0 {
             passages.update(|list| {
                 if let Some(entry) = list.iter_mut().find(|entry| entry.id == id) {
@@ -320,7 +365,7 @@ fn PageView(
                                         return;
                                     };
                                     let _ = target.set_pointer_capture(event.pointer_id());
-                                    move_frame(event, kind, id, rect);
+                                    begin_drag(event, kind, id, rect, 0);
                                 }
                                 on:pointermove=drag_move
                                 on:pointerup=move |_| finish_drag(())
@@ -351,6 +396,45 @@ fn PageView(
                                 >
                                     "✕"
                                 </button>
+                                {if kind == 0 {
+                                    view! {
+                                        <div
+                                            class="ref-handle ref-handle-open ref-handle-left"
+                                            title="调整起点"
+                                            on:pointerdown=move |event: web_sys::PointerEvent| {
+                                                event.stop_propagation();
+                                                begin_drag(event, kind, id, rect, 1);
+                                            }
+                                            on:click=move |event: web_sys::MouseEvent| event.stop_propagation()
+                                        >
+                                            "["
+                                        </div>
+                                        <div
+                                            class="ref-handle ref-handle-open ref-handle-right"
+                                            title="调整终点"
+                                            on:pointerdown=move |event: web_sys::PointerEvent| {
+                                                event.stop_propagation();
+                                                begin_drag(event, kind, id, rect, 2);
+                                            }
+                                            on:click=move |event: web_sys::MouseEvent| event.stop_propagation()
+                                        >
+                                            "]"
+                                        </div>
+                                    }
+                                        .into_any()
+                                } else {
+                                    view! {
+                                        <div class="ref-dot dot-nw" on:pointerdown=move |event: web_sys::PointerEvent| { event.stop_propagation(); begin_drag(event, kind, id, rect, 5); }></div>
+                                        <div class="ref-dot dot-n" on:pointerdown=move |event: web_sys::PointerEvent| { event.stop_propagation(); begin_drag(event, kind, id, rect, 3); }></div>
+                                        <div class="ref-dot dot-ne" on:pointerdown=move |event: web_sys::PointerEvent| { event.stop_propagation(); begin_drag(event, kind, id, rect, 6); }></div>
+                                        <div class="ref-dot dot-w" on:pointerdown=move |event: web_sys::PointerEvent| { event.stop_propagation(); begin_drag(event, kind, id, rect, 1); }></div>
+                                        <div class="ref-dot dot-e" on:pointerdown=move |event: web_sys::PointerEvent| { event.stop_propagation(); begin_drag(event, kind, id, rect, 2); }></div>
+                                        <div class="ref-dot dot-sw" on:pointerdown=move |event: web_sys::PointerEvent| { event.stop_propagation(); begin_drag(event, kind, id, rect, 7); }></div>
+                                        <div class="ref-dot dot-s" on:pointerdown=move |event: web_sys::PointerEvent| { event.stop_propagation(); begin_drag(event, kind, id, rect, 4); }></div>
+                                        <div class="ref-dot dot-se" on:pointerdown=move |event: web_sys::PointerEvent| { event.stop_propagation(); begin_drag(event, kind, id, rect, 8); }></div>
+                                    }
+                                        .into_any()
+                                }}
                                 {move_handle}
                             </div>
                         }

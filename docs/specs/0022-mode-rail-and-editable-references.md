@@ -238,13 +238,18 @@ gesture changed from *replace* to *add* as part of that redesign, because replac
   marks it active, clicking pins it (a 1 px accent outline shows why it persists). The white circular
   ✕ sits at the top-right with its top edge on the reference's top edge and deletes (undoable); regions
   also show a move handle. Dragging the frame moves the reference, clamped to the page, and the first
-  6 px of movement records one undo entry. Resizing and text re-anchoring remain, as do the region's
-  eight edge handles.
+  6 px of movement records one undo entry.
+- **B. Resizing landed.** A quote shows `[` and `]` on its ends; a region shows eight dots (corners and
+  edges). Dragging either resizes in that direction, clamped to the page with a 1 % minimum; the first
+  6 px records one undo entry, shared with moving. Text re-anchoring (re-reading the quote after the
+  handles move) remains.
 
 ## Deviations
 
 - The frame itself is the move surface; the region's circular handle is an affordance, not a separate
-  drag target. Resizing handles are not built yet.
+  drag target.
+- Resizing a quote changes its rectangle but not yet its text; the quote is re-read from the text layer
+  in the next slice.
 
 - Dragging in page mode adds rather than replaces. This supersedes the earlier replace-by-default
   answer, because replace made the middle-range case destructive; 清空 is the only replace gesture.

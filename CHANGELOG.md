@@ -70,6 +70,9 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Reference resizing: quote brackets at both ends, eight dots on a region; all clamped and undoable.
+
+
 - Reference frames on the page: hover highlights, click pins, ✕ deletes, drag moves; all undoable.
 
 

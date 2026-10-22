@@ -2085,3 +2085,50 @@ mark.find-hit {
 .ref-frame.active {
   cursor: grab;
 }
+
+/* Resize affordances: brackets for a quote, dots for a region. */
+.ref-handle-open {
+  width: 16px;  /* size */
+  height: 22px;  /* size */
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  line-height: 1;
+}
+
+.ref-handle-left {
+  top: 50%;
+  left: -8px;  /* size */
+  transform: translateY(-50%);
+  cursor: ew-resize;
+}
+
+.ref-handle-right {
+  top: 50%;
+  right: -8px;  /* size */
+  transform: translateY(-50%);
+  cursor: ew-resize;
+}
+
+.ref-dot {
+  position: absolute;
+  display: none;
+  width: 10px;  /* size */
+  height: 10px;  /* size */
+  background: #ffffff;
+  border: 1px solid var(--accent);
+  border-radius: 50%;
+  z-index: 5;
+}
+
+.ref-frame.active .ref-dot {
+  display: block;
+}
+
+.dot-nw { top: -5px; left: -5px; cursor: nwse-resize; }  /* size */
+.dot-n  { top: -5px; left: 50%; transform: translateX(-50%); cursor: ns-resize; }  /* size */
+.dot-ne { top: -5px; right: -5px; cursor: nesw-resize; }  /* size */
+.dot-w  { top: 50%; left: -5px; transform: translateY(-50%); cursor: ew-resize; }  /* size */
+.dot-e  { top: 50%; right: -5px; transform: translateY(-50%); cursor: ew-resize; }  /* size */
+.dot-sw { bottom: -5px; left: -5px; cursor: nesw-resize; }  /* size */
+.dot-s  { bottom: -5px; left: 50%; transform: translateX(-50%); cursor: ns-resize; }  /* size */
+.dot-se { bottom: -5px; right: -5px; cursor: nwse-resize; }  /* size */
