@@ -31,6 +31,8 @@ let documentName = "";
 let rememberPosition = true;
 let defaultZoom = 100;
 let pageMode = "continuous";
+let toolMode = "pointer";
+let gestureShift = false;
 let spreadOffset = false;
 let pendingDefaultZoom = 0;
 let restorePage = 0;
@@ -1251,9 +1253,19 @@ function reportSelection() {
       return;
     }
     hadSelection = true;
-    window.__pdfscopeSelection?.(payload);
+    window.__pdfscopeSelection?.({
+      ...payload,
+      auto: toolMode === "text" || gestureShift,
+    });
   }, 120);
 }
+
+document.addEventListener("click", (event) => {
+  if (toolMode !== "pages") return;
+  const page = pageShellOf(event.target);
+  if (!page) return;
+  window.__pdfscopeTogglePage?.(Number(page.dataset.page));
+});
 
 document.addEventListener("selectionchange", reportSelection);
 document.addEventListener("mouseup", reportSelection);
@@ -1345,6 +1357,36 @@ function disarmCapture() {
   stageElement()?.classList.remove("capturing");
 }
 
+document.addEventListener(
+  "pointerdown",
+  (event) => {
+    gestureShift = event.shiftKey;
+
+    // Modifier borrowing: Alt draws a box, Cmd/Ctrl clicks a page, without changing the tool.
+    if (event.altKey && toolMode === "pointer") {
+      const page = pageShellOf(event.target);
+      if (page) beginCapture();
+    }
+
+    if (event.metaKey || event.ctrlKey) {
+      const page = pageShellOf(event.target);
+      if (page) {
+        const number = Number(page.dataset.page);
+        const startX = event.clientX;
+        const startY = event.clientY;
+        const once = (up) => {
+          document.removeEventListener("pointerup", once);
+          if (Math.hypot(up.clientX - startX, up.clientY - startY) < 4) {
+            window.__pdfscopeTogglePage?.(number);
+          }
+        };
+        document.addEventListener("pointerup", once);
+      }
+    }
+  },
+  true,
+);
+
 document.addEventListener("pointerdown", (event) => {
   if (!captureArmed) return;
   const page = pageShellOf(event.target);
@@ -1373,6 +1415,9 @@ document.addEventListener("pointerup", async (event) => {
   marqueeStart = null;
   clearMarquee();
   disarmCapture();
+  if (toolMode === "box") {
+    beginCapture();
+  }
 
   if (!page || !end || !start) return;
 
@@ -1464,6 +1509,16 @@ window.PDFScope = {
   setPageMode(mode) {
     pageMode = ["single", "spread"].includes(mode) ? mode : "continuous";
     applyPageMode();
+  },
+
+  /// pointer | text | box | pages. Text and box tools stay active until pointer is chosen.
+  setTool(name) {
+    toolMode = ["text", "box", "pages"].includes(name) ? name : "pointer";
+    if (toolMode === "box") {
+      beginCapture();
+    } else {
+      disarmCapture();
+    }
   },
 
   /// Shifts the spread pairing by one page: page 1 pairs with 2 instead of standing alone.

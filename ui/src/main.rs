@@ -106,6 +106,12 @@ fn read_number(value: &JsValue, key: &str) -> Option<f64> {
         .as_f64()
 }
 
+fn read_flag(value: &JsValue, key: &str) -> Option<bool> {
+    js_sys::Reflect::get(value, &JsValue::from_str(key))
+        .ok()?
+        .as_bool()
+}
+
 fn read_string(value: &JsValue, key: &str) -> Option<String> {
     js_sys::Reflect::get(value, &JsValue::from_str(key))
         .ok()?
@@ -262,8 +268,20 @@ fn App() -> impl IntoView {
     let error = RwSignal::new(Option::<String>::None);
     let settings_open = RwSignal::new(false);
     let reading = RwSignal::new(false);
-    // 0 text, 1 box, 2 page range: the rail's active tool.
+    // 0 pointer, 1 text, 2 box, 3 pages: the rail's active tool.
     let tool = RwSignal::new(0_u8);
+    let page_set = RwSignal::new(Vec::<u32>::new());
+
+    let choose_tool = move |next: u8| {
+        tool.set(next);
+        let name = match next {
+            1 => "text",
+            2 => "box",
+            3 => "pages",
+            _ => "pointer",
+        };
+        let _ = call("setTool", &[JsValue::from_str(name)]);
+    };
     // Starts true so the banner does not flash before settings load.
     let configured = RwSignal::new(true);
     let toasts = RwSignal::new(Vec::<(f64, String)>::new());
@@ -539,6 +557,11 @@ fn App() -> impl IntoView {
             return;
         }
 
+        if event.key() == "Escape" && tool.get() != 0 {
+            choose_tool(0);
+            return;
+        }
+
         if event.key() == "Escape" && reading.get() {
             reading.set(false);
             return;
@@ -591,7 +614,21 @@ fn App() -> impl IntoView {
     // The renderer reports a selection through one global callback, registered once.
     Effect::new(move |_| {
         let callback = Closure::<dyn Fn(JsValue)>::new(move |value: JsValue| {
-            if let Some(parsed) = parse_selection(&value) {
+            let Some(parsed) = parse_selection(&value) else {
+                return;
+            };
+            let auto = read_flag(&value, "auto").unwrap_or(false);
+            if auto {
+                passages.update(|list| {
+                    list.push(Passage {
+                        page: parsed.page,
+                        quote: parsed.text.clone(),
+                        rect: parsed.rect,
+                    })
+                });
+                selection.set(None);
+                let _ = call("clearSelection", &[]);
+            } else {
                 selection.set(Some(parsed));
             }
         });
@@ -599,6 +636,32 @@ fn App() -> impl IntoView {
             let _ = js_sys::Reflect::set(
                 &window,
                 &JsValue::from_str("__pdfscopeSelection"),
+                callback.as_ref(),
+            );
+        }
+        callback.forget();
+    });
+
+    // Page clicks in page mode toggle a page; the set is the document scope.
+    Effect::new(move |_| {
+        let callback = Closure::<dyn Fn(f64)>::new(move |page: f64| {
+            let page = page as u32;
+            if page == 0 {
+                return;
+            }
+            page_set.update(|set| {
+                if let Some(index) = set.iter().position(|entry| *entry == page) {
+                    set.remove(index);
+                } else {
+                    set.push(page);
+                    set.sort_unstable();
+                }
+            });
+        });
+        if let Some(window) = web_sys::window() {
+            let _ = js_sys::Reflect::set(
+                &window,
+                &JsValue::from_str("__pdfscopeTogglePage"),
                 callback.as_ref(),
             );
         }
@@ -642,9 +705,8 @@ fn App() -> impl IntoView {
     // The renderer reports arming; the rail follows, including when Esc disarms it.
     Effect::new(move |_| {
         let callback = Closure::<dyn Fn(bool)>::new(move |armed: bool| {
-            if armed {
-                tool.set(1);
-            } else if tool.get() == 1 {
+            // Arming can be a borrowed gesture (Alt); it must not change the chosen tool.
+            if !armed && tool.get() == 2 {
                 tool.set(0);
             }
         });
@@ -1013,59 +1075,53 @@ fn App() -> impl IntoView {
                     </aside>
                 </Show>
 
-                <div class="float-tools">
+                <div class="tool-rail">
                     <button
-                        class="tool"
+                        class="rail-pointer"
                         class:active=move || tool.get() == 0
-                        title="文字：拖选正文，选中后加入引用"
-                        on:click=move |_| {
-                            tool.set(0);
-                            let _ = call("disarmCapture", &[]);
-                        }
+                        title="指针：正常阅读与选择（V）"
+                        on:click=move |_| choose_tool(0)
                     >
-                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
-                            <path d="M4 6h16M4 12h11M4 18h16" />
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M5 3l6.5 16 2.4-6.1L20 10.5 5 3z" />
                         </svg>
                     </button>
-                    <button
-                        class="tool"
-                        class:active=move || tool.get() == 1
-                        title="框选：框住图表或公式，再提问"
-                        prop:disabled=move || !ready.get()
-                        on:click=move |_| {
-                            if tool.get() == 1 {
-                                tool.set(0);
-                                let _ = call("disarmCapture", &[]);
-                            } else {
-                                tool.set(1);
-                                let _ = call("beginCapture", &[]);
-                            }
-                        }
-                    >
-                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
-                        </svg>
-                    </button>
-                    <button
-                        class="tool"
-                        class:active=move || tool.get() == 2
-                        title="页码：把整页纳入提问范围"
-                        on:click=move |_| {
-                            tool.set(2);
-                            if let Some(input) = web_sys::window()
-                                .and_then(|window| window.document())
-                                .and_then(|document| document.get_element_by_id("range-input"))
-                                .and_then(|element| element.dyn_into::<HtmlInputElement>().ok())
-                            {
-                                let _ = input.focus();
-                            }
-                        }
-                    >
-                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="4" y="3" width="12" height="16" rx="1.5" />
-                            <path d="M8 21h10a2 2 0 0 0 2-2V8" />
-                        </svg>
-                    </button>
+                    <div class="rail-capsule">
+                        <button
+                            class="rail-tool"
+                            class:active=move || tool.get() == 1
+                            title="文字：划选即加入引用（T · ⇧ 临时）"
+                            prop:disabled=move || !ready.get()
+                            on:click=move |_| choose_tool(1)
+                        >
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+                                <path d="M4 6h16M4 12h11M4 18h16" />
+                            </svg>
+                        </button>
+                        <button
+                            class="rail-tool"
+                            class:active=move || tool.get() == 2
+                            title="框选：拖出矩形（B · ⌥ 临时）"
+                            prop:disabled=move || !ready.get()
+                            on:click=move |_| choose_tool(2)
+                        >
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
+                            </svg>
+                        </button>
+                        <button
+                            class="rail-tool"
+                            class:active=move || tool.get() == 3
+                            title="页面：点击或拖动选择页面（D · ⌘ 临时）"
+                            prop:disabled=move || !ready.get()
+                            on:click=move |_| choose_tool(3)
+                        >
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="5" y="3" width="12" height="16" rx="1.5" />
+                                <path d="M9 21h8a2 2 0 0 0 2-2V8" />
+                            </svg>
+                        </button>
+                    </div>
                 </div>
             <main
                 class="stage"

@@ -70,6 +70,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- The four-tool rail: pointer plus a sticky text/box/pages capsule, `V/T/B/D` shortcuts, `Esc` back to
+  pointer, and modifier borrowing (Shift text, Alt box, Cmd/Ctrl page toggle).
+
+
 - 双页奇偶偏移: the cover can pair with page 2 instead of standing alone; the choice persists.
 
 

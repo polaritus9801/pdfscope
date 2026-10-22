@@ -949,45 +949,69 @@ body {
 }
 
 /* #6: floating tool rail */
-.float-tools {
-  /* Part of the layout, not an overlay: pages keep centred and never slide underneath. */
+.tool-rail {
   flex: none;
   align-self: flex-start;
   margin: var(--space-4) 0 var(--space-4) var(--space-4);
   z-index: 8;
   display: flex;
   flex-direction: column;
-  gap: 2px;  /* size */
-  padding: var(--space-1);
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.rail-pointer,
+.rail-tool {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;  /* size */
+  height: 40px;  /* size */
+  padding: 0;
+  color: var(--ink-muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.rail-pointer {
+  border-radius: 50%;
+  box-shadow: var(--shadow-2);
+}
+
+.rail-capsule {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-full);
   box-shadow: var(--shadow-2);
 }
 
-.tool {
-  width: var(--space-6);  /* size */
-  height: var(--space-6);  /* size */
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font: inherit;
-  color: var(--ink-muted);
-  background: transparent;
+.rail-capsule .rail-tool {
   border: none;
-  border-radius: 50%;
-  cursor: pointer;
+  border-radius: 0;
 }
 
-.tool:hover:not(:disabled) {
+.rail-capsule .rail-tool + .rail-tool {
+  border-top: 1px solid var(--border);
+}
+
+.rail-pointer:hover:not(:disabled),
+.rail-tool:hover:not(:disabled) {
   background: var(--accent-soft);
   color: var(--accent);
 }
 
-.tool:disabled {
-  color: var(--ink-faint);
-  cursor: default;
+.rail-pointer.active,
+.rail-tool.active {
+  background: var(--accent-soft);
+  color: var(--accent);
 }
+
+
+
 
 /* #8: references live in the composer */
 .ref-row {
@@ -1952,14 +1976,7 @@ mark.find-hit {
   border-radius: 2px;  /* size */
 }
 
-.tool.active {
-  background: var(--accent-soft);
-  color: var(--accent);
-}
 
-.tool.active:hover:not(:disabled) {
-  background: var(--accent-soft);
-}
 
 .error-card {
   display: flex;

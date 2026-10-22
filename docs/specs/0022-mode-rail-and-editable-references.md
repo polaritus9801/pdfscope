@@ -224,6 +224,15 @@ spread bar on the outer edge, and the middle-range redesign delegated to this do
 gesture changed from *replace* to *add* as part of that redesign, because replacing made the
 1–3 / 9–11 → 6–7 case impossible without clearing first.
 
+## Progress
+
+- **A. Rail and tools — first cut landed.** Four controls: a circular pointer and a capsule of text,
+  box and pages. `V/T/B/D` switch tools and are ignored while a text field has focus; `Escape` returns
+  to pointer. Box mode is sticky (re-arms after each capture); text mode auto-adds a passage instead of
+  showing the bar, and holding Shift does the same for one gesture. `⌘`/`Ctrl` clicks a page to toggle
+  it, `⌥`/`Alt` borrows a marquee for one gesture. The page set is collected but not yet drawn.
+- **B. Editable references** and **C. page scope visuals** remain.
+
 ## Deviations
 
 - Dragging in page mode adds rather than replaces. This supersedes the earlier replace-by-default
