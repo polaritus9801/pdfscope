@@ -31,6 +31,7 @@ let documentName = "";
 let rememberPosition = true;
 let defaultZoom = 100;
 let pageMode = "continuous";
+let spreadOffset = false;
 let pendingDefaultZoom = 0;
 let restorePage = 0;
 let initialized = false;
@@ -162,6 +163,12 @@ function visiblePages() {
   const total = document_?.numPages ?? 0;
   const current = Math.min(Math.max(currentPage, 1), total || 1);
   if (pageMode === "single") return new Set([current]);
+
+  if (spreadOffset) {
+    const left = current % 2 === 1 ? current : current - 1;
+    return new Set([left, Math.min(left + 1, total)]);
+  }
+
   if (current === 1) return new Set([1]);
   if (current % 2 === 0) return new Set([current, Math.min(current + 1, total)]);
   return new Set([current - 1, current]);
@@ -1457,6 +1464,14 @@ window.PDFScope = {
   setPageMode(mode) {
     pageMode = ["single", "spread"].includes(mode) ? mode : "continuous";
     applyPageMode();
+  },
+
+  /// Shifts the spread pairing by one page: page 1 pairs with 2 instead of standing alone.
+  setSpreadOffset(value) {
+    spreadOffset = Boolean(value);
+    if (pageMode === "spread") {
+      markCurrentPage();
+    }
   },
 
   /// The zoom a freshly opened document starts at, as a percentage of fit width.

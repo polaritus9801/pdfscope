@@ -139,8 +139,15 @@ selection cannot point at a hidden page.
 - **Spread implemented**: page 1 alone, then (2, 3), (4, 5)…; at page 2 the pair renders side by side
   (388 × 549 each in an 800 px stage). Both sheets render through an explicit window: in paged modes
   the scroll no longer decides the page, so entering the mode cannot jump to the last page.
-- **Coverage**: the smoke suite switches to single (one page at the top), back to continuous, then to
-  spread at page 2 and asserts pages 2 and 3 sit side by side. **84 checks**.
+- **Offset implemented**: `spread_offset` (settings → 阅读 → 双页奇偶偏移) lets the cover pair with
+  page 2 instead of standing alone; the preference persists and applies on load.
+- **Coverage**: the smoke suite switches to single (one page at the top), back to continuous, to
+  spread at page 2 (pages 2 and 3 side by side), then enables the offset and asserts page 1 pairs with
+  page 2. **85 checks**, run before the browser was closed.
+
+## Evidence
+
+`docs/images/reader-spread.png` — the facing pair at page 2 in light mode.
 
 ## Deviations
 
@@ -160,7 +167,9 @@ selection cannot point at a hidden page.
   (each sheet at half width), continuous 100 %. Zoom buttons are ignored while paged and the column's
   zoom returns when continuous does.
 - Paging is by page, not by spread: the pair window changes when the current page crosses a pair
-  boundary. The pairing offset control from the design is not built.
+  boundary.
+- The offset control lives in settings rather than the header, and has no shortcut yet; the design
+  asks for both (`⌘⇧O` in the header, spread only).
 - Mode changes reset the scroll; a finer anchor (keep the same paragraph) is not implemented.
 
 ## Open questions

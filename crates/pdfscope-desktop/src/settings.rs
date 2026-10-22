@@ -74,9 +74,12 @@ pub(crate) struct Settings {
     /// Zoom a newly opened document starts at, as a percentage of fit width.
     #[serde(default = "default_zoom")]
     pub(crate) default_zoom: u16,
-    /// `continuous` or `single`.
+    /// `continuous`, `single` or `spread`.
     #[serde(default = "default_mode")]
     pub(crate) page_mode: String,
+    /// Shift the spread pairing by one page.
+    #[serde(default)]
+    pub(crate) spread_offset: bool,
     /// Last window geometry, when the shell has recorded one.
     #[serde(default)]
     pub(crate) window: Option<WindowState>,
@@ -120,6 +123,7 @@ impl Default for Settings {
             remember_position: true,
             default_zoom: default_zoom(),
             page_mode: default_mode(),
+            spread_offset: false,
             window: None,
         }
     }
@@ -154,9 +158,12 @@ pub(crate) struct SettingsInput {
     /// Zoom a newly opened document starts at.
     #[serde(default)]
     pub(crate) default_zoom: Option<u16>,
-    /// `continuous` or `single`.
+    /// `continuous`, `single` or `spread`.
     #[serde(default)]
     pub(crate) page_mode: Option<String>,
+    /// Shift the spread pairing by one page.
+    #[serde(default)]
+    pub(crate) spread_offset: Option<bool>,
     /// A new key, when the user typed one. `None` keeps the stored key.
     pub(crate) api_key: Option<String>,
 }
@@ -184,8 +191,10 @@ pub(crate) struct SettingsView {
     pub(crate) remember_position: bool,
     /// Zoom a newly opened document starts at.
     pub(crate) default_zoom: u16,
-    /// `continuous` or `single`.
+    /// `continuous`, `single` or `spread`.
     pub(crate) page_mode: String,
+    /// Shift the spread pairing by one page.
+    pub(crate) spread_offset: bool,
     /// Whether a key is stored. The key itself never crosses this boundary.
     pub(crate) has_key: bool,
 }
@@ -274,6 +283,7 @@ pub(crate) fn load_settings(app: tauri::AppHandle) -> Result<SettingsView, Strin
         remember_position: settings.remember_position,
         default_zoom: settings.default_zoom,
         page_mode: settings.page_mode,
+        spread_offset: settings.spread_offset,
         has_key: has_key(&app),
     })
 }
@@ -310,6 +320,7 @@ pub(crate) fn save_settings(app: tauri::AppHandle, settings: SettingsInput) -> R
         remember_position: settings.remember_position.unwrap_or(true),
         default_zoom: settings.default_zoom.unwrap_or_else(default_zoom),
         page_mode: settings.page_mode.unwrap_or_else(default_mode),
+        spread_offset: settings.spread_offset.unwrap_or(false),
         window: stored_window,
     };
 

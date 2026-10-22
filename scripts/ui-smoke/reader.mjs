@@ -1,5 +1,8 @@
 // Drives the continuous reader in headless Chrome.
 //
+// Never kill Chrome by a broad pattern from around this script: it shares the machine with the
+// reader's own browser. Kill only the process this script spawned, which it already does.
+//
 // The fixture is generated here (40 text pages by default, one landscape page) so the test has no
 // binary dependency. `READER_PAGES=400` reuses the same checks at the spec's acceptance size. It verifies the four paths that share the scroll model — selection, box capture,
 // reference tints and [p.N] citation jumps — and writes the screenshots named in the spec.
@@ -341,6 +344,23 @@ try {
   );
   check(true, "spread shows pages 2 and 3 side by side");
   await shot("reader-01c-spread.png");
+
+  // Offset: the cover pairs with page 2 instead of standing alone.
+  await evaluate(`window.PDFScope.setSpreadOffset(true)`);
+  await evaluate(`window.PDFScope.render(1)`);
+  await waitFor(
+    `(() => {
+       const shown = [...document.querySelectorAll('.page')].filter(
+         (node) => getComputedStyle(node).display !== 'none',
+       );
+       if (shown.length !== 2) return false;
+       const pages = shown.map((node) => Number(node.dataset.page)).sort((a, b) => a - b);
+       return pages[0] === 1 && pages[1] === 2;
+     })()`,
+    "the offset pair at page 1",
+  );
+  check(true, "offset pairs page 1 with page 2");
+  await evaluate(`window.PDFScope.setSpreadOffset(false)`);
 
   await evaluate(`window.PDFScope.setPageMode("continuous")`);
 

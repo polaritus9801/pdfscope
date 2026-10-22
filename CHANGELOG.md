@@ -70,6 +70,9 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- 双页奇偶偏移: the cover can pair with page 2 instead of standing alone; the choice persists.
+
+
 - 双页对开: page 1 alone, then facing pairs, each sheet scaled as one unit; single mode now fits the
   whole page through the same mechanism.
 

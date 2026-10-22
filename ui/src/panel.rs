@@ -225,6 +225,7 @@ pub fn AiPanel(
     let form_remember = RwSignal::new(true);
     let form_zoom = RwSignal::new("100".to_owned());
     let form_mode = RwSignal::new("continuous".to_owned());
+    let form_spread_offset = RwSignal::new(false);
     let tab = RwSignal::new(0_u8);
     let form_error = RwSignal::new(Option::<String>::None);
 
@@ -738,6 +739,11 @@ pub fn AiPanel(
             &payload,
             &JsValue::from_str("remember_position"),
             &JsValue::from_bool(form_remember.get()),
+        );
+        let _ = js_sys::Reflect::set(
+            &payload,
+            &JsValue::from_str("spread_offset"),
+            &JsValue::from_bool(form_spread_offset.get()),
         );
         let _ = js_sys::Reflect::set(
             &payload,
@@ -1476,6 +1482,17 @@ pub fn AiPanel(
                                                     "双页"
                                                 </option>
                                             </select>
+                                        </label>
+
+                                        <label class="settings-row">
+                                            <span>"双页奇偶偏移"</span>
+                                            <input
+                                                type="checkbox"
+                                                prop:checked=move || form_spread_offset.get()
+                                                on:change=move |event| {
+                                                    form_spread_offset.set(event_target_checked(&event));
+                                                }
+                                            />
                                         </label>
 
                                         <label class="settings-row">
