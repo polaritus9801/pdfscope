@@ -74,6 +74,9 @@ pub(crate) struct Settings {
     /// Zoom a newly opened document starts at, as a percentage of fit width.
     #[serde(default = "default_zoom")]
     pub(crate) default_zoom: u16,
+    /// `continuous` or `single`.
+    #[serde(default = "default_mode")]
+    pub(crate) page_mode: String,
     /// Last window geometry, when the shell has recorded one.
     #[serde(default)]
     pub(crate) window: Option<WindowState>,
@@ -81,6 +84,10 @@ pub(crate) struct Settings {
 
 fn default_zoom() -> u16 {
     100
+}
+
+fn default_mode() -> String {
+    "continuous".to_owned()
 }
 
 fn default_font_size() -> u16 {
@@ -112,6 +119,7 @@ impl Default for Settings {
             font_size: default_font_size(),
             remember_position: true,
             default_zoom: default_zoom(),
+            page_mode: default_mode(),
             window: None,
         }
     }
@@ -146,6 +154,9 @@ pub(crate) struct SettingsInput {
     /// Zoom a newly opened document starts at.
     #[serde(default)]
     pub(crate) default_zoom: Option<u16>,
+    /// `continuous` or `single`.
+    #[serde(default)]
+    pub(crate) page_mode: Option<String>,
     /// A new key, when the user typed one. `None` keeps the stored key.
     pub(crate) api_key: Option<String>,
 }
@@ -173,6 +184,8 @@ pub(crate) struct SettingsView {
     pub(crate) remember_position: bool,
     /// Zoom a newly opened document starts at.
     pub(crate) default_zoom: u16,
+    /// `continuous` or `single`.
+    pub(crate) page_mode: String,
     /// Whether a key is stored. The key itself never crosses this boundary.
     pub(crate) has_key: bool,
 }
@@ -260,6 +273,7 @@ pub(crate) fn load_settings(app: tauri::AppHandle) -> Result<SettingsView, Strin
         font_size: settings.font_size,
         remember_position: settings.remember_position,
         default_zoom: settings.default_zoom,
+        page_mode: settings.page_mode,
         has_key: has_key(&app),
     })
 }
@@ -295,6 +309,7 @@ pub(crate) fn save_settings(app: tauri::AppHandle, settings: SettingsInput) -> R
         font_size: settings.font_size.unwrap_or_else(default_font_size),
         remember_position: settings.remember_position.unwrap_or(true),
         default_zoom: settings.default_zoom.unwrap_or_else(default_zoom),
+        page_mode: settings.page_mode.unwrap_or_else(default_mode),
         window: stored_window,
     };
 

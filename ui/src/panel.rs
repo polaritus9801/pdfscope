@@ -224,6 +224,7 @@ pub fn AiPanel(
     let form_font_size = RwSignal::new("14".to_owned());
     let form_remember = RwSignal::new(true);
     let form_zoom = RwSignal::new("100".to_owned());
+    let form_mode = RwSignal::new("continuous".to_owned());
     let tab = RwSignal::new(0_u8);
     let form_error = RwSignal::new(Option::<String>::None);
 
@@ -266,6 +267,9 @@ pub fn AiPanel(
                         .map(|zoom| (zoom as u16).to_string())
                         .unwrap_or_else(|| "100".to_owned()),
                 );
+                form_mode
+                    .set(text_of(&value, "page_mode").unwrap_or_else(|| "continuous".to_owned()));
+                let _ = crate::call("setPageMode", &[JsValue::from_str(&form_mode.get())]);
                 let _ = crate::call(
                     "setDefaultZoom",
                     &[JsValue::from_f64(
@@ -737,6 +741,11 @@ pub fn AiPanel(
         );
         let _ = js_sys::Reflect::set(
             &payload,
+            &JsValue::from_str("page_mode"),
+            &JsValue::from_str(&form_mode.get()),
+        );
+        let _ = js_sys::Reflect::set(
+            &payload,
             &JsValue::from_str("default_zoom"),
             &JsValue::from_f64(form_zoom.get().parse::<f64>().unwrap_or(100.0)),
         );
@@ -772,6 +781,7 @@ pub fn AiPanel(
                             "setRememberPosition",
                             &[JsValue::from_bool(form_remember.get())],
                         );
+                        let _ = crate::call("setPageMode", &[JsValue::from_str(&form_mode.get())]);
                         let _ = crate::call(
                             "setDefaultZoom",
                             &[JsValue::from_f64(
@@ -1453,6 +1463,18 @@ pub fn AiPanel(
                                     <section class="settings-section">
                                         <h3>"阅读"</h3>
                                         <p class="settings-hint">"重新打开文件时回到上次读到的位置。"</p>
+                                        <label class="settings-row">
+                                            <span>"翻页方式"</span>
+                                            <select on:change=move |event| form_mode.set(event_target_value(&event))>
+                                                <option value="continuous" selected=move || form_mode.get() == "continuous">
+                                                    "连续滚动"
+                                                </option>
+                                                <option value="single" selected=move || form_mode.get() == "single">
+                                                    "单页"
+                                                </option>
+                                            </select>
+                                        </label>
+
                                         <label class="settings-row">
                                             <span>"默认缩放"</span>
                                             <select on:change=move |event| form_zoom.set(event_target_value(&event))>

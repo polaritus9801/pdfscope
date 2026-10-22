@@ -1973,3 +1973,20 @@ mark.find-hit {
   border: 1px solid color-mix(in srgb, var(--danger) 30%, var(--border));
   border-radius: var(--radius-md);
 }
+
+/* Single page: the hidden sheets collapse, so the one on show starts at the top. */
+.pages.paged {
+  transform: none;
+  width: 100%;
+  max-width: 900px;  /* size */
+  margin: 0 auto;
+}
+
+.pages.paged .page {
+  display: none;
+}
+
+.pages.paged .page[data-current="true"] {
+  display: flex;
+  margin: 0 auto;
+}

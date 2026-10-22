@@ -59,6 +59,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Single-page reading mode, chosen in 阅读 → 翻页方式; the other sheets stay hidden and the current
+  page returns to the top.
+
+
 - Keyboard paths for the answer actions: ⌘⇧C copy, ⌘⇧R regenerate, ⌘⇧G continue, listed in settings.
 
 

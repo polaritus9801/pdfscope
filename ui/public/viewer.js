@@ -30,6 +30,7 @@ let currentPage = 1;
 let documentName = "";
 let rememberPosition = true;
 let defaultZoom = 100;
+let pagedMode = false;
 let pendingDefaultZoom = 0;
 let restorePage = 0;
 let initialized = false;
@@ -133,6 +134,25 @@ async function renderThumbnail(element) {
     element.replaceChildren(image);
   } catch {
     element.dataset.rendered = "failed";
+  }
+}
+
+function applyPageMode() {
+  const pages = pagesElement();
+  pages?.classList.toggle("paged", pagedMode);
+  markCurrentPage();
+
+  // Both differ only in layout, so the visual scroll must be re-established after the switch.
+  requestAnimationFrame(() => {
+    const stage = document.querySelector(".stage");
+    if (!stage) return;
+    stage.scrollTo({ top: 0 });
+  });
+}
+
+function markCurrentPage() {
+  for (const element of document.querySelectorAll(".page[data-page]")) {
+    element.dataset.current = String(Number(element.dataset.page) === currentPage);
   }
 }
 
@@ -349,6 +369,7 @@ function syncCurrentPage() {
   const page = pageAtFocus();
   if (page !== currentPage) {
     currentPage = page;
+    markCurrentPage();
     rememberPage(page);
     window.__pdfscopePage?.(page);
   }
@@ -364,6 +385,7 @@ function scrollToAnchor(anchor) {
   const current = pageRect.top + anchor.fraction * pageRect.height;
   stage.scrollTop += current - target;
   currentPage = anchor.page;
+  markCurrentPage();
   rememberPage(anchor.page);
   programmaticUntil = performance.now() + PROGRAMMATIC_SCROLL_MS;
   window.__pdfscopePage?.(anchor.page);
@@ -380,6 +402,7 @@ function scrollToPageNow(number) {
     stage.scrollTop += pageRect.top - stageRect.top - 16;
   }
   currentPage = target;
+  markCurrentPage();
   rememberPage(target);
   programmaticUntil = performance.now() + PROGRAMMATIC_SCROLL_MS;
   window.__pdfscopePage?.(target);
@@ -1318,6 +1341,12 @@ window.PDFScope = {
     input.files = transfer.files;
     input.dispatchEvent(new Event("change", { bubbles: true }));
     return true;
+  },
+
+  /// `single` shows one page at a time; anything else keeps the continuous column.
+  setPageMode(mode) {
+    pagedMode = mode === "single";
+    applyPageMode();
   },
 
   /// The zoom a freshly opened document starts at, as a percentage of fit width.

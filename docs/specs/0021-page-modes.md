@@ -1,9 +1,9 @@
 # 0021 — Page modes: single, spread and continuous
 
-- **Status:** draft
+- **Status:** accepted
 - **Author:** z1mLi
 - **Date:** 2026-10-22
-- **Approved by:** —
+- **Approved by:** z1mLi ("继续", 2026-10-22)
 
 ## Goal
 
@@ -110,7 +110,20 @@ selection cannot point at a hidden page.
 - Most readers use continuous; single/spread are for projection and for reading two-page scans.
 - `fit page` is the sensible default for paged modes; `fit width` remains for continuous.
 
+## Progress
+
+- **Single mode** implemented: `PDFScope.setPageMode("single")` hides the other sheets, collapses the
+  continuous transform, returns the scroll to zero, and marks the current page. The 阅读 setting
+  翻页方式 persists the choice. Measured: page top 80 px (stage top 56 + padding 24), scroll 0, one
+  page visible.
+- **Spread** not implemented.
+
 ## Deviations
+
+- Single mode is **fit width with vertical scroll**, not fit page. The whole page does not fit the
+  viewport; making it fit needs the page rendered at a paged scale rather than scaled down from the
+  continuous canvas. Recorded for the next slice.
+- Mode changes reset the scroll; a finer anchor (keep the same paragraph) is not implemented.
 
 ## Open questions
 
