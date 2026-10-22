@@ -226,6 +226,8 @@ pub fn AiPanel(
     let form_zoom = RwSignal::new("100".to_owned());
     let form_mode = RwSignal::new("continuous".to_owned());
     let manager_open = RwSignal::new(false);
+    // page, pointer x/y at press: a drag selects a range, a click toggles one page
+    let manager_drag = RwSignal::new(Option::<(u32, f64, f64)>::None);
     let form_spread_offset = RwSignal::new(false);
     let tab = RwSignal::new(0_u8);
     let form_error = RwSignal::new(Option::<String>::None);
@@ -1418,19 +1420,56 @@ pub fn AiPanel(
                                             class="thumb manager-thumb"
                                             data-page=number
                                             class:selected=move || page_set.get().contains(&number)
-                                            on:click=move |event: web_sys::MouseEvent| {
-                                                undo_push.run(());
+                                            on:pointerdown=move |event: web_sys::PointerEvent| {
+                                                manager_drag.set(Some((
+                                                    number,
+                                                    event.client_x() as f64,
+                                                    event.client_y() as f64,
+                                                )));
+                                            }
+                                            on:pointerup=move |event: web_sys::PointerEvent| {
+                                                let Some((start, start_x, start_y)) = manager_drag.get() else {
+                                                    return;
+                                                };
+                                                manager_drag.set(None);
                                                 let subtract = event.alt_key();
-                                                page_set.update(|set| {
-                                                    if subtract {
-                                                        set.retain(|page| *page != number);
-                                                    } else if let Some(index) = set.iter().position(|page| *page == number) {
-                                                        set.remove(index);
-                                                    } else {
-                                                        set.push(number);
-                                                        set.sort_unstable();
-                                                    }
-                                                });
+                                                let moved = (event.client_x() as f64 - start_x).abs()
+                                                    + (event.client_y() as f64 - start_y).abs();
+                                                let target = event
+                                                    .target()
+                                                    .and_then(|target| target.dyn_into::<web_sys::Element>().ok())
+                                                    .and_then(|element| element.closest("[data-page]").ok().flatten())
+                                                    .and_then(|element| element.get_attribute("data-page"))
+                                                    .and_then(|value| value.parse::<u32>().ok())
+                                                    .unwrap_or(number);
+
+                                                undo_push.run(());
+                                                if moved < 4.0 || target == start {
+                                                    page_set.update(|set| {
+                                                        if subtract {
+                                                            set.retain(|page| *page != start);
+                                                        } else if let Some(index) = set.iter().position(|page| *page == start) {
+                                                            set.remove(index);
+                                                        } else {
+                                                            set.push(start);
+                                                            set.sort_unstable();
+                                                        }
+                                                    });
+                                                } else {
+                                                    let (low, high) = (start.min(target), start.max(target));
+                                                    page_set.update(|set| {
+                                                        if subtract {
+                                                            set.retain(|page| *page < low || *page > high);
+                                                        } else {
+                                                            for page in low..=high {
+                                                                if !set.contains(&page) {
+                                                                    set.push(page);
+                                                                }
+                                                            }
+                                                            set.sort_unstable();
+                                                        }
+                                                    });
+                                                }
                                                 scope_mode.set(3);
                                             }
                                         >

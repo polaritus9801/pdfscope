@@ -262,7 +262,11 @@ gesture changed from *replace* to *add* as part of that redesign, because replac
   capped at 20, with a notice saying so instead of truncating silently). 管理页面引用 opens a dialog of
   thumbnails that scrolls the current page to the middle via `scrollIntoView({ block: "center" })`;
   clicking toggles a page (Alt subtracts), 清空 empties the set, and every change is undoable.
-  Drag-and-modifier range selection inside the manager is not built.
+  Dragging from one thumbnail to another selects the range; Alt subtracts it.
+- **Spread bars.** In a spread the right-hand sheet carries its bar and three actions on its right
+  edge, away from the spine, via a `data-spread` attribute the layout sets.
+- **A, B and C are implemented.** What is missing is human visual verification (no browser was used),
+  and the deviations below.
 
 ## Deviations
 

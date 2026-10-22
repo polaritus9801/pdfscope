@@ -70,6 +70,9 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Drag a range in the page manager; in a spread, the right sheet's bar sits on the right edge.
+
+
 - Three scope icons (whole document / current page / references) replace the page-range field, plus a
   page-manager dialog with thumbnails centred on the current page and a clear action.
 

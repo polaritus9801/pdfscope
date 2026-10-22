@@ -238,6 +238,19 @@ function resetPageLayers() {
   }
 }
 
+/// In a spread, the right-hand sheet gets its page bar on the right, away from the spine.
+function markSpreadSides() {
+  const visible = [...visiblePages()].sort((a, b) => a - b);
+  for (const element of document.querySelectorAll(".page[data-page]")) {
+    const page = Number(element.dataset.page);
+    if (pageMode !== "spread" || !visible.includes(page)) {
+      element.dataset.spread = "";
+      continue;
+    }
+    element.dataset.spread = page === visible[1] ? "right" : "left";
+  }
+}
+
 function markCurrentPage() {
   const visible = visiblePages();
   for (const element of document.querySelectorAll(".page[data-page]")) {
@@ -246,6 +259,7 @@ function markCurrentPage() {
     element.dataset.visible = String(visible.has(page));
   }
   if (pageMode !== "continuous") {
+    markSpreadSides();
     pagedLayout();
   }
 }

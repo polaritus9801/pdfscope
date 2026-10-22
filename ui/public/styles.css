@@ -2273,3 +2273,14 @@ mark.find-hit {
 .manager-thumb.selected .thumb-number {
   color: var(--accent);
 }
+
+/* The right sheet of a spread carries its bar and actions on the right, away from the spine. */
+.page[data-spread="right"] .page-bar {
+  left: auto;
+  right: -10px;  /* size */
+}
+
+.page[data-spread="right"] .page-bar-actions {
+  left: auto;
+  right: -40px;  /* size */
+}
