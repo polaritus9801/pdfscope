@@ -10,6 +10,9 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Changed
 
+- Removed fourteen dead style blocks from the stylesheet and styled the icon-only header button.
+
+
 - Undo/redo moved to `pdfscope-core::history`, with six tests for truncation, the depth limit and the
   round trip.
 

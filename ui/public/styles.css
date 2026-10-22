@@ -518,18 +518,6 @@ body {
   overflow-x: auto;
 }
 
-.tray-label {
-  color: var(--ink-muted);
-  white-space: nowrap;
-}
-
-.chips {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
-}
-
 .chip {
   display: inline-flex;
   align-items: center;
@@ -540,26 +528,6 @@ body {
   border-radius: var(--radius-full);
   background: var(--accent-soft);
   white-space: nowrap;
-}
-
-.chip-label {
-  max-width: 220px;  /* size */
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.chip-remove {
-  border: none;
-  background: transparent;
-  color: var(--ink-faint);
-  cursor: pointer;
-  font: inherit;
-  padding: 0 var(--space-1);
-  border-radius: var(--radius-full);
-}
-
-.chip-remove:hover {
-  color: var(--danger);
 }
 
 /* ── Workspace and AI panel ─────────────────────────────────────────────────────────────────── */
@@ -627,12 +595,6 @@ body {
   line-height: 1.65;
 }
 
-.thinking {
-  margin: 0 0 var(--space-2);
-  font-size: var(--text-sm);
-  color: var(--ink-faint);
-}
-
 .composer {
   display: flex;
   flex-direction: column;
@@ -688,22 +650,6 @@ body {
   background: rgb(20 16 26 / 30%);
 }
 
-.sheet-card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  width: 320px;  /* size */
-  padding: var(--space-4);
-  background: var(--surface);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-float);
-}
-
-.sheet-title {
-  margin: 0;
-  font-size: var(--text-lg);
-}
-
 .field {
   display: flex;
   flex-direction: column;
@@ -721,18 +667,6 @@ body {
   background: var(--surface-sunken);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-}
-
-.sheet-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-2);
-  margin-top: var(--space-1);
-}
-
-.sheet-error {
-  position: static;
-  margin: 0;
 }
 
 .citation {
@@ -785,35 +719,6 @@ body {
   background: rgb(203 184 236 / 20%);
   pointer-events: none;
   z-index: 6;
-}
-
-.chip-region {
-  padding-left: var(--space-1);
-}
-
-.chip-thumb {
-  width: 40px;  /* size */
-  height: 22px;  /* size */
-  object-fit: cover;
-  border-radius: 3px;  /* size */
-  border: 1px solid var(--border);
-}
-
-.range-row {
-  display: flex;
-  gap: var(--space-2);
-}
-
-.range-input {
-  flex: 1;
-  min-width: 0;
-  height: 30px;  /* size */
-  padding: 0 var(--space-2);
-  font: inherit;
-  color: var(--ink);
-  background: var(--surface-sunken);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
 }
 
 .range-summary {
@@ -1083,14 +988,6 @@ body {
 }
 
 /* #8: a reference stays tinted on the page while it is attached */
-.ref-tint {
-  position: absolute;
-  background: rgb(203 184 236 / 22%);
-  border-left: 2px solid var(--accent-strong);
-  pointer-events: none;
-  z-index: 3;
-}
-
 /* #5: collapsible, resizable panel */
 .panel {
   position: relative;
@@ -2283,4 +2180,9 @@ mark.find-hit {
 .page[data-spread="right"] .page-bar-actions {
   left: auto;
   right: -40px;  /* size */
+}
+
+/* An icon-only header button: the same height, less horizontal padding. */
+.button.icon-only {
+  padding-inline: var(--space-2);
 }

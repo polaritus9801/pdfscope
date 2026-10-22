@@ -338,6 +338,12 @@ The two pieces of logic that a screenshot could not check are unit-tested:
 
 Both are the functions the interface actually calls; the UI holds no second copy.
 
+## Cleanup
+
+Fourteen style blocks that nothing referenced (the old page-range row, tray chips, the old sheet and
+thinking styles, the previous reference tint) were deleted, and an audit for classes used without a
+rule found the icon-only header button, which now has one.
+
 ## Deviations
 
 - The reference undo stack is cleared when a question is sent: references become part of that turn's
