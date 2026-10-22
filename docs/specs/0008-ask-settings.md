@@ -122,6 +122,14 @@ outside the book when it matters), and uncertainty (say so). Questions about the
 text — later developments, other authors, comparisons — are answered normally; the only hard rule is
 that book-external material must not be presented as the book's.
 
+## Timeout is a setting, not a constant
+
+The request layer had a fixed 120 s timeout and the bridge a fixed 120 s silence watchdog. Both cut
+long reasoning streams short. They are now one setting: 接口 → 响应超时（秒）, default **0 = 不设限**.
+`ProviderConfig::with_timeout` carries it into the HTTP client (no `.timeout()` when unlimited), and
+the settings sheet publishes it to the bridge as `window.PDFScopeRequestTimeout`; zero disables the
+silence timer entirely.
+
 ## Deviations
 
 - The keychain round-trip could not be exercised in this environment (no interactive keychain). The

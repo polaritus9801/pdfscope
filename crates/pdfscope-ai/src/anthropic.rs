@@ -118,7 +118,7 @@ pub async fn stream(
 ) -> Result<EventStream, AiError> {
     let url = format!("{}/messages", config.base_url());
 
-    let response = crate::client()?
+    let response = crate::client(config.timeout())?
         .post(url)
         .header("x-api-key", config.api_key().expose())
         .header("anthropic-version", API_VERSION)

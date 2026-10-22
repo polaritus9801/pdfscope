@@ -10,6 +10,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Changed
 
+- The 120-second request timeout and the bridge's silence watchdog are one setting
+  (接口 → 响应超时), default unlimited.
+
+
 - Whole-document questions now carry the whole document; the page cap moved to 设置 → 阅读
   (每次最多发送页数, 全部 by default).
 

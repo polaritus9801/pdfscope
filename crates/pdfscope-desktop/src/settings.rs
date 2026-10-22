@@ -83,6 +83,9 @@ pub(crate) struct Settings {
     /// Most pages one question may carry; zero means the whole document.
     #[serde(default)]
     pub(crate) page_limit: u32,
+    /// Per-request limit in seconds; zero waits as long as the provider does.
+    #[serde(default)]
+    pub(crate) request_timeout: u32,
     /// Last window geometry, when the shell has recorded one.
     #[serde(default)]
     pub(crate) window: Option<WindowState>,
@@ -128,6 +131,7 @@ impl Default for Settings {
             page_mode: default_mode(),
             spread_offset: false,
             page_limit: 0,
+            request_timeout: 0,
             window: None,
         }
     }
@@ -171,6 +175,9 @@ pub(crate) struct SettingsInput {
     /// Most pages one question may carry; zero or absent means the whole document.
     #[serde(default)]
     pub(crate) page_limit: Option<u32>,
+    /// Per-request limit in seconds; zero or absent means no limit.
+    #[serde(default)]
+    pub(crate) request_timeout: Option<u32>,
     /// A new key, when the user typed one. `None` keeps the stored key.
     pub(crate) api_key: Option<String>,
 }
@@ -204,6 +211,8 @@ pub(crate) struct SettingsView {
     pub(crate) spread_offset: bool,
     /// Most pages one question may carry; zero means the whole document.
     pub(crate) page_limit: u32,
+    /// Per-request limit in seconds; zero waits as long as the provider does.
+    pub(crate) request_timeout: u32,
     /// Whether a key is stored. The key itself never crosses this boundary.
     pub(crate) has_key: bool,
 }
@@ -294,6 +303,7 @@ pub(crate) fn load_settings(app: tauri::AppHandle) -> Result<SettingsView, Strin
         page_mode: settings.page_mode,
         spread_offset: settings.spread_offset,
         page_limit: settings.page_limit,
+        request_timeout: settings.request_timeout,
         has_key: has_key(&app),
     })
 }
@@ -332,6 +342,7 @@ pub(crate) fn save_settings(app: tauri::AppHandle, settings: SettingsInput) -> R
         page_mode: settings.page_mode.unwrap_or_else(default_mode),
         spread_offset: settings.spread_offset.unwrap_or(false),
         page_limit: settings.page_limit.unwrap_or(0),
+        request_timeout: settings.request_timeout.unwrap_or(0),
         window: stored_window,
     };
 

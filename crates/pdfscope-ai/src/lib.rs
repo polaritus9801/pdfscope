@@ -124,6 +124,8 @@ pub struct ProviderConfig {
     base_url: String,
     model: String,
     api_key: Secret,
+    /// How long one request may take; `None` waits as long as the provider does.
+    timeout: Option<std::time::Duration>,
 }
 
 impl ProviderConfig {
@@ -154,6 +156,7 @@ impl ProviderConfig {
             base_url: base_url.trim_end_matches('/').to_owned(),
             model,
             api_key,
+            timeout: None,
         })
     }
 
@@ -180,6 +183,17 @@ impl ProviderConfig {
     /// The credential, for the request layer.
     pub fn api_key(&self) -> &Secret {
         &self.api_key
+    }
+
+    /// Sets the per-request limit; `None` waits as long as the provider does.
+    pub fn with_timeout(mut self, timeout: Option<std::time::Duration>) -> Self {
+        self.timeout = timeout;
+        self
+    }
+
+    /// The configured limit, if any.
+    pub(crate) fn timeout(&self) -> Option<std::time::Duration> {
+        self.timeout
     }
 }
 
@@ -361,11 +375,12 @@ pub async fn stream(
 }
 
 /// Shared HTTP client settings.
-pub(crate) fn client() -> Result<reqwest::Client, AiError> {
-    reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(120))
-        .build()
-        .map_err(AiError::Transport)
+pub(crate) fn client(timeout: Option<std::time::Duration>) -> Result<reqwest::Client, AiError> {
+    let mut builder = reqwest::Client::builder();
+    if let Some(timeout) = timeout {
+        builder = builder.timeout(timeout);
+    }
+    builder.build().map_err(AiError::Transport)
 }
 
 /// Reads a failed response body so the provider's message reaches the user.

@@ -9,6 +9,19 @@ use crate::panel::{
     PRESET_LABELS, apply_font_size, apply_theme, bridge, flag_of, number_of, preset, text_of,
 };
 
+/// Publishes the timeout to the bridge, in milliseconds; zero disables the watchdog.
+fn apply_request_timeout(seconds: &str) {
+    let Some(window) = web_sys::window() else {
+        return;
+    };
+    let seconds = seconds.parse::<u64>().unwrap_or(0);
+    let _ = js_sys::Reflect::set(
+        &window,
+        &JsValue::from_str("PDFScopeRequestTimeout"),
+        &JsValue::from_f64((seconds * 1000) as f64),
+    );
+}
+
 #[component]
 pub(crate) fn SettingsSheet(
     open: RwSignal<bool>,
@@ -47,6 +60,7 @@ pub(crate) fn SettingsSheet(
 
     let form_mode = RwSignal::new("continuous".to_owned());
     let form_page_limit = RwSignal::new(0_u32);
+    let form_timeout = RwSignal::new("0".to_owned());
 
     let form_spread_offset = RwSignal::new(false);
 
@@ -101,6 +115,12 @@ pub(crate) fn SettingsSheet(
                         .unwrap_or(0),
                 );
                 page_limit.set(form_page_limit.get());
+                form_timeout.set(
+                    number_of(&value, "request_timeout")
+                        .map(|seconds| (seconds as u32).to_string())
+                        .unwrap_or_else(|| "0".to_owned()),
+                );
+                apply_request_timeout(&form_timeout.get());
                 let _ = crate::call("setPageMode", &[JsValue::from_str(&form_mode.get())]);
                 let _ = crate::call(
                     "setDefaultZoom",
@@ -195,6 +215,11 @@ pub(crate) fn SettingsSheet(
         );
         let _ = js_sys::Reflect::set(
             &payload,
+            &JsValue::from_str("request_timeout"),
+            &JsValue::from_f64(form_timeout.get().parse::<f64>().unwrap_or(0.0)),
+        );
+        let _ = js_sys::Reflect::set(
+            &payload,
             &JsValue::from_str("default_zoom"),
             &JsValue::from_f64(form_zoom.get().parse::<f64>().unwrap_or(100.0)),
         );
@@ -227,6 +252,7 @@ pub(crate) fn SettingsSheet(
                         apply_theme(&form_theme.get());
                         apply_font_size(&form_font_size.get());
                         page_limit.set(form_page_limit.get());
+                        apply_request_timeout(&form_timeout.get());
                         let _ = crate::call(
                             "setRememberPosition",
                             &[JsValue::from_bool(form_remember.get())],
@@ -563,6 +589,19 @@ pub(crate) fn SettingsSheet(
                                                 on:input=move |event| form_model.set(event_target_value(&event))
                                             />
                                         </label>
+
+                                        <label class="settings-row">
+                                            <span>"响应超时（秒）"</span>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                prop:value=move || form_timeout.get()
+                                                on:input=move |event| form_timeout.set(event_target_value(&event))
+                                            />
+                                        </label>
+                                        <p class="settings-hint">
+                                            "0 表示不设限：模型思考多久都等。只有网络卡死时才会用到。"
+                                        </p>
 
                                     <section class="settings-section">
                                         <h3>"字号"</h3>

@@ -107,7 +107,7 @@ pub async fn stream(
 ) -> Result<EventStream, AiError> {
     let url = format!("{}/chat/completions", config.base_url());
 
-    let response = crate::client()?
+    let response = crate::client(config.timeout())?
         .post(url)
         .bearer_auth(config.api_key().expose())
         .json(&body(config, request))

@@ -199,6 +199,8 @@ pub(crate) async fn ask(
         Protocol::OpenAi
     };
 
+    let timeout = (settings.request_timeout > 0)
+        .then(|| std::time::Duration::from_secs(u64::from(settings.request_timeout)));
     let config = ProviderConfig::new(
         settings.preset,
         protocol,
@@ -206,7 +208,8 @@ pub(crate) async fn ask(
         settings.model,
         key,
     )
-    .map_err(|error| error.to_string())?;
+    .map_err(|error| error.to_string())?
+    .with_timeout(timeout);
 
     // Four turns is enough to resolve pronouns without spending the context on history.
     let history: Vec<HistoryTurn> = history

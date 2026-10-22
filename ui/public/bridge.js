@@ -37,9 +37,11 @@ window.Bridge = {
     }
 
     // Every path must end in an event: a rejected invoke used to leave the panel waiting forever,
-    // which looked exactly like the question had never been asked. The timer covers a stream that
-    // stops producing events without saying so.
-    const silenceLimit = 120_000;
+    // which looked exactly like the question had never been asked. The silence timer is opt-in now:
+    // a model may think for minutes without emitting anything, and the settings decide whether that
+    // is tolerated (zero means wait forever).
+    const configured = Number(window.PDFScopeRequestTimeout);
+    const silenceLimit = Number.isFinite(configured) && configured > 0 ? configured : 0;
 
     return new Promise((resolve) => {
       let settled = false;
@@ -61,7 +63,9 @@ window.Bridge = {
 
       const arm = () => {
         clearTimeout(timer);
-        timer = setTimeout(() => settle("error", "长时间没有响应，已结束"), silenceLimit);
+        if (silenceLimit > 0) {
+          timer = setTimeout(() => settle("error", "长时间没有响应，已结束"), silenceLimit);
+        }
       };
 
       (async () => {
