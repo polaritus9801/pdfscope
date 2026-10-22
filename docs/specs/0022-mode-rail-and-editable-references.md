@@ -1,9 +1,9 @@
 # 0022 — A mode rail, editable references and page scope
 
-- **Status:** draft
+- **Status:** accepted
 - **Author:** z1mLi
 - **Date:** 2026-10-22
-- **Approved by:** —
+- **Approved by:** z1mLi (2026-10-22, with the middle-range model delegated)
 
 ## Goal
 
@@ -38,9 +38,9 @@ modifier temporarily borrows a mode for one gesture, then returns to the current
 
 | Hold (macOS) | Hold (Windows/Linux) | While held |
 |---|---|---|
-| `⌘` | `Ctrl` | text swipe adds a passage |
+| `⌘` / `⌃` | `Ctrl` | drag across pages extends the page set |
+| `⇧` | `Shift` | text swipe adds a passage |
 | `⌥` | `Alt` | drag draws a marquee |
-| `⌃` | `Shift` | drag across pages extends the page set |
 
 ### Page scope
 
@@ -48,8 +48,8 @@ Three single-choice icons replace the range field, at the left of the composer r
 
 | Icon | Name | What the model receives |
 |---|---|---|
-| ▣ | 仅当前页 | text of the page in view |
 | ▤ | 整份文档 | text of every page (bounded by the existing page cap; the cap is reported, not silent) |
+| ▣ | 仅当前页 | text of the page in view |
 | ❝ | 仅引用 | only the passages and regions the reader added; no page text |
 
 To their right: **管理页面引用**, opening the page manager.
@@ -66,21 +66,30 @@ A page in scope gets:
 
 Toggle logic, stated as a state machine:
 
-- `anchor` is at most one pending endpoint: `Start(page)` or `End(page)`.
-- **从这里开始 (p)**: set `anchor = Start(p)`; preview `p .. last page`. Clicking another start
-  replaces it; clicking start on the same page clears it.
-- **到这里结束 (p)**: with `anchor = Start(s)`, commit `min(s,p) .. max(s,p)` and clear the anchor.
-  With no anchor, set `anchor = End(p)` and preview `1 .. p`; a following start closes it.
-- **单独这一页 (p)**: toggles page `p`, clears any anchor first.
-- Committed ranges are **merged into one page set**; overlap and nesting collapse by definition, so
-  nested or duplicate ranges cannot create duplicates.
-- `Escape` cancels a pending anchor without touching committed pages.
-- The purple bar shows the preview while an anchor is pending, and preview and set are visually
-  distinct (preview: dashed outline; committed: solid bar).
+**The problem with the first draft.** With pages 1–3 and 9–11 already chosen, clicking *start* on 6
+previewed 6–end and clicking *end* on 7 previewed 1–7; either gesture looked like it was destroying the
+existing selection. The endpoints were doing too much.
 
-In page mode (4), clicking a page toggles it; dragging across pages selects the range on release.
-`⌘`(Ctrl) during the drag adds, `⌥`(Alt) subtracts; without a modifier the drag replaces the set.
-A drag is committed only if it crosses at least one page boundary.
+**Revised model — endpoints are neutral, preview follows the pointer.**
+
+- Clicking **从这里开始 (p)** places a dashed endpoint marker on `p`. It changes **nothing** about the
+  committed set and draws **no range**.
+- While an endpoint exists, hovering page `q` shows a **faint dashed preview** of the range between
+  `p` and `q`; leaving the page removes the preview. The committed bars never dim.
+- Clicking **到这里结束 (q)** commits `min(p,q) .. max(p,q)`, merged into the set, and clears the
+  marker. Clicking **从这里开始** again moves the marker; clicking it on its own page clears it.
+- **到这里结束** works symmetrically: with no marker it becomes the pending endpoint, and a following
+  start closes the range. Both buttons are the same operation with different anchor labels.
+- **单独这一页 (p)** toggles one page and clears any pending marker.
+- `Escape` clears the marker. Committed ranges merge as a **set**, so overlap and nesting collapse —
+  nested or duplicate ranges cannot exist.
+
+**Dragging is the fast path, and it adds.** Dragging across pages 6 → 7 adds exactly 6–7 to the
+existing set; it never replaces it. `⌥`(Alt) during the drag subtracts; `⌘`(Ctrl) forces add (the
+default, but explicit). Replace is not a drag gesture at all — 清空页面引用 is the only way to empty
+the set, so a stray drag can never erase a carefully built range.
+
+A drag commits only if it crosses at least one page boundary. Clicking a page in page mode toggles it.
 
 ### Editing a reference
 
@@ -210,14 +219,12 @@ ranges merge by set semantics so a wrong range can be corrected page by page.
 
 ## Open questions
 
-1. **Modifier map** — `⌘`/`⌥`/`⌃` on macOS and `Ctrl`/`Alt`/`Shift` elsewhere: does that feel right?
-2. **End without start** — I propose it starts a centre-out selection (`End(p)` previews `1..p`, a
-   following start closes it). Acceptable?
-3. **Scope is undoable** — I have included page-set and scope-icon changes in the reference undo
-   stack. Is that what you want?
-4. **Spread bar** — for the right page, the bar and its three buttons sit on the right outer edge
-   (facing away from the gutter), so the two bars never crowd the spine. Good?
-5. **Page drag** — in page mode, a drag replaces the set unless `⌘`/`⌥` is held. Does replace-by-default
-   match your intent?
+All answered on 2026-10-22: the modifier map above, reference-related undo including page scope, the
+spread bar on the outer edge, and the middle-range redesign delegated to this document. The drag
+gesture changed from *replace* to *add* as part of that redesign, because replacing made the
+1–3 / 9–11 → 6–7 case impossible without clearing first.
 
 ## Deviations
+
+- Dragging in page mode adds rather than replaces. This supersedes the earlier replace-by-default
+  answer, because replace made the middle-range case destructive; 清空 is the only replace gesture.
