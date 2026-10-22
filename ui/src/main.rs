@@ -1877,6 +1877,10 @@ fn App() -> impl IntoView {
                 notify=notify
                 configured=configured
                 undo_push=undo_push
+                reset_history=Callback::new(move |_| {
+                    undo_stack.set(Vec::new());
+                    redo_stack.set(Vec::new());
+                })
                 scope_mode=scope_mode
                 page_set=page_set
             />

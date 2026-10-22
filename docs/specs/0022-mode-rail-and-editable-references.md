@@ -306,6 +306,15 @@ Four defects found by reading the code rather than looking at it:
 - `V/T/B/D` fired while the settings dialog was open and treated `<select>` as not-typing; both fixed.
 - Sending with the pages scope and an empty set now says so instead of silently sending nothing.
 
+### Fifth review pass
+
+- Reference rows in the composer deleted by their render index. After an undo changed the list, an
+  index could point at the wrong reference; rows delete by id now.
+- Sending moves references into the turn's history; the undo stack still held a state where they were
+  active, so ⌘Z would have duplicated them. Sending now clears the reference history, recorded as the
+  deviation below.
+- Escape did not close the page manager; it does now.
+
 ## Verification without a browser
 
 The two pieces of logic that a screenshot could not check are unit-tested:
@@ -318,6 +327,9 @@ The two pieces of logic that a screenshot could not check are unit-tested:
 Both are the functions the interface actually calls; the UI holds no second copy.
 
 ## Deviations
+
+- The reference undo stack is cleared when a question is sent: references become part of that turn's
+  history, and restoring them into the composer would duplicate them.
 
 - The frame itself is the move surface; the region's circular handle is an affordance, not a separate
   drag target.

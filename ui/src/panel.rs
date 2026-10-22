@@ -174,6 +174,7 @@ pub fn AiPanel(
     notify: Callback<String>,
     configured: RwSignal<bool>,
     undo_push: Callback<()>,
+    reset_history: Callback<()>,
     scope_mode: RwSignal<u8>,
     page_set: RwSignal<Vec<u32>>,
 ) -> impl IntoView {
@@ -384,6 +385,7 @@ pub fn AiPanel(
             });
             passages.set(Vec::new());
             regions.set(Vec::new());
+            reset_history.run(());
         }
         let current_page = page.get();
         let total = pages.get();
@@ -649,6 +651,20 @@ pub fn AiPanel(
                 80,
             );
         }
+    });
+
+    Effect::new(move |_| {
+        let handler =
+            Closure::<dyn Fn(web_sys::KeyboardEvent)>::new(move |event: web_sys::KeyboardEvent| {
+                if event.key() == "Escape" && manager_open.get() {
+                    manager_open.set(false);
+                }
+            });
+        if let Some(window) = web_sys::window() {
+            let _ = window
+                .add_event_listener_with_callback("keydown", handler.as_ref().unchecked_ref());
+        }
+        handler.forget();
     });
 
     let send = move |_| send_text(question.get());
@@ -1237,8 +1253,7 @@ pub fn AiPanel(
                     passages
                         .get()
                         .into_iter()
-                        .enumerate()
-                        .map(|(index, passage)| {
+                        .map(|passage| {
                             view! {
                                 <div class="ref-row">
                                     <span class="ref-kind">"文"</span>
@@ -1249,12 +1264,8 @@ pub fn AiPanel(
                                         title="移除"
                                         on:click=move |_| {
                                             undo_push.run(());
-                                            passages
-                                                .update(|list| {
-                                                    if index < list.len() {
-                                                        list.remove(index);
-                                                    }
-                                                });
+                                            let id = passage.id;
+                                            passages.update(|list| list.retain(|entry| entry.id != id));
                                         }
                                     >
                                         "✕"
@@ -1268,8 +1279,7 @@ pub fn AiPanel(
                     regions
                         .get()
                         .into_iter()
-                        .enumerate()
-                        .map(|(index, region)| {
+                        .map(|region| {
                             view! {
                                 <div class="ref-row">
                                     <img class="ref-thumb" src=region.image alt="" />
@@ -1280,12 +1290,8 @@ pub fn AiPanel(
                                         title="移除"
                                         on:click=move |_| {
                                             undo_push.run(());
-                                            regions
-                                                .update(|list| {
-                                                    if index < list.len() {
-                                                        list.remove(index);
-                                                    }
-                                                });
+                                            let id = region.id;
+                                            regions.update(|list| list.retain(|entry| entry.id != id));
                                         }
                                     >
                                         "✕"

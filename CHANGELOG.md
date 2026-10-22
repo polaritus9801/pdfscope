@@ -201,6 +201,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Fixed
 
+- Reference rows delete by id, Escape closes the page manager, and sending no longer leaves an undo
+  state that could duplicate the references.
+
+
 - Page selections now switch the request scope; a drag no longer pins a reference, shortcuts stay out
   of open dialogs, and an empty page scope is reported.
 
