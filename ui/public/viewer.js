@@ -147,6 +147,7 @@ function applyPageMode() {
   metricsDirty = true;
   if (!paged) {
     resetPageLayers();
+    reportZoom(true);
   }
 
   // Both differ only in layout, so the visual scroll must be re-established after the switch.
@@ -207,6 +208,10 @@ function pagedLayout() {
     layer.style.transform = `scale(${scale})`;
 
     window.__pagedDebug = { scale, baseWidth, baseHeight, columns, availableWidth, availableHeight };
+    // The header should say how much of the real page is shown, not the column's zoom. The callback
+    // takes the same shape reportZoom sends: `{ percent, settled }`.
+    const shownFraction = (baseWidth * scale) / availableWidth;
+    window.__pdfscopeZoom?.({ percent: Math.round(shownFraction * 100), settled: true });
   }
 }
 
@@ -1628,6 +1633,7 @@ window.PDFScope = {
   },
 
   zoomTo(percent, options = {}) {
+    if (pageMode !== "continuous") return;
     requestZoomTo(percent, options);
   },
 
@@ -1636,6 +1642,7 @@ window.PDFScope = {
   },
 
   fitWidth() {
+    if (pageMode !== "continuous") return;
     requestFitWidth();
   },
 

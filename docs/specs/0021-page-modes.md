@@ -154,9 +154,11 @@ selection cannot point at a hidden page.
   smoke suite already covers single, so the migration is checkable.
 
 
-- Both modes now scale the page **layer** (canvas + text layer together) and resize the box to match;
-  the continuous zoom transform is not used while paged. The zoom readout still shows the column's
-  zoom, not the paged fit ratio.
+- Both modes scale the page **layer** (canvas + text layer together) and resize the box to match; the
+  continuous zoom transform is not used while paged.
+- The zoom readout now reports **how much of a full page width is on show**: single 54 %, spread 50 %
+  (each sheet at half width), continuous 100 %. Zoom buttons are ignored while paged and the column's
+  zoom returns when continuous does.
 - Paging is by page, not by spread: the pair window changes when the current page crosses a pair
   boundary. The pairing offset control from the design is not built.
 - Mode changes reset the scroll; a finer anchor (keep the same paragraph) is not implemented.
