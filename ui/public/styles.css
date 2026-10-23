@@ -2392,3 +2392,91 @@ body.grip-dragging .text-grip {
 body.selection-quiet .textLayer :is(span, br)::selection {
   background: transparent;
 }
+
+/* The question field is a contenteditable editor; the placeholder is CSS, the pills are DOM. */
+.ask.editor {
+  height: auto;
+  min-height: 72px;  /* size */
+  white-space: pre-wrap;
+  cursor: text;
+  overflow-wrap: anywhere;
+}
+
+.ask.editor:empty::before {
+  content: attr(data-placeholder);
+  color: var(--ink-muted);
+  pointer-events: none;
+}
+
+.mention {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;  /* size */
+  padding: 0 6px;  /* size */
+  margin: 0 2px;  /* size */
+  font-size: var(--text-xs);
+  line-height: 18px;  /* size */
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: var(--radius-full);
+  vertical-align: baseline;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.mention-picker {
+  display: flex;
+  flex-direction: column;
+  max-height: 240px;  /* size */
+  overflow-y: auto;
+  padding: var(--space-1);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-2);
+}
+
+.mention-title {
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--ink-muted);
+}
+
+.mention-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-1) var(--space-2);
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--ink);
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.mention-item:hover {
+  background: var(--accent-soft);
+}
+
+.mention-kind {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;  /* size */
+  height: 18px;  /* size */
+  font-size: 10px;  /* size */
+  color: var(--accent);
+  background: var(--surface-sunken);
+  border-radius: var(--radius-sm);
+}
+
+.mention-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -118,6 +118,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- The question field is a contenteditable editor with inline attachment pills: type `@` to insert a
+  passage, region or page, delete a pill to remove its attachment (undoable), and send with Enter.
+
+
 - Navigation and zoom buttons have labels, and the spec carries a 19-step manual acceptance list.
 
 

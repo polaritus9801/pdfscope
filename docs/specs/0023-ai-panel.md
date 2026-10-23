@@ -149,6 +149,17 @@ before sending).
 3. **Sequence** — the program lands as one effort in dependency order; the first slice is the shell,
    the resizer and the scope control (shipped with this draft), then the attachment model.
 
+## 7b. Progress
+
+- **Shell, resizer, scope control** — landed. Flush column, border-as-divider with a 9 px drag strip,
+  content-anchored resize, three redrawn icons in a segmented control with a reference count badge.
+- **Composer** — landed as a contenteditable editor (`ui/public/composer.js`): attachment pills are
+  non-editable spans, `@` opens the picker above the field, choosing an item inserts a pill at the
+  caret, Backspace removes a pill and its attachment (one undo step), paste is reduced to text, and
+  Enter sends. Pills serialise as `@{kind:id}`; the interface turns them into `[引用 n]` in the order
+  passages → regions → pages, and an orphaned marker becomes `[引用已移除]`.
+- Still to come in P1: the horizontal context shelf, answers as references, drag-to-insert.
+
 ## 8. Gaps beyond the first inventory
 
 A second pass over mature assistants adds these, which the program should cover rather than

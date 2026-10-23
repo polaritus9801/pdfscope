@@ -12,6 +12,34 @@ use crate::scope_ui::PageManager;
 use crate::settings::SettingsSheet;
 use crate::{Passage, Region, truncate};
 
+/// Replaces pill markers with numbered references; an orphaned marker becomes plain text.
+fn inline_question(raw: &str, order: &[String]) -> String {
+    let mut text = raw.to_owned();
+    for (index, key) in order.iter().enumerate() {
+        text = text.replace(&format!("@{{{key}}}"), &format!("[引用 {}]", index + 1));
+    }
+    while let Some(start) = text.find("@{") {
+        let Some(offset) = text[start..].find('}') else {
+            break;
+        };
+        text.replace_range(start..start + offset + 1, "[引用已移除]");
+    }
+    text
+}
+
+/// Calls one function on `window.Composer`.
+fn composer(name: &str, args: &[JsValue]) -> Option<JsValue> {
+    let window = web_sys::window()?;
+    let object = js_sys::Reflect::get(&window, &JsValue::from_str("Composer")).ok()?;
+    let function = js_sys::Reflect::get(&object, &JsValue::from_str(name)).ok()?;
+    let function: js_sys::Function = function.dyn_into().ok()?;
+    let arguments = js_sys::Array::new();
+    for argument in args {
+        arguments.push(argument);
+    }
+    function.apply(&object, &arguments).ok()
+}
+
 /// Calls one function on `window.Bridge`.
 pub(crate) fn bridge(name: &str, args: &[JsValue]) -> Option<JsValue> {
     let window = web_sys::window()?;
@@ -193,6 +221,10 @@ pub fn AiPanel(
     let status = RwSignal::new(String::new());
     let streaming = RwSignal::new(false);
     let question = RwSignal::new(String::new());
+    let mentions = RwSignal::new(Vec::<String>::new());
+    let known_mentions = RwSignal::new(Vec::<String>::new());
+    let mention_open = RwSignal::new(false);
+    let editor_ref = NodeRef::<leptos::html::Div>::new();
     let failed = RwSignal::new(false);
     let history = RwSignal::new(Vec::<Stored>::new());
     let show_all = RwSignal::new(false);
@@ -271,6 +303,80 @@ pub fn AiPanel(
         answer.set(String::new());
         reasoning.set(String::new());
     };
+
+    // The editor reports text and the attachment keys of its pills.
+    Effect::new(move |_| {
+        let callback =
+            Closure::<dyn Fn(String, JsValue)>::new(move |text: String, keys: JsValue| {
+                let current: Vec<String> = keys
+                    .dyn_into::<js_sys::Array>()
+                    .map(|list| list.iter().filter_map(|value| value.as_string()).collect())
+                    .unwrap_or_default();
+
+                let previous = known_mentions.get();
+                for key in previous.iter().filter(|key| !current.contains(key)) {
+                    if let Some(id) = key.strip_prefix("p:").and_then(|id| id.parse::<u64>().ok()) {
+                        undo_push.run(());
+                        passages.update(|list| list.retain(|entry| entry.id != id));
+                    } else if let Some(id) =
+                        key.strip_prefix("r:").and_then(|id| id.parse::<u64>().ok())
+                    {
+                        undo_push.run(());
+                        regions.update(|list| list.retain(|entry| entry.id != id));
+                    }
+                }
+
+                known_mentions.set(current.clone());
+                mentions.set(current);
+                question.set(text);
+            });
+        if let Some(window) = web_sys::window() {
+            let _ = js_sys::Reflect::set(
+                &window,
+                &JsValue::from_str("__pdfscopeComposerInput"),
+                callback.as_ref(),
+            );
+        }
+        callback.forget();
+    });
+
+    Effect::new(move |_| {
+        let open = Closure::<dyn Fn()>::new(move || mention_open.set(true));
+        let close = Closure::<dyn Fn()>::new(move || mention_open.set(false));
+        if let Some(window) = web_sys::window() {
+            let _ = js_sys::Reflect::set(
+                &window,
+                &JsValue::from_str("__pdfscopeMentionOpen"),
+                open.as_ref(),
+            );
+            let _ = js_sys::Reflect::set(
+                &window,
+                &JsValue::from_str("__pdfscopeMentionClose"),
+                close.as_ref(),
+            );
+        }
+        open.forget();
+        close.forget();
+    });
+
+    // Hand the editor element to the renderer once it exists.
+    Effect::new(move |_| {
+        let Some(element) = editor_ref.get() else {
+            return;
+        };
+        let Some(window) = web_sys::window() else {
+            return;
+        };
+        let Ok(composer) = js_sys::Reflect::get(&window, &JsValue::from_str("Composer")) else {
+            return;
+        };
+        let Ok(init) = js_sys::Reflect::get(&composer, &JsValue::from_str("init")) else {
+            return;
+        };
+        if let Ok(init) = init.dyn_into::<js_sys::Function>() {
+            let _ = init.call1(&composer, &element);
+        }
+    });
 
     let send_text = move |asked: String| {
         if streaming.get() {
@@ -596,7 +702,32 @@ pub fn AiPanel(
         handler.forget();
     });
 
-    let send = move |_| send_text(question.get());
+    let composer_clear = move || {
+        let _ = composer("clear", &[JsValue::from_bool(true)]);
+        question.set(String::new());
+        mentions.set(Vec::new());
+        known_mentions.set(Vec::new());
+    };
+
+    let send = move |_| {
+        let mut order = Vec::new();
+        for passage in passages.get() {
+            order.push(format!("p:{}", passage.id));
+        }
+        for region in regions.get() {
+            order.push(format!("r:{}", region.id));
+        }
+        for page in page_set.get() {
+            order.push(format!("page:{page}"));
+        }
+
+        let text = inline_question(&question.get(), &order);
+        if text.trim().is_empty() {
+            return;
+        }
+        send_text(text);
+        composer_clear();
+    };
 
     let continue_last = move || {
         let all = turns.get();
@@ -1057,9 +1188,21 @@ pub fn AiPanel(
                                         class="ref-remove"
                                         title="移除"
                                         on:click=move |_| {
-                                            undo_push.run(());
                                             let id = passage.id;
-                                            passages.update(|list| list.retain(|entry| entry.id != id));
+                                            let key = format!("p:{id}");
+                                            let removed = composer(
+                                                "removeToken",
+                                                &[JsValue::from_str(&key)],
+                                            )
+                                            .and_then(|value| value.as_bool())
+                                            .unwrap_or(false);
+                                            // Removing a pill already removes the attachment, once.
+                                            if !removed {
+                                                undo_push.run(());
+                                                passages.update(|list| {
+                                                    list.retain(|entry| entry.id != id)
+                                                });
+                                            }
                                         }
                                     >
                                         "✕"
@@ -1083,9 +1226,20 @@ pub fn AiPanel(
                                         class="ref-remove"
                                         title="移除"
                                         on:click=move |_| {
-                                            undo_push.run(());
                                             let id = region.id;
-                                            regions.update(|list| list.retain(|entry| entry.id != id));
+                                            let key = format!("r:{id}");
+                                            let removed = composer(
+                                                "removeToken",
+                                                &[JsValue::from_str(&key)],
+                                            )
+                                            .and_then(|value| value.as_bool())
+                                            .unwrap_or(false);
+                                            if !removed {
+                                                undo_push.run(());
+                                                regions.update(|list| {
+                                                    list.retain(|entry| entry.id != id)
+                                                });
+                                            }
                                         }
                                     >
                                         "✕"
@@ -1162,23 +1316,117 @@ pub fn AiPanel(
                         .get()
                         .map(|message| view! { <p class="range-summary range-error">{message}</p> })
                 }}
-                <textarea
-                    class="ask"
-                    aria-label="问题"
-                    placeholder="问点什么…"
-                    prop:value=move || question.get()
-                    on:input=move |event| {
-                        question.set(event_target_value(&event));
-                        if let Some(target) = event
-                            .current_target()
-                            .and_then(|target| target.dyn_into::<web_sys::HtmlTextAreaElement>().ok())
-                        {
-                            let _ = target.set_attribute("style", "height:auto");
-                            let height = target.scroll_height().min(150);
-                            let _ = target.set_attribute("style", &format!("height:{height}px"));
-                        }
+                {move || {
+                    if !mention_open.get() {
+                        return ().into_any();
                     }
+                    let mut items = Vec::new();
+                    for passage in passages.get() {
+                        let key = format!("p:{}", passage.id);
+                        let label = format!("p.{}", passage.page);
+                        items.push(view! {
+                            <button
+                                class="mention-item"
+                                on:click=move |_| {
+                                    let _ = composer(
+                                        "insertToken",
+                                        &[JsValue::from_str(&key), JsValue::from_str(&label)],
+                                    );
+                                    mention_open.set(false);
+                                }
+                            >
+                                <span class="mention-kind">"文"</span>
+                                <span class="mention-label">{format!("p.{} · {}", passage.page, truncate(&passage.quote, 30))}</span>
+                            </button>
+                        }.into_any());
+                    }
+                    for region in regions.get() {
+                        let key = format!("r:{}", region.id);
+                        let label = format!("图 p.{}", region.page);
+                        items.push(view! {
+                            <button
+                                class="mention-item"
+                                on:click=move |_| {
+                                    let _ = composer(
+                                        "insertToken",
+                                        &[JsValue::from_str(&key), JsValue::from_str(&label)],
+                                    );
+                                    mention_open.set(false);
+                                }
+                            >
+                                <span class="mention-kind">"图"</span>
+                                <span class="mention-label">{format!("p.{} · 截图", region.page)}</span>
+                            </button>
+                        }.into_any());
+                    }
+                    for page in page_set.get() {
+                        let key = format!("page:{page}");
+                        let label = format!("p.{page}");
+                        items.push(view! {
+                            <button
+                                class="mention-item"
+                                on:click=move |_| {
+                                    let _ = composer(
+                                        "insertToken",
+                                        &[JsValue::from_str(&key), JsValue::from_str(&label)],
+                                    );
+                                    mention_open.set(false);
+                                }
+                            >
+                                <span class="mention-kind">"页"</span>
+                                <span class="mention-label">{format!("p.{page}")}</span>
+                            </button>
+                        }.into_any());
+                    }
+                    let current_page = page.get();
+                    let already = page_set.get().contains(&current_page);
+                    items.push(view! {
+                        <button
+                            class="mention-item"
+                            on:click=move |_| {
+                                if !already {
+                                    undo_push.run(());
+                                    page_set.update(|set| pdfscope_core::add_range(set, current_page, current_page));
+                                    scope_mode.set(2);
+                                }
+                                let _ = composer(
+                                    "insertToken",
+                                    &[
+                                        JsValue::from_str(&format!("page:{current_page}")),
+                                        JsValue::from_str(&format!("p.{current_page}")),
+                                    ],
+                                );
+                                mention_open.set(false);
+                            }
+                        >
+                            <span class="mention-kind">"+"</span>
+                            <span class="mention-label">{format!("引用当前页 p.{current_page}")}</span>
+                        </button>
+                    }.into_any());
+
+                    view! {
+                        <div
+                            class="mention-picker"
+                            on:pointerdown=move |event: web_sys::PointerEvent| event.prevent_default()
+                        >
+                            <p class="mention-title">"插入引用"</p>
+                            {items.collect_view()}
+                        </div>
+                    }
+                        .into_any()
+                }}
+                <div
+                    node_ref=editor_ref
+                    id="ask-editor"
+                    class="ask editor"
+                    contenteditable="true"
+                    role="textbox"
+                    aria-label="问题"
+                    data-placeholder="问点什么…"
                     on:keydown=move |event: web_sys::KeyboardEvent| {
+                        if event.is_composing() {
+                            return;
+                        }
                         let modified = event.meta_key()
                             || event.ctrl_key()
                             || event.alt_key()
@@ -1186,11 +1434,17 @@ pub fn AiPanel(
                         if event.key() == "Enter" && !modified {
                             event.prevent_default();
                             send(());
-                        } else if event.key() == "Escape" && streaming.get() {
-                            let _ = bridge("stop", &[]);
+                        } else if event.key() == "Enter" && event.shift_key() {
+                            event.prevent_default();
+                            let _ = composer("insertNewline", &[]);
+                        } else if event.key() == "Escape" {
+                            mention_open.set(false);
+                            if streaming.get() {
+                                let _ = bridge("stop", &[]);
+                            }
                         }
                     }
-                ></textarea>
+                ></div>
                 <div class="composer-row">
                     <span class="status">{move || status.get()}</span>
                     <button

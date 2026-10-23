@@ -1,0 +1,203 @@
+// The composer editor.
+//
+// A textarea cannot hold inline objects, so the question field is a contenteditable element whose
+// attachment tokens are non-editable pills. This module owns only the DOM side: serialisation,
+// token insertion, paste and the `@` trigger. The interface owns the attachments themselves.
+
+let root = null;
+let notify = null;
+let allowMention = true;
+
+function serialise() {
+  if (!root) return { text: "", keys: [] };
+  let text = "";
+  const keys = [];
+
+  const walk = (node) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      text += node.textContent.replace(/\u00a0/g, " ");
+      return;
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
+    if (node.dataset && node.dataset.key) {
+      text += `@{${node.dataset.key}}`;
+      keys.push(node.dataset.key);
+      return;
+    }
+    if (node.tagName === "BR") {
+      text += "\n";
+      return;
+    }
+    for (const child of node.childNodes) walk(child);
+    // Chromium wraps a line in a <div> after Enter; keep the break in the text.
+    if (node.tagName === "DIV" && node.nextSibling) text += "\n";
+  };
+
+  for (const child of root.childNodes) walk(child);
+  return { text: text.replace(/\n{3,}/g, "\n\n"), keys };
+}
+
+function emit() {
+  const payload = serialise();
+  if (notify) {
+    notify(payload.text, payload.keys);
+  } else {
+    window.__pdfscopeComposerInput?.(payload.text, payload.keys);
+  }
+}
+
+function caretInRoot() {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0 || !root) return null;
+  const range = selection.getRangeAt(0);
+  return root.contains(range.commonAncestorContainer) ? range : null;
+}
+
+function textBeforeCaret() {
+  const range = caretInRoot();
+  if (!range) return "";
+  const probe = range.cloneRange();
+  probe.setStart(root, 0);
+  return probe.toString();
+}
+
+function removeTrailingAt() {
+  const range = caretInRoot();
+  if (!range || !range.collapsed) return;
+  const text = textBeforeCaret();
+  if (!text.endsWith("@")) return;
+
+  const node = range.startContainer;
+  if (node.nodeType !== Node.TEXT_NODE || range.startOffset === 0) return;
+  const before = node.textContent.slice(0, range.startOffset);
+  if (!before.endsWith("@")) return;
+  // Only a mention trigger: start of the field, or preceded by whitespace.
+  const preceding = before.slice(0, -1);
+  if (preceding.length > 0 && !/\s$/.test(preceding)) return;
+
+  const next = before.slice(0, -1) + node.textContent.slice(range.startOffset);
+  node.textContent = next;
+  const offset = before.length - 1;
+  range.setStart(node, offset);
+  range.collapse(true);
+  const selection = window.getSelection();
+  selection.removeAllRanges();
+  selection.addRange(range);
+}
+
+function checkMention() {
+  if (!allowMention) return;
+  const text = textBeforeCaret();
+  if (!text.endsWith("@")) return;
+  const before = text.slice(0, -1);
+  if (before.length > 0 && !/\s$/.test(before)) return;
+  window.__pdfscopeMentionOpen?.();
+}
+
+function insertText(text) {
+  const range = caretInRoot();
+  if (!range) {
+    root.appendChild(document.createTextNode(text));
+  } else {
+    range.deleteContents();
+    const node = document.createTextNode(text);
+    range.insertNode(node);
+    range.setStartAfter(node);
+    range.collapse(true);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
+  root.focus();
+  emit();
+}
+
+function insertToken(key, label) {
+  if (!root) return;
+  removeTrailingAt();
+
+  const token = document.createElement("span");
+  token.className = "mention";
+  token.contentEditable = "false";
+  token.dataset.key = key;
+  token.textContent = `@${label}`;
+
+  const range = caretInRoot();
+  if (!range) {
+    root.appendChild(token);
+  } else {
+    range.deleteContents();
+    range.insertNode(token);
+    range.setStartAfter(token);
+    range.collapse(true);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
+
+  // A plain space after the pill keeps typing natural and keeps the caret out of the token.
+  const space = document.createTextNode(" ");
+  token.after(space);
+  const after = document.createRange();
+  after.setStart(space, 1);
+  after.collapse(true);
+  const selection = window.getSelection();
+  selection.removeAllRanges();
+  selection.addRange(after);
+
+  root.focus();
+  emit();
+}
+
+window.Composer = {
+  init(element, callback) {
+    root = element;
+    notify = callback;
+
+    root.addEventListener("input", () => {
+      emit();
+      checkMention();
+    });
+    root.addEventListener("paste", (event) => {
+      event.preventDefault();
+      const text = event.clipboardData?.getData("text/plain") ?? "";
+      insertText(text);
+    });
+    root.addEventListener("blur", () => {
+      window.__pdfscopeMentionClose?.();
+    });
+  },
+
+  clear(silent = false) {
+    if (!root) return;
+    root.replaceChildren();
+    if (!silent) emit();
+  },
+
+  removeToken(key) {
+    if (!root) return;
+    const token = root.querySelector(`.mention[data-key="${key}"]`);
+    if (!token) return;
+    // Take the following space with it, so two removals do not leave a double gap.
+    const next = token.nextSibling;
+    token.remove();
+    if (next && next.nodeType === Node.TEXT_NODE && next.textContent.startsWith(" ")) {
+      next.textContent = next.textContent.slice(1);
+    }
+    emit();
+  },
+
+  insertNewline() {
+    insertText("\n");
+  },
+
+  focus() {
+    root?.focus();
+  },
+
+  insertToken,
+
+  setMentionsAllowed(value) {
+    allowMention = Boolean(value);
+  },
+};
