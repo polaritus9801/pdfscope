@@ -38,7 +38,8 @@ pub async fn tavily(key: &Secret, query: &str) -> Result<Vec<WebResult>, AiError
         "include_answer": false,
     });
 
-    let response = crate::client(None)?
+    // A search should fail fast; it is a hint before the real request, not a research session.
+    let response = crate::client(Some(std::time::Duration::from_secs(20)))?
         .post(ENDPOINT)
         .json(&body)
         .send()

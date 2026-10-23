@@ -307,6 +307,16 @@ pub fn AiPanel(
     let dragging = RwSignal::new(false);
     let width = RwSignal::new(380_u32);
     let stage_anchor = RwSignal::new(Option::<(f64, f64)>::None);
+
+    // Restore the last width; the divider remembers it per machine.
+    Effect::new(move |_| {
+        if let Some(width_now) = crate::call("loadPanelWidth", &[]).and_then(|value| value.as_f64())
+        {
+            if width_now.is_finite() {
+                width.set((width_now as u32).clamp(320, 720));
+            }
+        }
+    });
     let pending = RwSignal::new(String::new());
     let scheduled = RwSignal::new(false);
 
@@ -1337,7 +1347,7 @@ pub fn AiPanel(
             class:collapsed=move || collapsed.get()
             style=move || {
                 if collapsed.get() {
-                    "width: 28px".to_owned()
+                    "width: 44px".to_owned()
                 } else {
                     format!("width: {}px", width.get())
                 }
@@ -1390,9 +1400,17 @@ pub fn AiPanel(
                         );
                     }
                 }
+                on:dblclick=move |_| {
+                    width.set(380);
+                    let _ = crate::call("savePanelWidth", &[JsValue::from_f64(380.0)]);
+                }
                 on:pointerup=move |_| {
                     dragging.set(false);
                     stage_anchor.set(None);
+                    let _ = crate::call(
+                        "savePanelWidth",
+                        &[JsValue::from_f64(f64::from(width.get()))],
+                    );
                     if let Some(root) = web_sys::window()
                         .and_then(|window| window.document())
                         .and_then(|document| document.document_element())

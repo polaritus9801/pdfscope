@@ -297,3 +297,71 @@ These join the phases below rather than forming a second spec.
   source of truth and serialization is one function, so a textarea fallback stays possible.
 - Persisted history needs a schema before P2; it must record attachments by value, not by pointer.
 - Web search depends on a provider and adds cost; it is opt-in per turn.
+
+
+## 11. Manual acceptance
+
+Run these against the desktop build with a configured model and (for §6) a Tavily key.
+
+### Composer
+1. Type `@`: the picker opens above the field. `↑`/`↓` wrap the highlight, Enter inserts, Esc closes.
+2. Choose a text reference: a lilac pill appears at the caret; typing continues after it.
+3. Select text in the answer, click 引用此回答: the pill quotes only that selection.
+4. Drag a shelf chip into the middle of a sentence: the pill lands at the drop point.
+5. Backspace over a pill: the attachment leaves the shelf; ⌘Z restores it once.
+6. Enter sends, Shift+Enter breaks a line, IME composition never sends mid-word.
+7. Delete the attachment with the shelf ✕: the pill disappears too, one undo step.
+
+### Shelf
+8. Text, region, image, file, page and answer rows appear only when non-empty and scroll sideways.
+9. Clicking a chip jumps to its page; ✕ removes it; the panel width never changes.
+
+### Answers
+10. Copy copies the body; 复制引用 appends `参考：p.n…`.
+11. 重试 resends; 编辑 puts the question back with a banner and replaces that turn and later ones;
+    分支 creates a new conversation containing that turn and earlier ones.
+12. A web answer keeps its numbered source cards after switching conversations and after restart;
+    clicking a card opens (or at minimum exposes) the URL.
+
+### History
+13. 新对话 adds a conversation; search matches titles, questions and answers; rename survives blur and
+    Enter; pin sorts first; delete needs a second click.
+14. Switch, restart, and reopen the document: the same conversations and pinned order return.
+15. 临时 shows the badge, is absent from the list, and disappears when switched away.
+16. 导出 copies the active conversation as Markdown.
+
+### Files and images
+17. Attach two images and a `.md`: three rows appear, each removable; the token hint grows.
+18. Send: images arrive as pictures and the file text is labelled `[附件文件 …]` in the prompt.
+
+### Web search
+19. Without a key, the globe search ends the turn with a message and keeps the draft and references.
+20. With a key, an answer shows numbered 来源 cards; an empty result says so and still answers.
+21. Turn the globe off: the next request does not search.
+
+### Panel
+22. The panel is flush with the window edge, its left border is the divider, and dragging it keeps the
+    document's centre in place. Double-click the divider to reset it to 380; the width survives a
+    restart.
+23. The scope control shows three icons, an accent segment and a reference count badge; tooltips carry
+    `全文 · N 页` and counts.
+
+### Runtime-only checks
+These cannot be verified by `just check` and need a human: caret behaviour in the contenteditable
+field, pill deletion across wrapped lines, the real Tavily response shape, and window.open behaviour
+for source cards in the desktop webview.
+
+
+## 12. Deviations
+
+- **Chip reordering is not built.** Dragging a chip always inserts a pill into the question; dropping it
+  on another chip does not change the shelf order. Insertion order is the send order.
+- **Duplicate detection is not built.** Selecting the same passage twice (or attaching the same image
+  or file twice) produces two attachments; the `@` picker reuses an existing attachment instead of
+  adding another, so the common path avoids it.
+- **Copy uses the clipboard, not a file.** 导出 copies Markdown; it does not write a `.md` file, because
+  the webview has no file-save bridge yet.
+- **Source cards open via `window.open`.** If the desktop webview refuses new windows, the card is
+  inert; copying the URL is the fallback the reader has today.
+- **Images and files are outside the reference undo snapshot**; passages, regions, pages and answers
+  are inside it.

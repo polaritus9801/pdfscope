@@ -1909,6 +1909,24 @@ window.PDFScope = {
     }
   },
 
+  /// The reader's preferred panel width, remembered between launches.
+  loadPanelWidth() {
+    try {
+      const value = Number(window.localStorage.getItem("pdfscope.panelWidth"));
+      return Number.isFinite(value) && value > 0 ? value : null;
+    } catch {
+      return null;
+    }
+  },
+
+  savePanelWidth(width) {
+    try {
+      window.localStorage.setItem("pdfscope.panelWidth", String(Math.round(width)));
+    } catch {
+      // Preference lost, layout still works.
+    }
+  },
+
   /// Opens a citation in the system browser.
   openUrl(url) {
     window.open(url, "_blank", "noopener");
