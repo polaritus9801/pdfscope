@@ -655,7 +655,11 @@ pub(crate) fn SettingsSheet(
                                                                         type="button"
                                                                         class="preset-option"
                                                                         class:selected=selected_class
-                                                                        on:click=move |_| {
+                                                                        on:pointerdown=move |event: web_sys::PointerEvent| {
+                                                                            // Commit on pointerdown so the menu closes on the first
+                                                                            // interaction, even if the click never reaches a removed row.
+                                                                            event.prevent_default();
+                                                                            event.stop_propagation();
                                                                             if let Some((protocol, base)) = preset(&value) {
                                                                                 form_protocol.set(protocol.to_owned());
                                                                                 form_base.set(base.to_owned());

@@ -348,8 +348,11 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Fixed
 
-- Tool shortcuts no longer fire while typing in the composer; held modifiers temporarily switch to
-  that tool's real behaviour; the page under the pointer stays lit through drags and edge auto-scroll.
+- Tool shortcuts no longer fire while typing in the composer; held modifiers now call the real
+  `setTool`, mirror the borrowed rail icon and clear reference handles; the vendor menu commits and
+  closes on the first pointer.
+- Investigation only: two pages can look lit during a fast 1→3 drag because the page wash has two
+  owners and a 120 ms opacity transition (see 0025).
 - The composer's inner focus rectangle is gone, its card border is stronger, the divider no longer
   paints a purple bar, and the collapsed rail is one full-height icon-only button.
 - Official SVG marks are downloaded for every provider; model rows and settings chips carry them.

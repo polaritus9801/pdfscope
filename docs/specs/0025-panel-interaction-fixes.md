@@ -14,8 +14,13 @@ typing `t` switched to the text tool and stole focus. The guard now uses
 
 Holding `⌘/Ctrl`, `⇧` or `⌥` in pointer mode now **switches the renderer to that tool** and restores
 pointer on release. The borrowed gesture therefore has exactly the sticky mode's behaviour — capture,
-page gestures, cursor, wash and selection — not a visual approximation. The borrow is cleared on
-keyup, blur and external tool changes, and is ignored while an editable field has focus.
+page gestures, cursor, wash and selection — not a visual approximation.
+
+The first attempt called a free `setTool()` that does not exist in the renderer, so the keydown
+threw before changing anything; it also never told Rust, leaving a focused reference's handles and
+wash visible. The borrow now calls `PDFScope.setTool()`, reports the borrowed mode to Rust, clears
+`focused_ref`/`active_ref` exactly like the rail does, and lights the borrowed rail icon. The borrow is
+cleared on keyup, blur and external tool changes, and is ignored while an editable field has focus.
 
 ## 3. The page under the pointer stays lit while dragging
 
@@ -62,3 +67,22 @@ ResizeObserver also refit pages repeatedly. Dragging now runs in JS and **scales
   window still finishes correctly.
 
 `just check` green; visual and pointer behaviour need a human pass.
+
+
+## Investigation — two pages lit during a 1→3 drag (not changed)
+
+Two independent effects can make page 2 and page 3 look lit at the same time:
+
+1. **The wash owns two sources.** `:hover` and the JS `.pointer-page` class can both be active, and
+   the page wash has `transition: opacity 120ms`. Moving quickly from page 2 to page 3 starts page 2's
+   fade-out and page 3's fade-in in the same 120ms, so both are visibly washed. A slow drag makes the
+   overlap invisible, which matches the roughly 50% reproduction rate.
+2. **Page 2 is also a range-preview.** Every page intersecting the marquee gets `.range-preview` with
+   a 2 px accent outline. That is intended range feedback, but it reads as a second highlighted page
+   next to the pointer wash.
+
+WebKit can also keep `:hover` on the pointer-down page during a prevented drag, which would leave
+page 2 hovered until release. The robust fix is to make the wash single-owner: remove the `:hover`
+wash in page mode, add a `.page-gesture` class while dragging, and disable the opacity transition
+while that class is present; `.pointer-page` remains the only page with a wash. That change is
+deliberately not made in this commit.

@@ -58,6 +58,8 @@ fn App() -> impl IntoView {
     let reading = RwSignal::new(false);
     // 0 pointer, 1 text, 2 box, 3 pages: the rail's active tool.
     let tool = RwSignal::new(0_u8);
+    // A held modifier borrows a tool in the renderer; the rail mirrors it, but the sticky tool does not change.
+    let borrowed_tool = RwSignal::new(Option::<u8>::None);
     let page_set = RwSignal::new(Vec::<u32>::new());
     // Bumped on every finished edit; an async re-read may only apply if nothing newer happened.
     let edit_epoch = RwSignal::new(0_u64);
@@ -75,6 +77,7 @@ fn App() -> impl IntoView {
     let choose_tool = move |next: u8| {
         focused_ref.set(None);
         active_ref.set(None);
+        borrowed_tool.set(None);
         tool.set(next);
         let name = match next {
             1 => "text",
@@ -831,6 +834,32 @@ fn App() -> impl IntoView {
         });
     });
 
+    // The renderer reports a borrowed tool; clear the reference focus so handles and the wash
+    // collapse exactly as they do when the sticky tool is chosen.
+    Effect::new(move |_| {
+        let callback = Closure::<dyn Fn(String)>::new(move |mode: String| {
+            let borrowed = match mode.as_str() {
+                "text" => Some(1),
+                "box" => Some(2),
+                "pages" => Some(3),
+                _ => None,
+            };
+            if borrowed.is_some() {
+                focused_ref.set(None);
+                active_ref.set(None);
+            }
+            borrowed_tool.set(borrowed);
+        });
+        if let Some(window) = web_sys::window() {
+            let _ = js_sys::Reflect::set(
+                &window,
+                &JsValue::from_str("__pdfscopeToolBorrowed"),
+                callback.as_ref(),
+            );
+        }
+        callback.forget();
+    });
+
     view! {
         <div
             class="app"
@@ -1152,7 +1181,7 @@ fn App() -> impl IntoView {
                     <div class="rail-capsule">
                         <button
                             class="rail-tool"
-                            class:active=move || tool.get() == 1
+                            class:active=move || tool.get() == 1 || borrowed_tool.get() == Some(1)
                             title="文字：划选即加入引用（T · ⇧ 临时）"
                             prop:disabled=move || !ready.get()
                             on:click=move |_| choose_tool(1)
@@ -1163,7 +1192,7 @@ fn App() -> impl IntoView {
                         </button>
                         <button
                             class="rail-tool"
-                            class:active=move || tool.get() == 2
+                            class:active=move || tool.get() == 2 || borrowed_tool.get() == Some(2)
                             title="框选：拖出矩形（B · ⌥ 临时）"
                             prop:disabled=move || !ready.get()
                             on:click=move |_| choose_tool(2)
@@ -1174,7 +1203,7 @@ fn App() -> impl IntoView {
                         </button>
                         <button
                             class="rail-tool"
-                            class:active=move || tool.get() == 3
+                            class:active=move || tool.get() == 3 || borrowed_tool.get() == Some(3)
                             title="页面：点击或拖动选择页面（D · ⌘ 临时）"
                             prop:disabled=move || !ready.get()
                             on:click=move |_| choose_tool(3)

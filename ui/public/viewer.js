@@ -132,22 +132,38 @@ function syncBorrow(event) {
     if (mode === borrowedMode) return;
     const previous = borrowedMode;
     borrowedMode = null;
-    if (toolMode === previous) setTool("pointer");
-    if (!mode || toolMode !== "pointer") return;
+    if (toolMode === previous) applyTool("pointer");
+    if (!mode || toolMode !== "pointer") {
+      reportBorrow("");
+      return;
+    }
   } else if (pointerHeld) {
     return;
   }
 
-  if (!mode || toolMode !== "pointer") return;
+  if (!mode || toolMode !== "pointer") {
+    reportBorrow("");
+    return;
+  }
   borrowedMode = mode;
-  setTool(mode);
+  applyTool(mode);
+  reportBorrow(mode);
+}
+
+function applyTool(mode) {
+  window.PDFScope?.setTool(mode);
+}
+
+function reportBorrow(mode) {
+  window.__pdfscopeToolBorrowed?.(mode || "");
 }
 
 function endBorrow() {
   if (!borrowedMode) return;
   const previous = borrowedMode;
   borrowedMode = null;
-  if (toolMode === previous) setTool("pointer");
+  if (toolMode === previous) applyTool("pointer");
+  reportBorrow("");
 }
 
 function nextFrame() {
