@@ -1781,7 +1781,10 @@ pub fn AiPanel(
                                 on:pointerdown=move |_| model_menu.set(false)
                             ></div>
                             <div class="model-menu">
-                                <div class="model-menu-head">"选择模型"</div>
+                                <div class="model-menu-head">
+                                    {provider_tile(provider_preset.get(), 18)}
+                                    <span>"选择模型"</span>
+                                </div>
                                 <button
                                     class="model-option"
                                     on:click=move |_| {

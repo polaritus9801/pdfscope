@@ -1,6 +1,6 @@
 # 0024 — AI panel visual refresh
 
-**Status:** accepted.
+**Status:** accepted and implemented.
 
 The design rationale and the comparison live in `docs/design/ai-panel.md`; this spec is the
 implementation contract.
@@ -43,4 +43,7 @@ one icon language, designed states. Behaviour, request logic and the reader stay
 - P3 landed: a three-line skeleton before the first token, a structured error card (icon, cause, retry
   and settings), focus-visible rings across the panel, a quiet turn entrance and skeleton shimmer,
   all disabled under `prefers-reduced-motion`.
-- Next: P4 settings.
+- P4 landed: the search provider is a two-column card list with marks, a hint and a selected check;
+  the key row carries an 已配置 badge; the model popover gains the provider mark in its header.
+- All phases landed. Behaviour is unchanged; only presentation, icons and the per-answer `model`
+  display field were added.

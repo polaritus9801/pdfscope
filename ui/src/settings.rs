@@ -5,6 +5,7 @@ use leptos::task::spawn_local;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
 
+use crate::icons::{icon, provider_tile};
 use crate::panel::{
     PRESET_LABELS, apply_font_size, apply_theme, bridge, flag_of, number_of, preset, text_of,
 };
@@ -708,30 +709,44 @@ pub(crate) fn SettingsSheet(
                                             "发送前按估算的上下文拦截；0 表示不检查。"
                                         </p>
 
+                                        <div class="provider-grid" role="radiogroup" aria-label="联网搜索服务">
+                                            {[
+                                                ("deepseek", "DeepSeek Search", "复用模型 Key"),
+                                                ("tavily", "Tavily", "独立 Key"),
+                                                ("brave", "Brave", "独立 Key"),
+                                                ("exa", "Exa", "独立 Key"),
+                                                ("serper", "Serper", "Google 结果"),
+                                            ]
+                                                .into_iter()
+                                                .map(|(id, name, hint)| {
+                                                    let id_value = id.to_owned();
+                                                    let selected = move || form_search_provider.get() == id;
+                                                    view! {
+                                                        <button
+                                                            class="provider-option"
+                                                            class:selected=selected
+                                                            role="radio"
+                                                            aria-checked=move || selected().to_string()
+                                                            on:click=move |_| form_search_provider.set(id_value.clone())
+                                                        >
+                                                            {provider_tile(name.to_owned(), 26)}
+                                                            <span class="provider-option-text">
+                                                                <strong>{name}</strong>
+                                                                <small>{hint}</small>
+                                                            </span>
+                                                            <Show when=selected>{icon("check", 14)}</Show>
+                                                        </button>
+                                                    }
+                                                })
+                                                .collect_view()}
+                                        </div>
                                         <label class="settings-row">
-                                            <span>"联网搜索服务"</span>
-                                            <select on:change=move |event| {
-                                                form_search_provider.set(event_target_value(&event))
-                                            }>
-                                                <option value="deepseek" selected=move || form_search_provider.get() == "deepseek">
-                                                    "DeepSeek Search（可复用模型 Key）"
-                                                </option>
-                                                <option value="tavily" selected=move || form_search_provider.get() == "tavily">
-                                                    "Tavily"
-                                                </option>
-                                                <option value="brave" selected=move || form_search_provider.get() == "brave">
-                                                    "Brave Search"
-                                                </option>
-                                                <option value="exa" selected=move || form_search_provider.get() == "exa">
-                                                    "Exa"
-                                                </option>
-                                                <option value="serper" selected=move || form_search_provider.get() == "serper">
-                                                    "Serper（Google）"
-                                                </option>
-                                            </select>
-                                        </label>
-                                        <label class="settings-row">
-                                            <span>"搜索 API Key"</span>
+                                            <span>
+                                                "搜索 API Key"
+                                                <Show when=move || search_key_stored.get()>
+                                                    <em class="settings-badge">"已配置"</em>
+                                                </Show>
+                                            </span>
                                             <input
                                                 type="password"
                                                 placeholder=move || {

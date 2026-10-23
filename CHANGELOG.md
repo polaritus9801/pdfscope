@@ -130,6 +130,9 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Search-provider cards with marks and a configured badge, and a provider mark in the model popover.
+
+
 - Skeleton, structured error, focus rings and reduced-motion-aware transitions in the AI panel.
 
 
