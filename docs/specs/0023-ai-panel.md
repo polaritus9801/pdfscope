@@ -211,6 +211,15 @@ before sending).
 - `分支` on any answer creates a new stored conversation containing that turn and everything before
   it, titled after its parent with a `· 分支` suffix, and switches to it.
 
+## 7g. Progress — text files
+
+- The same paperclip accepts text files (`txt`, `md`, `csv`, `json`, `log`, `yaml`); each is read as
+  text (200 KB limit) and appears in its own shelf row with its character count.
+- Files are inserted as pills through `@` or by drag, count toward the token estimate, and each one
+  is appended to the question as `[附件文件 name]` with a per-file 8 000-character limit
+  (`file_block` in core, four tests). They live for one send and are cleared afterwards.
+- Adding a file is not yet part of the reference undo snapshot, same as images.
+
 ## 8. Gaps beyond the first inventory
 
 A second pass over mature assistants adds these, which the program should cover rather than

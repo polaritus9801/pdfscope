@@ -118,6 +118,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Attach text files to a question; they appear in the shelf, are counted in the budget and are sent
+  as labelled, character-limited blocks.
+
+
 - Temporary conversations that are never persisted, and 分支 to continue from any answer in a new
   stored conversation.
 

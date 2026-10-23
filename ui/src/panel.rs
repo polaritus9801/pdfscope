@@ -212,6 +212,14 @@ struct Conversation {
     turns: Vec<Turn>,
 }
 
+/// A text file the reader attached to a question.
+#[derive(Clone, PartialEq)]
+struct UserFile {
+    id: u64,
+    name: String,
+    text: String,
+}
+
 /// An image the reader attached to a question.
 #[derive(Clone, PartialEq)]
 struct UserImage {
@@ -274,6 +282,8 @@ pub fn AiPanel(
     let next_conversation = RwSignal::new(0_u64);
     let images = RwSignal::new(Vec::<UserImage>::new());
     let next_image = RwSignal::new(0_u64);
+    let files = RwSignal::new(Vec::<UserFile>::new());
+    let next_file = RwSignal::new(0_u64);
     let editor_ref = NodeRef::<leptos::html::Div>::new();
     let failed = RwSignal::new(false);
     let history = RwSignal::new(Vec::<Stored>::new());
@@ -306,6 +316,9 @@ pub fn AiPanel(
         for answer in answers.get() {
             characters += answer.quote.chars().count();
         }
+        for file in files.get() {
+            characters += file.text.chars().count().min(8000);
+        }
         estimate_tokens(
             characters,
             regions.get().len() + images.get().len(),
@@ -313,7 +326,11 @@ pub fn AiPanel(
         )
     };
     let reference_count = move || {
-        passages.get().len() + regions.get().len() + page_set.get().len() + images.get().len()
+        passages.get().len()
+            + regions.get().len()
+            + page_set.get().len()
+            + images.get().len()
+            + files.get().len()
     };
 
     let redeem = move |index: usize| {
@@ -935,6 +952,10 @@ pub fn AiPanel(
                 ));
             }
         }
+        for file in files.get() {
+            text.push_str(&pdfscope_core::file_block(&file.name, &file.text, 8000));
+            text.push('\n');
+        }
         if text.trim().is_empty() {
             return;
         }
@@ -945,6 +966,7 @@ pub fn AiPanel(
         send_text(text);
         answers.set(Vec::new());
         images.set(Vec::new());
+        files.set(Vec::new());
         composer_clear();
     };
 
@@ -1035,6 +1057,15 @@ pub fn AiPanel(
         if !removed {
             undo_push.run(());
             page_set.update(|set| set.retain(|entry| *entry != page_number));
+        }
+    };
+    let remove_file = move |id: u64| {
+        let key = format!("file:{id}");
+        let removed = composer("removeToken", &[JsValue::from_str(&key)])
+            .and_then(|value| value.as_bool())
+            .unwrap_or(false);
+        if !removed {
+            files.update(|list| list.retain(|entry| entry.id != id));
         }
     };
     let remove_image = move |id: u64| {
@@ -1912,9 +1943,11 @@ pub fn AiPanel(
                     let pages_selected = page_set.get();
                     let cited = answers.get();
                     let pictures = images.get();
+                    let documents = files.get();
                     if quotes.is_empty()
                         && shots.is_empty()
                         && pictures.is_empty()
+                        && documents.is_empty()
                         && pages_selected.is_empty()
                         && cited.is_empty()
                     {
@@ -2046,6 +2079,41 @@ pub fn AiPanel(
                         }
                     });
 
+                    let file_row = (!documents.is_empty()).then(|| {
+                        view! {
+                            <div class="shelf-row">
+                                <span class="shelf-label">"文件"</span>
+                                <div class="shelf-track">
+                                    {documents
+                                        .into_iter()
+                                        .map(|file| {
+                                            let id = file.id;
+                                            view! {
+                                                <div class="attach-chip" title=file.name.clone()>
+                                                    <span class="chip-kind">"件"</span>
+                                                    <span class="chip-text">{file.name.clone()}</span>
+                                                    <span class="chip-page">
+                                                        {format!("{} 字", file.text.chars().count())}
+                                                    </span>
+                                                    <span
+                                                        class="chip-x"
+                                                        title="移除"
+                                                        on:click=move |event: web_sys::MouseEvent| {
+                                                            event.stop_propagation();
+                                                            remove_file(id);
+                                                        }
+                                                    >
+                                                        "✕"
+                                                    </span>
+                                                </div>
+                                            }
+                                        })
+                                        .collect_view()}
+                                </div>
+                            </div>
+                        }
+                    });
+
                     let page_row = (!pages_selected.is_empty()).then(|| {
                         view! {
                             <div class="shelf-row">
@@ -2140,6 +2208,7 @@ pub fn AiPanel(
                             {quote_row}
                             {shot_row}
                             {image_row}
+                            {file_row}
                             {page_row}
                             {answer_row}
                         </div>
@@ -2293,6 +2362,25 @@ pub fn AiPanel(
                             >
                                 <span class="mention-kind">"页"</span>
                                 <span class="mention-label">{format!("p.{page}")}</span>
+                            </button>
+                        }.into_any());
+                    }
+                    for file in files.get() {
+                        let key = format!("file:{}", file.id);
+                        let label = truncate(&file.name, 14);
+                        items.push(view! {
+                            <button
+                                class="mention-item"
+                                on:click=move |_| {
+                                    let _ = composer(
+                                        "insertToken",
+                                        &[JsValue::from_str(&key), JsValue::from_str(&label)],
+                                    );
+                                    mention_open.set(false);
+                                }
+                            >
+                                <span class="mention-kind">"件"</span>
+                                <span class="mention-label">{file.name.clone()}</span>
                             </button>
                         }.into_any());
                     }
@@ -2464,11 +2552,11 @@ pub fn AiPanel(
                             id="attach-input"
                             class="file-input"
                             type="file"
-                            accept="image/*"
+                            accept="image/*,.txt,.md,.markdown,.csv,.json,.log,.yaml,.yml"
                             multiple
                             on:change=move |_| {
                                 let Some(promise) = crate::call(
-                                    "readImages",
+                                    "readAttachments",
                                     &[JsValue::from_str("attach-input")],
                                 ) else {
                                     return;
@@ -2482,18 +2570,37 @@ pub fn AiPanel(
                                         return;
                                     };
                                     for entry in list.iter() {
-                                        let name = crate::model::read_string(&entry, "name")
-                                            .unwrap_or_else(|| "图片".to_owned());
-                                        let image = crate::model::read_string(&entry, "image")
+                                        let kind = crate::model::read_string(&entry, "kind")
                                             .unwrap_or_default();
-                                        if !image.starts_with("data:image/") {
-                                            continue;
+                                        let name = crate::model::read_string(&entry, "name")
+                                            .unwrap_or_else(|| "附件".to_owned());
+                                        let data = crate::model::read_string(&entry, "data")
+                                            .unwrap_or_default();
+                                        match kind.as_str() {
+                                            "image" if data.starts_with("data:image/") => {
+                                                let id = next_image.get() + 1;
+                                                next_image.set(id);
+                                                images.update(|list| {
+                                                    list.push(UserImage { id, name, image: data })
+                                                });
+                                            }
+                                            "text" if !data.trim().is_empty() => {
+                                                let id = next_file.get() + 1;
+                                                next_file.set(id);
+                                                files.update(|list| {
+                                                    list.push(UserFile { id, name, text: data })
+                                                });
+                                            }
+                                            "error" => {
+                                                if let Some(message) = crate::model::read_string(
+                                                    &entry,
+                                                    "message",
+                                                ) {
+                                                    notify.run(message);
+                                                }
+                                            }
+                                            _ => {}
                                         }
-                                        let id = next_image.get() + 1;
-                                        next_image.set(id);
-                                        images.update(|list| {
-                                            list.push(UserImage { id, name, image })
-                                        });
                                     }
                                 });
                             }

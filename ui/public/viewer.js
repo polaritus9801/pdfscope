@@ -1909,21 +1909,33 @@ window.PDFScope = {
     }
   },
 
-  /// Reads the images chosen in a file input as data URLs.
-  async readImages(inputId) {
+  /// Reads the attachments chosen in a file input: images as data URLs, text files as text.
+  async readAttachments(inputId) {
     const input = document.getElementById(inputId);
     const files = [...(input?.files ?? [])];
     const out = [];
+    const textish = /\.(txt|md|markdown|csv|json|log|ya?ml)$/i;
+    const LIMIT = 200_000;
 
     for (const file of files) {
-      if (!file.type.startsWith("image/")) continue;
-      const dataUrl = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-      out.push({ name: file.name, image: String(dataUrl) });
+      if (file.type.startsWith("image/")) {
+        const dataUrl = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+        out.push({ kind: "image", name: file.name, data: String(dataUrl) });
+      } else if (file.type.startsWith("text/") || textish.test(file.name)) {
+        if (file.size > LIMIT) {
+          out.push({ kind: "error", name: file.name, message: "文件太大，请换一个小于 200KB 的" });
+          continue;
+        }
+        const text = await file.text();
+        out.push({ kind: "text", name: file.name, data: text });
+      } else {
+        out.push({ kind: "error", name: file.name, message: "目前只支持图片和文本文件" });
+      }
     }
     if (input) input.value = "";
     return out;

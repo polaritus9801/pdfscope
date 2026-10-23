@@ -9,6 +9,7 @@
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 pub mod anchor;
+pub mod attachments;
 pub mod citation;
 pub mod error;
 pub mod geo;
@@ -22,6 +23,7 @@ pub mod tokens;
 pub use anchor::{
     Anchor, PageHash, PageText, Resolution, SelectedText, TextItem, capture, normalize, resolve,
 };
+pub use attachments::file_block;
 pub use citation::{Segment, segments};
 pub use error::{CoreError, CoreResult};
 pub use geo::Rect;
