@@ -1927,57 +1927,16 @@ window.PDFScope = {
   beginGripDrag(pageNumber, id, start, end, side, clientX, clientY) {
     const page = pageElement(pageNumber);
     const layer = page?.querySelector(".textLayer");
-    const frame = page?.querySelector(`.ref-frame[data-ref="${id}"]`);
-    if (!page || !layer || !frame) return;
+    if (!page || !layer || end <= start) return;
 
-    if (end <= start) return;
     const total = layer.textContent.length;
-    const grip = { fixed: side === "start" ? end : start, side, last: side === "start" ? start : end };
-    const marks = [...document.querySelectorAll(`.passage-mark[data-passage="${id}"]`)];
-    for (const mark of marks) mark.style.visibility = "hidden";
-
-    const live = document.createElement("div");
-    live.className = "passage-live";
-    // Inside the frame, so the percentages of the live boxes and the grips share one origin.
-    frame.appendChild(live);
-
-    const frameBox = () => frame.getBoundingClientRect();
-    const pageBox = () => page.getBoundingClientRect();
-
-    const paint = (geometry) => {
-      live.replaceChildren();
-      const frameRect = frameBox();
-      const pageRect = pageBox();
-      if (frameRect.width === 0 || frameRect.height === 0) return;
-
-      for (const rect of geometry.rects) {
-        const mark = document.createElement("div");
-        mark.className = "passage-live-mark";
-        mark.style.left = `${(pageRect.left + rect.x * pageRect.width - frameRect.left) / frameRect.width * 100}%`;
-        mark.style.top = `${(pageRect.top + rect.y * pageRect.height - frameRect.top) / frameRect.height * 100}%`;
-        mark.style.width = `${rect.width * pageRect.width / frameRect.width * 100}%`;
-        mark.style.height = `${rect.height * pageRect.height / frameRect.height * 100}%`;
-        live.appendChild(mark);
-      }
-
-      const grips = frame.querySelectorAll(".text-grip");
-      const startGrip = grips[0];
-      const endGrip = grips[1];
-      const first = geometry.rects[0];
-      const last = geometry.rects[geometry.rects.length - 1];
-      if (startGrip && first) {
-        startGrip.style.left = `${(pageRect.left + first.x * pageRect.width - frameRect.left) / frameRect.width * 100}%`;
-        startGrip.style.top = `${(pageRect.top + (first.y + first.height / 2) * pageRect.height - frameRect.top) / frameRect.height * 100}%`;
-      }
-      if (endGrip && last) {
-        endGrip.style.left = `${(pageRect.left + (last.x + last.width) * pageRect.width - frameRect.left) / frameRect.width * 100}%`;
-        endGrip.style.top = `${(pageRect.top + (last.y + last.height / 2) * pageRect.height - frameRect.top) / frameRect.height * 100}%`;
-      }
-    };
+    const fixed = side === "start" ? end : start;
+    let moving = side === "start" ? start : end;
+    let began = false;
 
     const geometryFor = () => {
-      const startOffset = Math.min(grip.fixed, grip.last);
-      const endOffset = Math.max(grip.fixed, grip.last);
+      const startOffset = Math.min(fixed, moving);
+      const endOffset = Math.max(fixed, moving);
       const range = rangeBetween(layer, startOffset, endOffset);
       if (!range) return null;
       const geometry = rangeGeometry(page, range);
@@ -1985,28 +1944,14 @@ window.PDFScope = {
       return { ...geometry, start: startOffset, end: endOffset };
     };
 
-    const initial = geometryFor();
-    if (initial) paint(initial);
-
-    const move = (event) => {
-      const caret = caretInside(layer, event.clientX, event.clientY);
-      if (caret) {
-        const offset = offsetAt(layer, caret.startContainer, caret.startOffset);
-        if (offset !== null) grip.last = Math.max(0, Math.min(total, offset));
-      }
-      const geometry = geometryFor();
-      if (geometry) paint(geometry);
-      event.preventDefault();
-    };
-
-    const up = (event) => {
-      document.removeEventListener("pointermove", move, true);
-      document.removeEventListener("pointerup", up, true);
-      document.body.classList.remove("grip-dragging");
-      live.remove();
-      for (const mark of marks) mark.style.visibility = "";
+    const report = () => {
       const geometry = geometryFor();
       if (!geometry) return;
+      if (!began) {
+        began = true;
+        // One undo entry per gesture, taken before the first change is applied.
+        window.__pdfscopePassageBegin?.(id);
+      }
       window.__pdfscopePassageEdited?.({
         id,
         page: pageNumber,
@@ -2016,13 +1961,31 @@ window.PDFScope = {
         rect: geometry.rect,
         rects: geometry.rects,
       });
+    };
+
+    const move = (event) => {
+      const caret = caretInside(layer, event.clientX, event.clientY);
+      if (caret) {
+        const offset = offsetAt(layer, caret.startContainer, caret.startOffset);
+        if (offset !== null) moving = Math.max(0, Math.min(total, offset));
+      }
+      report();
+      event.preventDefault();
+    };
+
+    const up = (event) => {
+      document.removeEventListener("pointermove", move, true);
+      document.removeEventListener("pointerup", up, true);
+      document.removeEventListener("pointercancel", up, true);
+      document.body.classList.remove("grip-dragging");
+      report();
       event.preventDefault();
     };
 
     document.body.classList.add("grip-dragging");
     document.addEventListener("pointermove", move, true);
     document.addEventListener("pointerup", up, true);
-    move({ clientX, clientY, preventDefault() {} });
+    document.addEventListener("pointercancel", up, true);
   },
 
   /// Re-crops a region after its rectangle changed.

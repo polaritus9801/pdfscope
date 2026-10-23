@@ -243,6 +243,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Fixed
 
+- Grip dragging now has a single source of truth: the interface state drives marks, frame and grips
+  reactively, so no second highlight layer can appear and the grips stay on the selection.
+
+
 - Text selections no longer stack stale highlight boxes after an edit, and the endpoint grips sit on
   the line's centre.
 

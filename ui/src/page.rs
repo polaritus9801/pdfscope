@@ -398,29 +398,44 @@ pub(crate) fn PageView(
 
             <For
                 each=move || {
-                    let mut marks = Vec::<(String, (f64, f64, f64, f64))>::new();
+                    let mut marks = Vec::<(u64, usize)>::new();
                     for passage in passages.get() {
                         if passage.page != number {
                             continue;
                         }
-                        let boxes = if passage.rects.is_empty() {
-                            vec![passage.rect]
+                        let count = if passage.rects.is_empty() {
+                            1
                         } else {
-                            passage.rects.clone()
+                            passage.rects.len()
                         };
-                        for (index, rect) in boxes.into_iter().enumerate() {
-                            let key = format!(
-                                "{}:{}:{:.5}:{:.5}:{:.5}:{:.5}",
-                                passage.id, index, rect.0, rect.1, rect.2, rect.3
-                            );
-                            marks.push((key, rect));
+                        for index in 0..count {
+                            marks.push((passage.id, index));
                         }
                     }
                     marks
                 }
-                key=|(key, _)| key.clone()
-                children=move |(_, rect)| {
-                    view! { <div class="passage-mark" style=rect_style(rect)></div> }
+                key=|(id, index)| format!("{id}:{index}")
+                children=move |(id, index)| {
+                    view! {
+                        <div
+                            class="passage-mark"
+                            style=move || {
+                                let rect = passages
+                                    .get()
+                                    .iter()
+                                    .find(|entry| entry.id == id)
+                                    .map(|entry| {
+                                        if entry.rects.is_empty() {
+                                            entry.rect
+                                        } else {
+                                            entry.rects.get(index).copied().unwrap_or(entry.rect)
+                                        }
+                                    })
+                                    .unwrap_or((0.0, 0.0, 0.0, 0.0));
+                                rect_style(rect)
+                            }
+                        ></div>
+                    }
                 }
             />
 

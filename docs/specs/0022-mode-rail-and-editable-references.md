@@ -535,6 +535,18 @@ region drag also starts from the rectangle read at press time instead of one cap
 The grips sit at the vertical centre of the first and last line now, because dragging them is caret
 logic, not point logic.
 
+### Follow-up: one source of truth while a grip drags
+
+The grip gesture had two painters — the renderer drew a live layer while the interface also held the
+passage — and the two disagreed after every drop. That whole layer is gone. A grip drag now only
+reports: the renderer reads the caret, rebuilds the character Range and sends
+`__pdfscopePassageEdited`; the interface applies quote, rectangle, boxes and offsets, and every visual
+(mark, frame, both grips) is a reactive expression over that one state. `__pdfscopePassageBegin` takes
+the single undo snapshot before the first change.
+
+Marks are keyed by passage and line index and their geometry is a reactive style, so dragging updates
+the same nodes instead of replacing them, and a changed selection cannot leave a stale copy behind.
+
 ## Deviations
 
 - The reference undo stack is cleared when a question is sent: references become part of that turn's

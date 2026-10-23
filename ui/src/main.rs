@@ -611,6 +611,22 @@ fn App() -> impl IntoView {
         handler.forget();
     });
 
+    // One undo entry per grip gesture, taken before the first change.
+    Effect::new(move |_| {
+        let callback = Closure::<dyn Fn(f64)>::new(move |_id: f64| {
+            undo_push.run(());
+            edit_epoch.update(|epoch| *epoch += 1);
+        });
+        if let Some(window) = web_sys::window() {
+            let _ = js_sys::Reflect::set(
+                &window,
+                &JsValue::from_str("__pdfscopePassageBegin"),
+                callback.as_ref(),
+            );
+        }
+        callback.forget();
+    });
+
     // A finished grip drag: the renderer reports the new character range, its text and its boxes.
     Effect::new(move |_| {
         let callback = Closure::<dyn Fn(JsValue)>::new(move |value: JsValue| {
@@ -633,8 +649,6 @@ fn App() -> impl IntoView {
                 return;
             }
 
-            undo_push.run(());
-            edit_epoch.update(|epoch| *epoch += 1);
             passages.update(|list| {
                 if let Some(entry) = list.iter_mut().find(|entry| entry.id == id) {
                     entry.quote = text;
