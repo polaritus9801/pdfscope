@@ -211,6 +211,15 @@ pub(crate) struct Turn {
     sources: Vec<Source>,
 }
 
+/// A half-finished answer saved while streaming, used for crash recovery.
+#[derive(serde::Deserialize)]
+struct PartialTurn {
+    question: String,
+    answer: String,
+    reasoning: String,
+    seconds: f64,
+}
+
 /// One conversation stored against a document.
 #[derive(Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 struct Conversation {
@@ -548,6 +557,73 @@ pub fn AiPanel(
         let _ = composer("removeDraft", &[JsValue::from_str(&key)]);
     };
 
+    let partial_key = move || {
+        let id = active.get();
+        (!id.is_empty()).then(|| draft_key_for(&id))
+    };
+
+    let save_partial_now = move || {
+        if temporary.get().is_some() {
+            return;
+        }
+        let Some(key) = partial_key() else {
+            return;
+        };
+        let answer_now = answer.get();
+        let reasoning_now = reasoning.get();
+        if answer_now.trim().is_empty() && reasoning_now.trim().is_empty() {
+            return;
+        }
+        let payload = serde_json::json!({
+            "question": current_question.get(),
+            "answer": answer_now,
+            "reasoning": reasoning_now,
+            "seconds": think_seconds.get().max(0.1),
+        })
+        .to_string();
+        let _ = composer(
+            "savePartialSoon",
+            &[JsValue::from_str(&key), JsValue::from_str(&payload)],
+        );
+    };
+
+    let drop_partial = move || {
+        if let Some(key) = partial_key() {
+            let _ = composer("clearPartial", &[JsValue::from_str(&key)]);
+        }
+    };
+
+    let restore_partial = move |id: &str| {
+        if temporary.get().is_some() || id.is_empty() {
+            return;
+        }
+        let key = draft_key_for(id);
+        let stored = composer("loadPartial", &[JsValue::from_str(&key)])
+            .and_then(|value| value.as_string())
+            .unwrap_or_default();
+        if stored.trim().is_empty() {
+            return;
+        }
+        let _ = composer("clearPartial", &[JsValue::from_str(&key)]);
+        let Ok(partial) = serde_json::from_str::<PartialTurn>(&stored) else {
+            return;
+        };
+        if partial.answer.trim().is_empty() && partial.reasoning.trim().is_empty() {
+            return;
+        }
+        turns.update(|list| {
+            list.push(Turn {
+                question: partial.question,
+                answer: partial.answer,
+                reasoning: partial.reasoning,
+                seconds: partial.seconds.max(0.1),
+                interrupted: true,
+                sources: Vec::new(),
+            });
+        });
+        notify.run("已恢复上次被打断的回答".to_owned());
+    };
+
     // The editor reports text and the attachment keys of its pills.
     Effect::new(move |_| {
         let callback =
@@ -725,6 +801,7 @@ pub fn AiPanel(
         turns.set(first_turns);
         session_model.set(first_model);
         restore_draft(&first);
+        restore_partial(&first);
         show_all.set(false);
         sync_ready.set(true);
         save_conversations();
@@ -1010,6 +1087,7 @@ pub fn AiPanel(
                     if !text.is_empty() {
                         answer.update(|buffer| buffer.push_str(&text));
                     }
+                    save_partial_now();
                 };
                 let kind = text_of(&event, "kind").unwrap_or_default();
                 match kind.as_str() {
@@ -1019,6 +1097,7 @@ pub fn AiPanel(
                                 think_started.set(js_sys::Date::now());
                             }
                             reasoning.update(|buffer| buffer.push_str(&delta));
+                            save_partial_now();
                         }
                     }
                     "text" => {
@@ -1072,6 +1151,7 @@ pub fn AiPanel(
                         settle_seconds();
                         let kept = !answer.get().trim().is_empty();
                         archive();
+                        drop_partial();
                         status.set(if kept {
                             "已停止".to_owned()
                         } else {
@@ -1088,6 +1168,7 @@ pub fn AiPanel(
                         let empty = answer.get().trim().is_empty();
                         let had_reasoning = !reasoning.get().trim().is_empty();
                         archive();
+                        drop_partial();
 
                         if empty {
                             status.set(if had_reasoning {
@@ -1106,6 +1187,7 @@ pub fn AiPanel(
                         settle_seconds();
                         interrupted.set(!answer.get().trim().is_empty());
                         archive();
+                        drop_partial();
                         failed.set(true);
                         let message =
                             text_of(&event, "message").unwrap_or_else(|| "请求失败".to_owned());
@@ -1409,6 +1491,7 @@ pub fn AiPanel(
         temporary.set(None);
         reset_transient();
         restore_draft(&id);
+        restore_partial(&id);
         history_open.set(false);
         sync_ready.set(true);
     };
@@ -1434,6 +1517,7 @@ pub fn AiPanel(
         temporary.set(None);
         reset_transient();
         restore_draft(&id);
+        restore_partial(&id);
         history_open.set(false);
         save_conversations();
     };
@@ -1443,6 +1527,10 @@ pub fn AiPanel(
             return;
         }
         drop_draft(&id);
+        {
+            let key = draft_key_for(&id);
+            let _ = composer("clearPartial", &[JsValue::from_str(&key)]);
+        }
         conversations.update(|list| list.retain(|entry| entry.id != id));
         confirm_delete.set(None);
         if active.get() == id {

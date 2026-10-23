@@ -273,6 +273,35 @@ window.Composer = {
     }
   },
 
+  /// Persists an in-flight answer so a crash does not lose it.
+  savePartialSoon(key, json) {
+    clearTimeout(partialTimer);
+    partialTimer = setTimeout(() => {
+      try {
+        window.localStorage.setItem(`pdfscope.partial.${key}`, json);
+      } catch {
+        // A recovery copy is best-effort.
+      }
+    }, 800);
+  },
+
+  loadPartial(key) {
+    try {
+      return window.localStorage.getItem(`pdfscope.partial.${key}`) ?? "";
+    } catch {
+      return "";
+    }
+  },
+
+  clearPartial(key) {
+    clearTimeout(partialTimer);
+    try {
+      window.localStorage.removeItem(`pdfscope.partial.${key}`);
+    } catch {
+      // Nothing to clear.
+    }
+  },
+
   loadPromptHistory() {
     try {
       return window.localStorage.getItem("pdfscope.prompts");
@@ -320,6 +349,7 @@ window.Composer = {
 
 // Keyboard navigation for the mention picker (which is rendered by the interface).
 let draftTimer = null;
+let partialTimer = null;
 let mentionIndex = -1;
 
 function mentionItems() {

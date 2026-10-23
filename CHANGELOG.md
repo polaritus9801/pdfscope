@@ -126,6 +126,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Crash recovery: a half-streamed answer is restored as an interrupted turn after a restart, ready for
+  继续生成.
+
+
 - Per-conversation model switching from a settings-defined model list, carried into the request as an
   override.
 

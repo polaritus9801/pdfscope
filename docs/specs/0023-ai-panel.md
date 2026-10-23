@@ -315,6 +315,14 @@ Office files are read with a small ZIP reader (central directory, stored and raw
   and falls back to the settings model when absent. The command has an explicit
   `too_many_arguments` allow because Tauri passes them positionally.
 
+## 7o. Progress — crash recovery
+
+While an answer streams, a debounced copy of `{question, answer, reasoning, seconds}` is written under
+`pdfscope.partial.<document>.<conversation>` (temporary conversations excluded). Archiving, stopping or
+an error clears it. On opening a document or switching to a conversation, a surviving partial is
+turned into a normal turn marked `interrupted`, which keeps the existing 继续生成 button, and the
+toast says the answer was recovered. Deleting a conversation clears both its draft and its partial.
+
 ## 8. Gaps beyond the first inventory
 
 A second pass over mature assistants adds these, which the program should cover rather than
@@ -413,6 +421,8 @@ Run these against the desktop build with a configured model and (for §6) a Tavi
     `全文 · N 页` and counts.
 24. Add two models in 设置 → 可选模型: the header becomes a picker; switching affects only that
     conversation, survives a restart, and a branch inherits it.
+25. Ask a question, kill the app while it streams, reopen the document: the half answer returns as an
+    interrupted turn with 继续生成, and no duplicate partial remains.
 
 ### Runtime-only checks
 These cannot be verified by `just check` and need a human: caret behaviour in the contenteditable
