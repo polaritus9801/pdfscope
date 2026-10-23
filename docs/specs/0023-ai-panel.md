@@ -244,6 +244,20 @@ before sending).
 - Because sources live in the turn, switching conversations, branching, retrying and reloading keep
   the cards attached to the answer that used them.
 
+## 7j. Review pass
+
+Three state bugs found by reading the combined flows:
+
+- **Renaming could erase itself.** Enter committed and closed the field; the blur that followed read an
+  empty buffer and committed `新对话`. Blur now commits only when the same row is still renaming.
+- **A failed search consumed references.** The move into “历史引用” happened before the search; a
+  missing key therefore emptied the shelf for a request that never ran. References move only after the
+  search succeeds.
+- **A failed search erased the draft.** The composer was cleared when the button was pressed, not when
+  the request started. Clearing now waits for `request_started`, which the request path bumps after
+  the search; a failure leaves the draft, the pills and every attachment in place.
+- Switching conversations, branching and editing are refused while a turn streams.
+
 ## 8. Gaps beyond the first inventory
 
 A second pass over mature assistants adds these, which the program should cover rather than

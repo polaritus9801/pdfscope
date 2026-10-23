@@ -295,6 +295,8 @@ pub fn AiPanel(
     let files = RwSignal::new(Vec::<UserFile>::new());
     let web = RwSignal::new(false);
     let sources = RwSignal::new(Vec::<Source>::new());
+    let pending_clear = RwSignal::new(false);
+    let request_started = RwSignal::new(0_u64);
     let next_file = RwSignal::new(0_u64);
     let editor_ref = NodeRef::<leptos::html::Div>::new();
     let failed = RwSignal::new(false);
@@ -611,7 +613,6 @@ pub fn AiPanel(
             interrupted.set(false);
         }
         current_question.set(asked.clone());
-        question.set(String::new());
         answer.set(String::new());
         reasoning.set(String::new());
         think_started.set(js_sys::Date::now());
@@ -625,15 +626,6 @@ pub fn AiPanel(
         let passages_now = passages.get();
         let regions_now = regions.get();
 
-        if !passages_now.is_empty() || !regions_now.is_empty() {
-            history.update(|list| {
-                list.extend(passages_now.iter().cloned().map(Stored::Passage));
-                list.extend(regions_now.iter().cloned().map(Stored::Region));
-            });
-            passages.set(Vec::new());
-            regions.set(Vec::new());
-            reset_history.run(());
-        }
         let current_page = page.get();
         let total = pages.get();
         let pictures = images.get();
@@ -691,10 +683,24 @@ pub fn AiPanel(
                         status.set(format!("联网搜索失败：{message}"));
                         failed.set(true);
                         streaming.set(false);
+                        pending_clear.set(false);
                         return;
                     }
                 }
             }
+
+            // Only a request that actually starts consumes the references. A failed web search
+            // must leave them in the shelf so the reader can retry without re-selecting.
+            if !passages_now.is_empty() || !regions_now.is_empty() {
+                history.update(|list| {
+                    list.extend(passages_now.iter().cloned().map(Stored::Passage));
+                    list.extend(regions_now.iter().cloned().map(Stored::Region));
+                });
+                passages.set(Vec::new());
+                regions.set(Vec::new());
+                reset_history.run(());
+            }
+            request_started.update(|count| *count += 1);
 
             // Page text is fetched here, not in Rust: the renderer owns the document.
             let mut context: Vec<(u32, String)> = Vec::new();
@@ -994,6 +1000,20 @@ pub fn AiPanel(
         known_mentions.set(Vec::new());
     };
 
+    // The composer is cleared only once a request has actually started, not when the button was
+    // pressed: a failed web search must leave the draft and its attachments untouched.
+    Effect::new(move |_| {
+        let _ = request_started.get();
+        if !pending_clear.get() {
+            return;
+        }
+        pending_clear.set(false);
+        answers.set(Vec::new());
+        images.set(Vec::new());
+        files.set(Vec::new());
+        composer_clear();
+    });
+
     let send = move |_| {
         // While an answer streams the button is "stop"; Enter must not wipe the draft either.
         if streaming.get() {
@@ -1036,10 +1056,7 @@ pub fn AiPanel(
             editing.set(None);
         }
         send_text(text);
-        answers.set(Vec::new());
-        images.set(Vec::new());
-        files.set(Vec::new());
-        composer_clear();
+        pending_clear.set(true);
     };
 
     let continue_last = move || {
@@ -1175,6 +1192,10 @@ pub fn AiPanel(
     };
 
     let switch_conversation = move |id: String| {
+        if streaming.get() {
+            notify.run("回答生成中，结束后再切换对话".to_owned());
+            return;
+        }
         let Some(conversation) = conversations.get().into_iter().find(|entry| entry.id == id)
         else {
             return;
@@ -1249,6 +1270,10 @@ pub fn AiPanel(
     };
 
     let branch_conversation = move |index: usize| {
+        if streaming.get() {
+            notify.run("回答生成中，结束后再分支".to_owned());
+            return;
+        }
         let prefix: Vec<Turn> = turns.get().into_iter().take(index + 1).collect();
         if prefix.is_empty() {
             return;
@@ -1556,11 +1581,15 @@ pub fn AiPanel(
                                                             }
                                                         }
                                                         on:blur=move |_| {
-                                                            let value = renaming
-                                                                .get()
-                                                                .map(|(_, value)| value)
-                                                                .unwrap_or_default();
-                                                            commit_rename(id_for_blur.clone(), value);
+                                                            // Enter already committed and closed the field; a blur
+                                                            // that arrives afterwards must not rename again with "".
+                                                            let Some((current, value)) = renaming.get() else {
+                                                                return;
+                                                            };
+                                                            if current != id_for_blur {
+                                                                return;
+                                                            }
+                                                            commit_rename(current, value);
                                                         }
                                                     />
                                                 }
@@ -1765,6 +1794,9 @@ pub fn AiPanel(
                                                 <button
                                                     class="action"
                                                     on:click=move |_| {
+                                                        if streaming.get() {
+                                                            return;
+                                                        }
                                                         editing.set(Some(index));
                                                         let _ = composer(
                                                             "setPlainText",

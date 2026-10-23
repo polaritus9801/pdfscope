@@ -295,6 +295,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Fixed
 
+- A failed web search no longer consumes references or clears the draft; rename blur cannot reset a
+  title; conversation actions are refused while streaming.
+
+
 - Selections report again: the rect-merging helper no longer drops `right`/`bottom`.
 
 
