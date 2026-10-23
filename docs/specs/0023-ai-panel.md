@@ -233,6 +233,11 @@ before sending).
 - Failures are explicit: no key, browser build, or a provider error stops the turn with a message and
   does not fall back silently. An empty result set is reported and the question proceeds locally.
 - The 来源 chips are the citation cards; inline hover cards inside an answer are not built.
+- **Providers** — DeepSeek Search is the default (it reuses the model key; official endpoint
+  `POST https://api.deepseek.com/v1/tools/search`, per-request billing). Tavily, Brave, Exa and Serper
+  are selectable in 设置 → 接口. Each is parsed into the same `WebResult` and covered by parsing tests;
+  unknown ids fall back to DeepSeek. Search keys live in `search-keys.json` (0600), one entry per
+  provider, and the old single Tavily key file is migrated on read.
 
 ## 7i. Progress — per-answer citations
 

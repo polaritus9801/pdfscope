@@ -10,6 +10,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Changed
 
+- Web search offers DeepSeek Search (default, reusing the model key), Tavily, Brave, Exa and Serper,
+  with a provider picker and per-provider keys.
+
+
 - The AI panel is a flush column: its left border is the divider and the drag affordance, resizing
   keeps the document's centre in place, and the three scope icons are a refined segmented control
   with a reference count badge.

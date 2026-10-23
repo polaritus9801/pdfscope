@@ -4,6 +4,7 @@
 //! operating system's keychain and is never written next to the settings, never returned to the
 //! webview, and never logged.
 
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use futures::StreamExt;
@@ -47,6 +48,8 @@ const KEY_FILE: &str = "api-key";
 
 /// The search provider key lives beside the model key, with the same permissions.
 const SEARCH_KEY_FILE: &str = "search-key";
+/// Per-provider search keys, kept in one permission-restricted file.
+const SEARCH_KEYS_FILE: &str = "search-keys.json";
 
 /// What is stored on disk.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -89,6 +92,9 @@ pub(crate) struct Settings {
     /// Per-request limit in seconds; zero waits as long as the provider does.
     #[serde(default)]
     pub(crate) request_timeout: u32,
+    /// Search backend id (`deepseek`, `tavily`, `brave`, `exa`, `serper`).
+    #[serde(default = "default_search_provider")]
+    pub(crate) search_provider: String,
     /// Last window geometry, when the shell has recorded one.
     #[serde(default)]
     pub(crate) window: Option<WindowState>,
@@ -108,6 +114,10 @@ fn default_font_size() -> u16 {
 
 fn default_true() -> bool {
     true
+}
+
+fn default_search_provider() -> String {
+    "deepseek".to_owned()
 }
 
 fn default_prompt() -> String {
@@ -135,6 +145,7 @@ impl Default for Settings {
             spread_offset: false,
             page_limit: 0,
             request_timeout: 0,
+            search_provider: default_search_provider(),
             window: None,
         }
     }
@@ -181,6 +192,9 @@ pub(crate) struct SettingsInput {
     /// Per-request limit in seconds; zero or absent means no limit.
     #[serde(default)]
     pub(crate) request_timeout: Option<u32>,
+    /// Search backend id.
+    #[serde(default)]
+    pub(crate) search_provider: Option<String>,
     /// A new key, when the user typed one. `None` keeps the stored key.
     pub(crate) api_key: Option<String>,
     /// A new search key, when the user typed one. `None` keeps the stored key.
@@ -219,6 +233,8 @@ pub(crate) struct SettingsView {
     pub(crate) page_limit: u32,
     /// Per-request limit in seconds; zero waits as long as the provider does.
     pub(crate) request_timeout: u32,
+    /// Selected search backend id.
+    pub(crate) search_provider: String,
     /// Whether a key is stored. The key itself never crosses this boundary.
     pub(crate) has_key: bool,
     /// Whether a search-provider key is stored.
@@ -293,33 +309,62 @@ fn has_key(app: &tauri::AppHandle) -> bool {
     read_key(app).is_some()
 }
 
-fn search_key_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+fn search_keys_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     let directory = app
         .path()
         .app_config_dir()
         .map_err(|error| format!("无法定位配置目录：{error}"))?;
     std::fs::create_dir_all(&directory).map_err(|error| format!("无法创建配置目录：{error}"))?;
-    Ok(directory.join(SEARCH_KEY_FILE))
+    Ok(directory.join(SEARCH_KEYS_FILE))
 }
 
-fn read_search_key(app: &tauri::AppHandle) -> Option<String> {
-    let path = search_key_path(app).ok()?;
-    let key = std::fs::read_to_string(path).ok()?;
-    let key = key.trim().to_owned();
-    (!key.is_empty()).then_some(key)
+fn read_search_keys(app: &tauri::AppHandle) -> BTreeMap<String, String> {
+    let mut keys: BTreeMap<String, String> = search_keys_path(app)
+        .ok()
+        .and_then(|path| std::fs::read_to_string(path).ok())
+        .and_then(|json| serde_json::from_str(&json).ok())
+        .unwrap_or_default();
+
+    // Migrate the single Tavily key written by the first build.
+    if !keys.contains_key("tavily") {
+        if let Ok(path) = app
+            .path()
+            .app_config_dir()
+            .map(|directory| directory.join(SEARCH_KEY_FILE))
+        {
+            if let Ok(key) = std::fs::read_to_string(path) {
+                let key = key.trim();
+                if !key.is_empty() {
+                    keys.insert("tavily".to_owned(), key.to_owned());
+                }
+            }
+        }
+    }
+    keys
 }
 
-fn write_search_key(app: &tauri::AppHandle, key: &str) -> Result<(), String> {
-    let path = search_key_path(app)?;
-    std::fs::write(&path, key).map_err(|error| format!("无法写入搜索 API Key：{error}"))?;
+fn write_search_key(app: &tauri::AppHandle, provider: &str, key: &str) -> Result<(), String> {
+    let mut keys = read_search_keys(app);
+    keys.insert(provider.to_owned(), key.to_owned());
+    let path = search_keys_path(app)?;
+    let json = serde_json::to_string_pretty(&keys)
+        .map_err(|error| format!("无法序列化搜索 Key：{error}"))?;
+    std::fs::write(&path, json).map_err(|error| format!("无法写入搜索 Key：{error}"))?;
 
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
         let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
     }
-
     Ok(())
+}
+
+/// The key for one provider: its own, or the model key for DeepSeek.
+fn search_key_for(app: &tauri::AppHandle, provider: &str) -> Option<String> {
+    let keys = read_search_keys(app);
+    keys.get(provider)
+        .cloned()
+        .or_else(|| (provider == "deepseek").then(|| read_key(app)).flatten())
 }
 
 /// Reads the stored configuration for the webview.
@@ -341,8 +386,9 @@ pub(crate) fn load_settings(app: tauri::AppHandle) -> Result<SettingsView, Strin
         spread_offset: settings.spread_offset,
         page_limit: settings.page_limit,
         request_timeout: settings.request_timeout,
+        search_provider: settings.search_provider.clone(),
         has_key: has_key(&app),
-        has_search_key: read_search_key(&app).is_some(),
+        has_search_key: search_key_for(&app, &settings.search_provider).is_some(),
     })
 }
 
@@ -361,9 +407,13 @@ pub(crate) fn save_settings(app: tauri::AppHandle, settings: SettingsInput) -> R
             write_key(&app, key)?;
         }
     }
+    let provider = settings
+        .search_provider
+        .clone()
+        .unwrap_or_else(default_search_provider);
     if let Some(key) = settings.search_api_key.as_deref().map(str::trim) {
         if !key.is_empty() {
-            write_search_key(&app, key)?;
+            write_search_key(&app, &provider, key)?;
         }
     }
 
@@ -386,6 +436,9 @@ pub(crate) fn save_settings(app: tauri::AppHandle, settings: SettingsInput) -> R
         spread_offset: settings.spread_offset.unwrap_or(false),
         page_limit: settings.page_limit.unwrap_or(0),
         request_timeout: settings.request_timeout.unwrap_or(0),
+        search_provider: settings
+            .search_provider
+            .unwrap_or_else(default_search_provider),
         window: stored_window,
     };
 
@@ -402,8 +455,16 @@ pub(crate) async fn web_search(
     app: tauri::AppHandle,
     query: String,
 ) -> Result<Vec<pdfscope_ai::search::WebResult>, String> {
-    let key = read_search_key(&app).ok_or_else(|| "还没有保存搜索 API Key".to_owned())?;
-    pdfscope_ai::search::tavily(&pdfscope_ai::Secret::new(key), &query)
+    let settings = read_settings(&app);
+    let provider = pdfscope_ai::search::Provider::from_id(&settings.search_provider);
+    let key = search_key_for(&app, provider.id()).ok_or_else(|| {
+        if provider.reuses_model_key() {
+            "还没有保存 API Key（DeepSeek 搜索复用模型 Key）".to_owned()
+        } else {
+            format!("还没有保存 {} 的搜索 Key", provider.label())
+        }
+    })?;
+    pdfscope_ai::search::search(provider, &pdfscope_ai::Secret::new(key), &query)
         .await
         .map_err(|error| error.to_string())
 }

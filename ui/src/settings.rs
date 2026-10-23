@@ -62,6 +62,7 @@ pub(crate) fn SettingsSheet(
     let form_page_limit = RwSignal::new(0_u32);
     let form_timeout = RwSignal::new("0".to_owned());
     let form_search_key = RwSignal::new(String::new());
+    let form_search_provider = RwSignal::new("deepseek".to_owned());
     let search_key_stored = RwSignal::new(false);
 
     let form_spread_offset = RwSignal::new(false);
@@ -128,6 +129,11 @@ pub(crate) fn SettingsSheet(
                         .ok()
                         .and_then(|flag| flag.as_bool())
                         .unwrap_or(false),
+                );
+                form_search_provider.set(
+                    text_of(&value, "search_provider")
+                        .filter(|provider| !provider.trim().is_empty())
+                        .unwrap_or_else(|| "deepseek".to_owned()),
                 );
                 let _ = crate::call("setPageMode", &[JsValue::from_str(&form_mode.get())]);
                 let _ = crate::call(
@@ -225,6 +231,11 @@ pub(crate) fn SettingsSheet(
             &payload,
             &JsValue::from_str("request_timeout"),
             &JsValue::from_f64(form_timeout.get().parse::<f64>().unwrap_or(0.0)),
+        );
+        let _ = js_sys::Reflect::set(
+            &payload,
+            &JsValue::from_str("search_provider"),
+            &JsValue::from_str(&form_search_provider.get()),
         );
         let search_key = form_search_key.get();
         if !search_key.trim().is_empty() {
@@ -625,14 +636,38 @@ pub(crate) fn SettingsSheet(
                                         </p>
 
                                         <label class="settings-row">
-                                            <span>"搜索 API Key（Tavily）"</span>
+                                            <span>"联网搜索服务"</span>
+                                            <select on:change=move |event| {
+                                                form_search_provider.set(event_target_value(&event))
+                                            }>
+                                                <option value="deepseek" selected=move || form_search_provider.get() == "deepseek">
+                                                    "DeepSeek Search（可复用模型 Key）"
+                                                </option>
+                                                <option value="tavily" selected=move || form_search_provider.get() == "tavily">
+                                                    "Tavily"
+                                                </option>
+                                                <option value="brave" selected=move || form_search_provider.get() == "brave">
+                                                    "Brave Search"
+                                                </option>
+                                                <option value="exa" selected=move || form_search_provider.get() == "exa">
+                                                    "Exa"
+                                                </option>
+                                                <option value="serper" selected=move || form_search_provider.get() == "serper">
+                                                    "Serper（Google）"
+                                                </option>
+                                            </select>
+                                        </label>
+                                        <label class="settings-row">
+                                            <span>"搜索 API Key"</span>
                                             <input
                                                 type="password"
                                                 placeholder=move || {
                                                     if search_key_stored.get() {
                                                         "已保存 · 留空保持不变"
+                                                    } else if form_search_provider.get() == "deepseek" {
+                                                        "可留空 · 复用模型 API Key"
                                                     } else {
-                                                        "tvly-…"
+                                                        "填写该服务的 Key"
                                                     }
                                                 }
                                                 prop:value=move || form_search_key.get()
@@ -642,7 +677,7 @@ pub(crate) fn SettingsSheet(
                                             />
                                         </label>
                                         <p class="settings-hint">
-                                            "用于联网搜索。默认使用 Tavily；填写后保存即可启用。"
+                                            "DeepSeek Search 复用模型 Key；其余服务各自填写。保存后生效。"
                                         </p>
 
                                     <section class="settings-section">
