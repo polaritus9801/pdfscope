@@ -497,6 +497,32 @@ after release, when the set is committed.
   receives every event. While a grip is dragged the marks cannot follow (text is re-read on release),
   so the grips travel to the frame's own edges until the drop.
 
+### Follow-up: grips are range editors
+
+The grips were still rectangle editors: they moved the union box, so no character was added, the marks
+never changed, and the release re-read failed often enough that the grip snapped back. That model is
+gone.
+
+A passage now stores the selection's absolute character offsets in the page's text layer. A grip press
+hands the gesture to the renderer (`beginGripDrag`), which:
+
+- reads a caret under the pointer with `caretRangeFromPoint` and converts it to an offset;
+- rebuilds the Range between that offset and the fixed opposite end, so **crossing lines and adding
+  words work exactly like a native selection**;
+- paints the live selection itself (`.passage-live` inside the frame, which is why its percentages and
+  the grips share one origin) and moves both grips to the live ends;
+- reports `{start, end, text, rect, rects}` once, on release, through `__pdfscopePassageEdited`; the
+  interface records one undo step and re-renders.
+
+While dragging, frames, grips and the live layer drop `pointer-events`, or the caret lookup would hit
+the grip instead of text. A pair of offsets that is empty is refused, so old references cannot start a
+drag from a stale zero.
+
+Also: a page gesture anchors both ends in the stage's **content** space, so scrolling no longer drags
+the starting edge along the viewport or drops the outline from pages already covered; the live box and
+the covered pages now agree with the committed result. Double-click opens a file only when no document
+is open.
+
 ## Deviations
 
 - The reference undo stack is cleared when a question is sent: references become part of that turn's

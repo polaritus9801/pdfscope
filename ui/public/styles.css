@@ -2323,3 +2323,31 @@ mark.find-hit {
   border-color: #d2d2d9;  /* size */
   background: rgb(120 120 134 / 10%);
 }
+
+/* While a grip is dragged the renderer paints the live selection itself. */
+body.grip-dragging {
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: ew-resize;
+}
+
+/* While a grip is dragged it must not sit under the caret lookup: the text layer has to be the top
+   hit target, or caretRangeFromPoint returns the grip itself and nothing moves. */
+body.grip-dragging .ref-frame,
+body.grip-dragging .text-grip,
+body.grip-dragging .passage-live {
+  pointer-events: none !important;
+}
+
+.passage-live {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.passage-live-mark {
+  position: absolute;
+  background: rgb(203 184 236 / 45%);
+  border-radius: 2px;  /* size */
+}

@@ -10,6 +10,9 @@ pub(crate) struct Selection {
     /// The tight line boxes of the selection itself, not the whole line.
     pub(crate) rects: Vec<(f64, f64, f64, f64)>,
     pub(crate) text: String,
+    /// Character offsets of the selection within the page's text layer.
+    pub(crate) start: usize,
+    pub(crate) end: usize,
 }
 
 /// A rectangle the reader captured, as a PNG data URL.
@@ -31,6 +34,9 @@ pub(crate) struct Passage {
     pub(crate) rect: (f64, f64, f64, f64),
     /// What the reader actually selected, line by line.
     pub(crate) rects: Vec<(f64, f64, f64, f64)>,
+    /// Character offsets; the grips rebuild the selection from these.
+    pub(crate) start: usize,
+    pub(crate) end: usize,
 }
 
 /// One page's size at scale 1, as the renderer measured it.
@@ -101,6 +107,8 @@ pub(crate) fn parse_selection(value: &JsValue) -> Option<Selection> {
     let height = read_number(value, "height")?;
     let text = read_string(value, "text")?;
     let rects = parse_rects(value);
+    let start = read_number(value, "start").unwrap_or(0.0).max(0.0) as usize;
+    let end = read_number(value, "end").unwrap_or(0.0).max(0.0) as usize;
 
     let in_unit = |n: f64| (0.0..=1.0).contains(&n);
     if page == 0 || !in_unit(x) || !in_unit(y) || !in_unit(width) || !in_unit(height) {
@@ -115,6 +123,8 @@ pub(crate) fn parse_selection(value: &JsValue) -> Option<Selection> {
         rect: (x, y, width, height),
         rects,
         text,
+        start,
+        end,
     })
 }
 

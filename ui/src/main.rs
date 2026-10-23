@@ -22,7 +22,7 @@ mod settings;
 pub(crate) use model::{PageSize, Passage, Region, Selection, truncate};
 pub(crate) use page::PageView;
 
-use model::{parse_page_sizes, parse_selection, read_flag, read_number, read_string};
+use model::{parse_page_sizes, parse_rects, parse_selection, read_flag, read_number, read_string};
 
 /// Calls one of the functions the renderer exposes.
 pub(crate) fn call(name: &str, args: &[JsValue]) -> Option<JsValue> {
@@ -522,6 +522,8 @@ fn App() -> impl IntoView {
                         quote: parsed.text.clone(),
                         rect: parsed.rect,
                         rects: parsed.rects.clone(),
+                        start: parsed.start,
+                        end: parsed.end,
                     })
                 });
                 selection.set(None);
@@ -607,6 +609,52 @@ fn App() -> impl IntoView {
                 .add_event_listener_with_callback("pointerdown", handler.as_ref().unchecked_ref());
         }
         handler.forget();
+    });
+
+    // A finished grip drag: the renderer reports the new character range, its text and its boxes.
+    Effect::new(move |_| {
+        let callback = Closure::<dyn Fn(JsValue)>::new(move |value: JsValue| {
+            let id = read_number(&value, "id").unwrap_or(0.0) as u64;
+            let text = read_string(&value, "text").unwrap_or_default();
+            if id == 0 || text.trim().is_empty() {
+                return;
+            }
+
+            let start = read_number(&value, "start").unwrap_or(0.0).max(0.0) as usize;
+            let end = read_number(&value, "end").unwrap_or(0.0).max(0.0) as usize;
+            let rects = parse_rects(&value);
+            let rect_value =
+                js_sys::Reflect::get(&value, &JsValue::from_str("rect")).unwrap_or(JsValue::NULL);
+            let x = read_number(&rect_value, "x").unwrap_or(0.0);
+            let y = read_number(&rect_value, "y").unwrap_or(0.0);
+            let width = read_number(&rect_value, "width").unwrap_or(0.0);
+            let height = read_number(&rect_value, "height").unwrap_or(0.0);
+            if width <= 0.0 || height <= 0.0 {
+                return;
+            }
+
+            undo_push.run(());
+            edit_epoch.update(|epoch| *epoch += 1);
+            passages.update(|list| {
+                if let Some(entry) = list.iter_mut().find(|entry| entry.id == id) {
+                    entry.quote = text;
+                    entry.rect = (x, y, width, height);
+                    if !rects.is_empty() {
+                        entry.rects = rects;
+                    }
+                    entry.start = start;
+                    entry.end = end;
+                }
+            });
+        });
+        if let Some(window) = web_sys::window() {
+            let _ = js_sys::Reflect::set(
+                &window,
+                &JsValue::from_str("__pdfscopePassageEdited"),
+                callback.as_ref(),
+            );
+        }
+        callback.forget();
     });
 
     // The renderer reports a captured region the same way it reports a selection.
@@ -1098,6 +1146,10 @@ fn App() -> impl IntoView {
             <main
                 class="stage"
                 on:dblclick=move |_| {
+                    // The empty reader opens a file on double click; an open document must not.
+                    if pages.get() > 0 {
+                        return;
+                    }
                     if let Some(input) = web_sys::window()
                         .and_then(|window| window.document())
                         .and_then(|document| document.get_element_by_id("file-input"))

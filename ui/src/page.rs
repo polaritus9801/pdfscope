@@ -4,7 +4,7 @@ use leptos::prelude::*;
 use leptos::task::spawn_local;
 use wasm_bindgen::{JsCast, JsValue};
 
-use crate::model::{Passage, Region, Selection, read_string, rect_style, truncate};
+use crate::model::{Passage, Region, Selection, rect_style, truncate};
 use crate::{call, settle};
 
 #[component]
@@ -45,7 +45,7 @@ pub(crate) fn PageView(
     let drag = RwSignal::new(Option::<Drag>::None);
     let drag_moved = RwSignal::new(false);
     let suppress_click = RwSignal::new(false);
-    let finish_drag = move |kind: u8, id: u64| {
+    let finish_drag = move |id: u64| {
         let moved = drag_moved.get();
         drag.set(None);
         drag_moved.set(false);
@@ -54,19 +54,12 @@ pub(crate) fn PageView(
             return;
         }
 
-        let rect = if kind == 0 {
-            passages
-                .get()
-                .iter()
-                .find(|entry| entry.id == id)
-                .map(|entry| entry.rect)
-        } else {
-            regions
-                .get()
-                .iter()
-                .find(|entry| entry.id == id)
-                .map(|entry| entry.rect)
-        };
+        // Only regions use the rectangle drag now; passages are edited by their character grips.
+        let rect = regions
+            .get()
+            .iter()
+            .find(|entry| entry.id == id)
+            .map(|entry| entry.rect);
         let Some((x, y, width, height)) = rect else {
             return;
         };
@@ -87,34 +80,7 @@ pub(crate) fn PageView(
             &JsValue::from_f64(height),
         );
 
-        if kind == 0 {
-            // A quote's text follows its rectangle; re-read it from the text layer.
-            let Some(handle) = call(
-                "textInRect",
-                &[JsValue::from_f64(f64::from(number)), rect_value.into()],
-            ) else {
-                return;
-            };
-            spawn_local(async move {
-                if let Ok(value) = settle(handle).await {
-                    if edit_epoch.get() != epoch {
-                        return;
-                    }
-                    let text = read_string(&value, "text").unwrap_or_default();
-                    let rects = crate::model::parse_rects(&value);
-                    if !text.trim().is_empty() {
-                        passages.update(|list| {
-                            if let Some(entry) = list.iter_mut().find(|entry| entry.id == id) {
-                                entry.quote = text;
-                                if !rects.is_empty() {
-                                    entry.rects = rects;
-                                }
-                            }
-                        });
-                    }
-                }
-            });
-        } else {
+        {
             let Some(handle) = call(
                 "regionImage",
                 &[JsValue::from_f64(f64::from(number)), rect_value.into()],
@@ -241,6 +207,8 @@ pub(crate) fn PageView(
                     quote: current.text.clone(),
                     rect: current.rect,
                     rects: current.rects.clone(),
+                    start: current.start,
+                    end: current.end,
                 });
             });
             selection.set(None);
@@ -410,7 +378,13 @@ pub(crate) fn PageView(
                         passage.rects.clone()
                     };
                     for rect in boxes {
-                        marks.push(view! { <div class="passage-mark" style=rect_style(rect)></div> });
+                        marks.push(view! {
+                            <div
+                                class="passage-mark"
+                                data-passage=passage.id
+                                style=rect_style(rect)
+                            ></div>
+                        });
                     }
                 }
                 marks.collect_view()
@@ -443,17 +417,24 @@ pub(crate) fn PageView(
                 let mut frames = Vec::new();
                 for passage in passages.get() {
                     if passage.page == number {
-                        frames.push((0_u8, passage.id, passage.rect, passage.rects));
+                        frames.push((
+                            0_u8,
+                            passage.id,
+                            passage.rect,
+                            passage.rects,
+                            passage.start,
+                            passage.end,
+                        ));
                     }
                 }
                 for region in regions.get() {
                     if region.page == number {
-                        frames.push((1_u8, region.id, region.rect, Vec::new()));
+                        frames.push((1_u8, region.id, region.rect, Vec::new(), 0, 0));
                     }
                 }
                 frames
                     .into_iter()
-                    .map(|(kind, id, rect, tight)| {
+                    .map(|(kind, id, rect, tight, start, end)| {
                         let first = tight.first().copied().unwrap_or(rect);
                         let last = tight.last().copied().unwrap_or(rect);
                         let unit = |value: f64, origin: f64, span: f64| {
@@ -499,6 +480,7 @@ pub(crate) fn PageView(
                             <div
                                 class="ref-frame"
                                 data-kind=if kind == 0 { "passage" } else { "region" }
+                                data-ref=id
                                 class:active=is_active
                                 class:focused=is_focused
                                 class:editable=editable
@@ -523,8 +505,8 @@ pub(crate) fn PageView(
                                     begin_drag(event, kind, id, rect, 0);
                                 }
                                 on:pointermove=drag_move
-                                on:pointerup=move |_| finish_drag(kind, id)
-                                on:pointercancel=move |_| finish_drag(kind, id)
+                                on:pointerup=move |_| finish_drag(id)
+                                on:pointercancel=move |_| finish_drag(id)
                                 on:click=move |_| {
                                     if !editable() {
                                         return;
@@ -561,29 +543,47 @@ pub(crate) fn PageView(
                                 {if kind == 0 {
                                     view! {
                                         <div
-                                            class="text-grip"
+                                            class="text-grip grip-start"
                                             style=start_position
                                             title="调整起点"
                                             on:pointerdown=move |event: web_sys::PointerEvent| {
                                                 event.stop_propagation();
-                                                begin_drag(event, kind, id, rect, 1);
+                                                event.prevent_default();
+                                                let _ = call(
+                                                    "beginGripDrag",
+                                                    &[
+                                                        JsValue::from_f64(f64::from(number)),
+                                                        JsValue::from_f64(id as f64),
+                                                        JsValue::from_f64(start as f64),
+                                                        JsValue::from_f64(end as f64),
+                                                        JsValue::from_str("start"),
+                                                        JsValue::from_f64(event.client_x() as f64),
+                                                        JsValue::from_f64(event.client_y() as f64),
+                                                    ],
+                                                );
                                             }
-                                            on:pointermove=drag_move
-                                            on:pointerup=move |_| finish_drag(kind, id)
-                                            on:pointercancel=move |_| finish_drag(kind, id)
                                             on:click=move |event: web_sys::MouseEvent| event.stop_propagation()
                                         ></div>
                                         <div
-                                            class="text-grip"
+                                            class="text-grip grip-end"
                                             style=end_position
                                             title="调整终点"
                                             on:pointerdown=move |event: web_sys::PointerEvent| {
                                                 event.stop_propagation();
-                                                begin_drag(event, kind, id, rect, 2);
+                                                event.prevent_default();
+                                                let _ = call(
+                                                    "beginGripDrag",
+                                                    &[
+                                                        JsValue::from_f64(f64::from(number)),
+                                                        JsValue::from_f64(id as f64),
+                                                        JsValue::from_f64(start as f64),
+                                                        JsValue::from_f64(end as f64),
+                                                        JsValue::from_str("end"),
+                                                        JsValue::from_f64(event.client_x() as f64),
+                                                        JsValue::from_f64(event.client_y() as f64),
+                                                    ],
+                                                );
                                             }
-                                            on:pointermove=drag_move
-                                            on:pointerup=move |_| finish_drag(kind, id)
-                                            on:pointercancel=move |_| finish_drag(kind, id)
                                             on:click=move |event: web_sys::MouseEvent| event.stop_propagation()
                                         ></div>
                                     }

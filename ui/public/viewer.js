@@ -1227,6 +1227,84 @@ function caretInside(layer, clientX, clientY) {
   return range;
 }
 
+/// Absolute character offset of a point inside the text layer.
+function offsetAt(layer, node, offset) {
+  try {
+    const range = document.createRange();
+    range.selectNodeContents(layer);
+    range.setEnd(node, offset);
+    return range.toString().length;
+  } catch {
+    return null;
+  }
+}
+
+/// The range between two absolute character offsets of the layer's text.
+function rangeBetween(layer, start, end) {
+  const range = document.createRange();
+  let position = 0;
+  let started = false;
+  let ended = false;
+  const walker = document.createTreeWalker(layer, NodeFilter.SHOW_TEXT);
+  let node = walker.nextNode();
+
+  while (node) {
+    const length = node.textContent.length;
+    if (!started && position + length >= start) {
+      range.setStart(node, Math.max(0, Math.min(length, start - position)));
+      started = true;
+    }
+    if (!ended && position + length >= end) {
+      range.setEnd(node, Math.max(0, Math.min(length, end - position)));
+      ended = true;
+      break;
+    }
+    position += length;
+    node = walker.nextNode();
+  }
+
+  return started && ended ? range : null;
+}
+
+/// Text and normalised boxes for a range inside a page.
+function rangeGeometry(page, range) {
+  const box = page.getBoundingClientRect();
+  if (box.width === 0 || box.height === 0) return null;
+
+  const unit = (value) => Math.min(Math.max(value, 0), 1);
+  let left = Infinity;
+  let top = Infinity;
+  let right = -Infinity;
+  let bottom = -Infinity;
+  const rects = [];
+
+  for (const line of range.getClientRects()) {
+    if (line.width === 0 || line.height === 0) continue;
+    left = Math.min(left, line.left);
+    top = Math.min(top, line.top);
+    right = Math.max(right, line.right);
+    bottom = Math.max(bottom, line.bottom);
+    rects.push({
+      x: unit((line.left - box.left) / box.width),
+      y: unit((line.top - box.top) / box.height),
+      width: unit(line.width / box.width),
+      height: unit(line.height / box.height),
+    });
+  }
+  if (!Number.isFinite(left) || rects.length === 0) return null;
+
+  return {
+    text: range.toString().replace(/\s+/g, " ").trim(),
+    rects,
+    rect: {
+      x: unit((left - box.left) / box.width),
+      y: unit((top - box.top) / box.height),
+      width: unit((right - left) / box.width),
+      height: unit((bottom - top) / box.height),
+    },
+  };
+}
+
 function normalisedSelectionRect() {
   const selection = window.getSelection();
   if (!selection || selection.isCollapsed || selection.rangeCount === 0) return null;
@@ -1275,7 +1353,21 @@ function normalisedSelectionRect() {
   const number = Number(startPage.dataset.page);
   if (!number) return null;
 
-  return { page: number, x, y, width, height, text, rects };
+  const start = offsetAt(layer, range.startContainer, range.startOffset);
+  const end = offsetAt(layer, range.endContainer, range.endOffset);
+  if (start === null || end === null) return null;
+
+  return {
+    page: number,
+    x,
+    y,
+    width,
+    height,
+    text,
+    rects,
+    start: Math.min(start, end),
+    end: Math.max(start, end),
+  };
 }
 
 let settleSelectionTimer = null;
@@ -1318,10 +1410,15 @@ function updatePagePreview(clientX, clientY) {
   if (!stage) return;
 
   const stageBox = stage.getBoundingClientRect();
-  const left = Math.min(pageGesture.startX, clientX) - stageBox.left + stage.scrollLeft;
-  const top = Math.min(pageGesture.startY, clientY) - stageBox.top + stage.scrollTop;
-  const width = Math.abs(clientX - pageGesture.startX);
-  const height = Math.abs(clientY - pageGesture.startY);
+  // Both ends live in the stage's content space, so scrolling moves the box with the pages instead
+  // of dragging the starting edge along the viewport.
+  const currentX = clientX - stageBox.left + stage.scrollLeft;
+  const currentY = clientY - stageBox.top + stage.scrollTop;
+  const start = pageGesture.startContent;
+  const left = Math.min(start.x, currentX);
+  const top = Math.min(start.y, currentY);
+  const width = Math.abs(currentX - start.x);
+  const height = Math.abs(currentY - start.y);
 
   let marquee = stage.querySelector(".page-marquee");
   if (!marquee) {
@@ -1335,15 +1432,23 @@ function updatePagePreview(clientX, clientY) {
   marquee.style.height = `${height}px`;
   marquee.classList.toggle("subtract", Boolean(pageGesture.subtract));
 
-  const leftmost = Math.min(pageGesture.startX, clientX);
-  const rightmost = Math.max(pageGesture.startX, clientX);
-  const topmost = Math.min(pageGesture.startY, clientY);
-  const bottommost = Math.max(pageGesture.startY, clientY);
+  const leftmost = left;
+  const rightmost = left + width;
+  const topmost = top;
+  const bottommost = top + height;
 
   for (const page of document.querySelectorAll(".page[data-page]")) {
     const box = page.getBoundingClientRect();
+    // Compare in content space as well, or scrolled-away pages lose their outline.
+    const pageLeft = box.left - stageBox.left + stage.scrollLeft;
+    const pageTop = box.top - stageBox.top + stage.scrollTop;
+    const pageRight = pageLeft + box.width;
+    const pageBottom = pageTop + box.height;
     const covers =
-      box.right >= leftmost && box.left <= rightmost && box.bottom >= topmost && box.top <= bottommost;
+      pageRight >= leftmost &&
+      pageLeft <= rightmost &&
+      pageBottom >= topmost &&
+      pageTop <= bottommost;
     page.classList.toggle("range-preview", covers);
     // The batch inherits the gesture's meaning so the outline can say add (accent) or subtract (white).
     page.classList.toggle("subtract", covers && pageGesture.subtract);
@@ -1422,10 +1527,16 @@ document.addEventListener(
     if (!page) return;
 
     event.preventDefault();
+    const stage = stageElement();
+    const stageBox = stage.getBoundingClientRect();
     pageGesture = {
       page: Number(page.dataset.page),
       startX: event.clientX,
       startY: event.clientY,
+      startContent: {
+        x: event.clientX - stageBox.left + stage.scrollLeft,
+        y: event.clientY - stageBox.top + stage.scrollTop,
+      },
       // Drag, click and modifier borrow all follow the page the gesture starts on.
       subtract: page.classList.contains("in-scope"),
     };
@@ -1809,6 +1920,109 @@ window.PDFScope = {
     }
 
     return { text: "", rects: [] };
+  },
+
+  /// Starts dragging one end of a passage. The renderer owns the gesture: it reads character offsets
+  /// from the caret under the pointer, rebuilds the Range, and reports the final geometry on release.
+  beginGripDrag(pageNumber, id, start, end, side, clientX, clientY) {
+    const page = pageElement(pageNumber);
+    const layer = page?.querySelector(".textLayer");
+    const frame = page?.querySelector(`.ref-frame[data-ref="${id}"]`);
+    if (!page || !layer || !frame) return;
+
+    if (end <= start) return;
+    const total = layer.textContent.length;
+    const grip = { fixed: side === "start" ? end : start, side, last: side === "start" ? start : end };
+    const marks = [...document.querySelectorAll(`.passage-mark[data-passage="${id}"]`)];
+    for (const mark of marks) mark.style.visibility = "hidden";
+
+    const live = document.createElement("div");
+    live.className = "passage-live";
+    // Inside the frame, so the percentages of the live boxes and the grips share one origin.
+    frame.appendChild(live);
+
+    const frameBox = () => frame.getBoundingClientRect();
+    const pageBox = () => page.getBoundingClientRect();
+
+    const paint = (geometry) => {
+      live.replaceChildren();
+      const frameRect = frameBox();
+      const pageRect = pageBox();
+      if (frameRect.width === 0 || frameRect.height === 0) return;
+
+      for (const rect of geometry.rects) {
+        const mark = document.createElement("div");
+        mark.className = "passage-live-mark";
+        mark.style.left = `${(pageRect.left + rect.x * pageRect.width - frameRect.left) / frameRect.width * 100}%`;
+        mark.style.top = `${(pageRect.top + rect.y * pageRect.height - frameRect.top) / frameRect.height * 100}%`;
+        mark.style.width = `${rect.width * pageRect.width / frameRect.width * 100}%`;
+        mark.style.height = `${rect.height * pageRect.height / frameRect.height * 100}%`;
+        live.appendChild(mark);
+      }
+
+      const grips = frame.querySelectorAll(".text-grip");
+      const startGrip = grips[0];
+      const endGrip = grips[1];
+      const first = geometry.rects[0];
+      const last = geometry.rects[geometry.rects.length - 1];
+      if (startGrip && first) {
+        startGrip.style.left = `${(pageRect.left + first.x * pageRect.width - frameRect.left) / frameRect.width * 100}%`;
+        startGrip.style.top = `${(pageRect.top + (first.y + first.height) * pageRect.height - frameRect.top) / frameRect.height * 100}%`;
+      }
+      if (endGrip && last) {
+        endGrip.style.left = `${(pageRect.left + (last.x + last.width) * pageRect.width - frameRect.left) / frameRect.width * 100}%`;
+        endGrip.style.top = `${(pageRect.top + (last.y + last.height) * pageRect.height - frameRect.top) / frameRect.height * 100}%`;
+      }
+    };
+
+    const geometryFor = () => {
+      const startOffset = Math.min(grip.fixed, grip.last);
+      const endOffset = Math.max(grip.fixed, grip.last);
+      const range = rangeBetween(layer, startOffset, endOffset);
+      if (!range) return null;
+      const geometry = rangeGeometry(page, range);
+      if (!geometry) return null;
+      return { ...geometry, start: startOffset, end: endOffset };
+    };
+
+    const initial = geometryFor();
+    if (initial) paint(initial);
+
+    const move = (event) => {
+      const caret = caretInside(layer, event.clientX, event.clientY);
+      if (caret) {
+        const offset = offsetAt(layer, caret.startContainer, caret.startOffset);
+        if (offset !== null) grip.last = Math.max(0, Math.min(total, offset));
+      }
+      const geometry = geometryFor();
+      if (geometry) paint(geometry);
+      event.preventDefault();
+    };
+
+    const up = (event) => {
+      document.removeEventListener("pointermove", move, true);
+      document.removeEventListener("pointerup", up, true);
+      document.body.classList.remove("grip-dragging");
+      live.remove();
+      for (const mark of marks) mark.style.visibility = "";
+      const geometry = geometryFor();
+      if (!geometry) return;
+      window.__pdfscopePassageEdited?.({
+        id,
+        page: pageNumber,
+        start: geometry.start,
+        end: geometry.end,
+        text: geometry.text,
+        rect: geometry.rect,
+        rects: geometry.rects,
+      });
+      event.preventDefault();
+    };
+
+    document.body.classList.add("grip-dragging");
+    document.addEventListener("pointermove", move, true);
+    document.addEventListener("pointerup", up, true);
+    move({ clientX, clientY, preventDefault() {} });
   },
 
   /// Re-crops a region after its rectangle changed.

@@ -243,6 +243,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Fixed
 
+- Text grips now edit character ranges across lines and follow the caret; page-scroll previews stay
+  anchored to content; double-click no longer opens a file while one is open.
+
+
 - Page gestures scroll at the stage edge and turn light grey when subtracting; passages no longer
   move as boxes and their endpoint grips drag again.
 
