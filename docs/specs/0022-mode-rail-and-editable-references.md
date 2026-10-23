@@ -564,6 +564,13 @@ before painting; and while the old selection is being cleared, native paint is m
 pointer press, so a late repaint cannot show. The frame is derived from the union of the merged line
 boxes (`geo::union_of`, four tests) instead of the payload union.
 
+### Regression: selections stopped reporting
+
+The rect-merging helper returned only `width`/`height`; the payload code still read `rect.right` and
+`rect.bottom`, produced `NaN`, failed the unit-range check and dropped every selection. The merged
+rects carry all four edges again, and the payload derives an edge from `left + width` if it is ever
+missing.
+
 ## Deviations
 
 - The reference undo stack is cleared when a question is sent: references become part of that turn's

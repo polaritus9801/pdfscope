@@ -1338,6 +1338,8 @@ function mergedClientRects(rects) {
   return merged.map((line) => ({
     left: line.left,
     top: line.top,
+    right: line.right,
+    bottom: line.bottom,
     width: line.right - line.left,
     height: line.bottom - line.top,
   }));
@@ -1368,8 +1370,10 @@ function normalisedSelectionRect() {
     if (rect.width === 0 || rect.height === 0) continue;
     left = Math.min(left, rect.left);
     top = Math.min(top, rect.top);
-    right = Math.max(right, rect.right);
-    bottom = Math.max(bottom, rect.bottom);
+    const rectRight = rect.right ?? rect.left + rect.width;
+    const rectBottom = rect.bottom ?? rect.top + rect.height;
+    right = Math.max(right, rectRight);
+    bottom = Math.max(bottom, rectBottom);
     rects.push({
       x: unit((rect.left - box.left) / box.width),
       y: unit((rect.top - box.top) / box.height),

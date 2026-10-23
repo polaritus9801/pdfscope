@@ -243,6 +243,9 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Fixed
 
+- Selections report again: the rect-merging helper no longer drops `right`/`bottom`.
+
+
 - Overlapping Range boxes are merged into one box per line, and native selection paint is muted while
   the old selection is cleared, so no flatter second layer can survive under a reference.
 
