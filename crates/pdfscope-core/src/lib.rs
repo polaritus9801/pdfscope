@@ -28,7 +28,7 @@ pub use citation::{Segment, segments};
 pub use error::{CoreError, CoreResult};
 pub use geo::Rect;
 pub use ids::{BookId, PageIndex};
-pub use markdown::{to_html, transcript_markdown};
+pub use markdown::{link_source_markers, to_html, transcript_markdown};
 pub use pages::{add_range, remove_page, subtract_range, toggle_page};
 pub use ranges::{PageSpan, RangeError, parse_ranges};
 pub use tokens::estimate_tokens;

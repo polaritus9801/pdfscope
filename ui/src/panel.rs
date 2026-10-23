@@ -6,7 +6,7 @@ use wasm_bindgen::closure::Closure;
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 
-use pdfscope_core::{Segment, estimate_tokens, segments, transcript_markdown};
+use pdfscope_core::{Segment, estimate_tokens, link_source_markers, segments, transcript_markdown};
 
 use crate::scope_ui::PageManager;
 use crate::settings::SettingsSheet;
@@ -1898,6 +1898,11 @@ pub fn AiPanel(
                                     else {
                                         return;
                                     };
+                                    if let Some(url) = target.get_attribute("data-url") {
+                                        event.prevent_default();
+                                        let _ = crate::call("openUrl", &[JsValue::from_str(&url)]);
+                                        return;
+                                    }
                                     if let Some(number) = target
                                         .get_attribute("data-page")
                                         .and_then(|value| value.parse::<u32>().ok())
@@ -1962,7 +1967,14 @@ pub fn AiPanel(
                                                     <div
                                                         id=format!("answer-{index}")
                                                         class="answer-text markdown"
-                                                        inner_html=pdfscope_core::to_html(&turn.answer)
+                                                        inner_html=link_source_markers(
+                                                            &pdfscope_core::to_html(&turn.answer),
+                                                            &turn
+                                                                .sources
+                                                                .iter()
+                                                                .map(|source| (source.title.clone(), source.url.clone()))
+                                                                .collect::<Vec<_>>(),
+                                                        )
                                                     ></div>
                                                 }
                                                     .into_any()

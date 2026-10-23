@@ -232,7 +232,9 @@ before sending).
   title/URL pair in a 来源 shelf row. Clicking a chip opens it in the system browser.
 - Failures are explicit: no key, browser build, or a provider error stops the turn with a message and
   does not fall back silently. An empty result set is reported and the question proceeds locally.
-- The 来源 chips are the citation cards; inline hover cards inside an answer are not built.
+- The 来源 chips are the citation cards. Inline `[来源 n]` markers inside an answer are now linked:
+  `link_source_markers` (four tests) rewrites them into spans carrying the escaped URL, and the
+  transcript click handler opens them. Hover preview cards are still not built.
 - **Providers** — DeepSeek Search is the default (it reuses the model key; official endpoint
   `POST https://api.deepseek.com/v1/tools/search`, per-request billing). Tavily, Brave, Exa and Serper
   are selectable in 设置 → 接口. Each is parsed into the same `WebResult` and covered by parsing tests;
@@ -368,7 +370,8 @@ Run these against the desktop build with a configured model and (for §6) a Tavi
 11. 重试 resends; 编辑 puts the question back with a banner and replaces that turn and later ones;
     分支 creates a new conversation containing that turn and earlier ones.
 12. A web answer keeps its numbered source cards after switching conversations and after restart;
-    clicking a card opens (or at minimum exposes) the URL.
+    clicking a card opens (or at minimum exposes) the URL. A `[来源 n]` marker inside the answer is
+    itself clickable and carries the same URL.
 
 ### History
 13. 新对话 adds a conversation; search matches titles, questions and answers; rename survives blur and
@@ -418,7 +421,7 @@ unique paths. Browser builds fall back to the clipboard.
 - Duplicate detection covers passages and regions; attaching the same image or file twice still
   produces two attachments (the `@` picker reuses existing ones on the common path).
 - Export writes into the system Downloads directory; there is no folder picker yet.
-- **Source cards open via `window.open`.** If the desktop webview refuses new windows, the card is
-  inert; copying the URL is the fallback the reader has today.
+- **Source cards open via `window.open`.** If the desktop webview refuses new windows, both the cards
+  and inline markers are inert; there is no clipboard fallback for them yet.
 - **Images and files are outside the reference undo snapshot**; passages, regions, pages and answers
   are inside it.

@@ -256,6 +256,82 @@ fn is_safe_url(url: &str) -> bool {
     lower.starts_with("http://") || lower.starts_with("https://") || lower.starts_with("mailto:")
 }
 
+/// Turns `[来源 n]` markers in rendered HTML into clickable inline source links.
+///
+/// The marker stays visible; the span carries the URL so the interface can open it. Attributes are
+/// escaped here because provider titles are untrusted.
+pub fn link_source_markers(html: &str, sources: &[(String, String)]) -> String {
+    let mut output = html.to_owned();
+    for (index, (title, url)) in sources.iter().enumerate() {
+        let number = index + 1;
+        let span = format!(
+            "<span class=\"source-inline\" data-url=\"{}\" title=\"{}\">[来源 {}]</span>",
+            escape_attribute(url),
+            escape_attribute(title),
+            number
+        );
+        output = output.replace(&format!("[来源 {number}]"), &span);
+        output = output.replace(&format!("[来源{number}]"), &span);
+    }
+    output
+}
+
+fn escape_attribute(value: &str) -> String {
+    let mut escaped = String::with_capacity(value.len());
+    for character in value.chars() {
+        match character {
+            '&' => escaped.push_str("&amp;"),
+            '"' => escaped.push_str("&quot;"),
+            '<' => escaped.push_str("&lt;"),
+            '>' => escaped.push_str("&gt;"),
+            other => escaped.push(other),
+        }
+    }
+    escaped
+}
+
+#[cfg(test)]
+mod source_link_tests {
+    use super::*;
+
+    fn sources() -> Vec<(String, String)> {
+        vec![
+            ("One".to_owned(), "https://one.example".to_owned()),
+            (
+                "Two \"q\"".to_owned(),
+                "https://two.example/?a=1&b=2".to_owned(),
+            ),
+        ]
+    }
+
+    #[test]
+    fn markers_become_clickable_spans() {
+        let html = link_source_markers("<p>see [来源 1]</p>", &sources());
+        assert!(html.contains("data-url=\"https://one.example\""));
+        assert!(html.contains(">[来源 1]</span>"));
+    }
+
+    #[test]
+    fn both_spacing_variants_are_linked() {
+        let html = link_source_markers("<p>[来源2]</p>", &sources());
+        assert!(html.contains("data-url=\"https://two.example/?a=1&amp;b=2\""));
+    }
+
+    #[test]
+    fn titles_and_urls_are_escaped() {
+        let html = link_source_markers("[来源 2]", &sources());
+        assert!(html.contains("title=\"Two &quot;q&quot;\""));
+        assert!(!html.contains("&b=2\""));
+    }
+
+    #[test]
+    fn unknown_or_out_of_range_markers_stay_text() {
+        let html = link_source_markers("[来源 9] [来源 1]", &sources()[..1]);
+        assert!(!html.contains("[来源 9]</span>"));
+        assert!(html.contains("[来源 1]</span>"));
+    }
+}
+
 /// Exports a conversation as Markdown: one numbered section per question and answer.
 pub fn transcript_markdown(turns: &[(String, String)]) -> String {
     let mut out = String::new();

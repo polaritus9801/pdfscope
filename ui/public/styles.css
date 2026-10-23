@@ -2878,3 +2878,16 @@ body.selection-quiet .textLayer :is(span, br)::selection {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Inline web citations inside an answer: the marker itself is the link. */
+.source-inline {
+  color: var(--accent);
+  border-bottom: 1px dotted color-mix(in srgb, var(--accent) 55%, transparent);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.source-inline:hover {
+  background: var(--accent-soft);
+  border-radius: 3px;  /* size */
+}
