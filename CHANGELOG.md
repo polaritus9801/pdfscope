@@ -118,6 +118,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- A conversation library per document: search, rename, pin, delete, new conversation, with the old
+  single transcript migrated into it.
+
+
 - Conversations persist per document across restarts, with a 新对话 action to start clean.
 
 

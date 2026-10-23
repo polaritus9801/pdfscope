@@ -171,13 +171,18 @@ before sending).
   active row highlighted) and Enter picks; Esc closes it. Every turn has 编辑, which puts its question
   back in the editor behind a banner and, on send, replaces that turn and everything after it.
 
-## 7c. Progress — persistence
+## 7c. Progress — the conversation library
 
 - Each document's transcript is stored in the webview's local storage under its file name and loaded
   when that document opens, so closing the app no longer loses the conversation.
 - `新对话` clears the transcript and its stored copy; it refuses while a turn streams.
-- Still missing from the history model: multiple conversations, search, rename, pin and delete.
-  A full manager needs a conversation record (id, title, timestamps) rather than one array per file.
+- **Multiple conversations** — landed. A document owns a library of `Conversation { id, title,
+  updated, pinned, turns }`, stored under `pdfscope.conversations.<document>`; the old single
+  transcript is migrated into the first conversation. The drawer offers search across titles,
+  questions and answers, rename inline, pin (which sorts first), two-step delete, and new
+  conversation. Pin/rename/delete and new conversations all persist immediately.
+- Remaining in P2: branching from an answer (edit-and-resend covers the common case), pinning a whole
+  document, and exporting a conversation.
 
 ## 8. Gaps beyond the first inventory
 

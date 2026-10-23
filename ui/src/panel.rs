@@ -12,17 +12,20 @@ use crate::scope_ui::PageManager;
 use crate::settings::SettingsSheet;
 use crate::{Passage, Region, truncate};
 
-/// Writes one document's transcript to the webview's storage.
-fn persist_turns(key: &str, turns: &[Turn]) {
-    if key.trim().is_empty() {
-        return;
-    }
-    if let Ok(json) = serde_json::to_string(turns) {
-        let _ = crate::call(
-            "saveTranscript",
-            &[JsValue::from_str(key), JsValue::from_str(&json)],
-        );
-    }
+/// The first question of a conversation, shortened for a list row.
+fn conversation_title(turns: &[Turn]) -> String {
+    turns
+        .first()
+        .map(|turn| {
+            let question = turn
+                .question
+                .split("\n\n[引用的先前回答]")
+                .next()
+                .unwrap_or_default();
+            truncate(question, 30)
+        })
+        .filter(|title| !title.trim().is_empty())
+        .unwrap_or_else(|| "新对话".to_owned())
 }
 
 /// Replaces pill markers with numbered references; an orphaned marker becomes plain text.
@@ -198,6 +201,17 @@ pub(crate) struct Turn {
     interrupted: bool,
 }
 
+/// One conversation stored against a document.
+#[derive(Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+struct Conversation {
+    id: String,
+    title: String,
+    updated: f64,
+    #[serde(default)]
+    pinned: bool,
+    turns: Vec<Turn>,
+}
+
 /// A reference that was used and moved to history.
 #[derive(Clone, PartialEq)]
 enum Stored {
@@ -241,6 +255,14 @@ pub fn AiPanel(
     let known_mentions = RwSignal::new(Vec::<String>::new());
     let mention_open = RwSignal::new(false);
     let editing = RwSignal::new(Option::<usize>::None);
+    let conversations = RwSignal::new(Vec::<Conversation>::new());
+    let active = RwSignal::new(String::new());
+    let history_open = RwSignal::new(false);
+    let history_query = RwSignal::new(String::new());
+    let renaming = RwSignal::new(Option::<(String, String)>::None);
+    let confirm_delete = RwSignal::new(Option::<String>::None);
+    let sync_ready = RwSignal::new(false);
+    let next_conversation = RwSignal::new(0_u64);
     let editor_ref = NodeRef::<leptos::html::Div>::new();
     let failed = RwSignal::new(false);
     let history = RwSignal::new(Vec::<Stored>::new());
@@ -316,7 +338,6 @@ pub fn AiPanel(
             interrupted: interrupted.get(),
         };
         turns.update(|list| list.push(finished));
-        persist_turns(&document_key.get(), &turns.get());
         current_question.set(String::new());
         answer.set(String::new());
         reasoning.set(String::new());
@@ -412,21 +433,100 @@ pub fn AiPanel(
         }
     });
 
-    // A different document starts from its own transcript, or from nothing.
-    Effect::new(move |_| {
-        let key = document_key.get();
+    let new_conversation_id = move || {
+        let serial = next_conversation.get() + 1;
+        next_conversation.set(serial);
+        format!("{}-{serial}", js_sys::Date::now() as u64)
+    };
+
+    let save_conversations = move || {
+        let key = document_key.get_untracked();
         if key.trim().is_empty() {
-            turns.set(Vec::new());
             return;
         }
-        let stored = crate::call("loadTranscript", &[JsValue::from_str(&key)])
-            .and_then(|value| value.as_string());
-        turns.set(
-            stored
-                .and_then(|json| serde_json::from_str::<Vec<Turn>>(&json).ok())
-                .unwrap_or_default(),
-        );
+        if let Ok(json) = serde_json::to_string(&conversations.get_untracked()) {
+            let _ = crate::call(
+                "saveConversations",
+                &[JsValue::from_str(&key), JsValue::from_str(&json)],
+            );
+        }
+    };
+
+    // A document owns a library of conversations; the first one is selected on open.
+    Effect::new(move |_| {
+        let key = document_key.get();
+        sync_ready.set(false);
+        if key.trim().is_empty() {
+            conversations.set(Vec::new());
+            active.set(String::new());
+            turns.set(Vec::new());
+            sync_ready.set(true);
+            return;
+        }
+
+        let mut list: Vec<Conversation> =
+            crate::call("loadConversations", &[JsValue::from_str(&key)])
+                .and_then(|value| value.as_string())
+                .and_then(|json| serde_json::from_str(&json).ok())
+                .unwrap_or_default();
+
+        if list.is_empty() {
+            // Migrate the single transcript written by the previous build.
+            let legacy: Vec<Turn> = crate::call("loadTranscript", &[JsValue::from_str(&key)])
+                .and_then(|value| value.as_string())
+                .and_then(|json| serde_json::from_str(&json).ok())
+                .unwrap_or_default();
+            let id = new_conversation_id();
+            list.push(Conversation {
+                title: conversation_title(&legacy),
+                id: id.clone(),
+                updated: js_sys::Date::now(),
+                pinned: false,
+                turns: legacy,
+            });
+        }
+
+        list.sort_by(|left, right| {
+            right.pinned.cmp(&left.pinned).then_with(|| {
+                right
+                    .updated
+                    .partial_cmp(&left.updated)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+        });
+
+        let first = list[0].id.clone();
+        let first_turns = list[0].turns.clone();
+        conversations.set(list);
+        active.set(first);
+        turns.set(first_turns);
         show_all.set(false);
+        sync_ready.set(true);
+        save_conversations();
+    });
+
+    // Whatever changes the active turns is written back into its conversation.
+    Effect::new(move |_| {
+        if !sync_ready.get() {
+            return;
+        }
+        let current_turns = turns.get();
+        let id = active.get();
+        if id.is_empty() {
+            return;
+        }
+        conversations.update(|list| {
+            if let Some(conversation) = list.iter_mut().find(|entry| entry.id == id) {
+                if conversation.turns != current_turns {
+                    conversation.updated = js_sys::Date::now();
+                    if conversation.title.trim().is_empty() || conversation.title == "新对话" {
+                        conversation.title = conversation_title(&current_turns);
+                    }
+                    conversation.turns = current_turns.clone();
+                }
+            }
+        });
+        save_conversations();
     });
 
     let send_text = move |asked: String| {
@@ -902,6 +1002,104 @@ pub fn AiPanel(
         }
     };
 
+    let reset_transient = move || {
+        current_question.set(String::new());
+        answer.set(String::new());
+        reasoning.set(String::new());
+        failed.set(false);
+        show_all.set(false);
+        editing.set(None);
+        question.set(String::new());
+        mentions.set(Vec::new());
+        known_mentions.set(Vec::new());
+        let _ = composer("clear", &[JsValue::from_bool(true)]);
+    };
+
+    let switch_conversation = move |id: String| {
+        let Some(conversation) = conversations.get().into_iter().find(|entry| entry.id == id)
+        else {
+            return;
+        };
+        active.set(id);
+        turns.set(conversation.turns);
+        reset_transient();
+        history_open.set(false);
+        sync_ready.set(true);
+    };
+
+    let create_conversation = move || {
+        if streaming.get() {
+            return;
+        }
+        let id = new_conversation_id();
+        conversations.update(|list| {
+            list.push(Conversation {
+                id: id.clone(),
+                title: "新对话".to_owned(),
+                updated: js_sys::Date::now(),
+                pinned: false,
+                turns: Vec::new(),
+            });
+        });
+        active.set(id);
+        turns.set(Vec::new());
+        reset_transient();
+        history_open.set(false);
+        save_conversations();
+    };
+
+    let delete_conversation = move |id: String| {
+        if streaming.get() {
+            return;
+        }
+        conversations.update(|list| list.retain(|entry| entry.id != id));
+        confirm_delete.set(None);
+        if active.get() == id {
+            let mut remaining = conversations.get();
+            remaining.sort_by(|left, right| {
+                right.pinned.cmp(&left.pinned).then_with(|| {
+                    right
+                        .updated
+                        .partial_cmp(&left.updated)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })
+            });
+            if let Some(next) = remaining.into_iter().next() {
+                active.set(next.id.clone());
+                turns.set(next.turns);
+                reset_transient();
+            } else {
+                create_conversation();
+            }
+        }
+        save_conversations();
+    };
+
+    let toggle_pin = move |id: String| {
+        conversations.update(|list| {
+            if let Some(conversation) = list.iter_mut().find(|entry| entry.id == id) {
+                conversation.pinned = !conversation.pinned;
+            }
+        });
+        save_conversations();
+    };
+
+    let commit_rename = move |id: String, title: String| {
+        let title = if title.trim().is_empty() {
+            "新对话".to_owned()
+        } else {
+            title.trim().to_owned()
+        };
+        conversations.update(|list| {
+            if let Some(conversation) = list.iter_mut().find(|entry| entry.id == id) {
+                conversation.title = title;
+                conversation.updated = js_sys::Date::now();
+            }
+        });
+        renaming.set(None);
+        save_conversations();
+    };
+
     view! {
         <aside
             class="panel"
@@ -986,28 +1184,197 @@ pub fn AiPanel(
                 <span class="panel-model">{move || model.get()}</span>
                 <button
                     class="panel-new"
+                    title="历史对话"
+                    on:click=move |_| history_open.set(true)
+                >
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 12a9 9 0 1 0 3-6.7" />
+                        <path d="M3 4v5h5" />
+                        <path d="M12 8v4l3 2" />
+                    </svg>
+                </button>
+                <button
+                    class="panel-new"
                     title="新对话"
-                    on:click=move |_| {
-                        if streaming.get() {
-                            return;
-                        }
-                        turns.set(Vec::new());
-                        current_question.set(String::new());
-                        answer.set(String::new());
-                        reasoning.set(String::new());
-                        failed.set(false);
-                        show_all.set(false);
-                        let key = document_key.get();
-                        if !key.trim().is_empty() {
-                            let _ = crate::call("clearTranscript", &[JsValue::from_str(&key)]);
-                        }
-                    }
+                    on:click=move |_| create_conversation()
                 >
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
                         <path d="M12 5v14M5 12h14" />
                     </svg>
                 </button>
             </div>
+
+            <Show when=move || history_open.get()>
+                <div class="history-drawer">
+                    <header class="history-head">
+                        <span class="history-heading">"对话"</span>
+                        <button
+                            class="icon-button"
+                            title="关闭"
+                            on:click=move |_| history_open.set(false)
+                        >
+                            "✕"
+                        </button>
+                    </header>
+                    <div class="history-tools">
+                        <input
+                            class="history-search"
+                            type="search"
+                            placeholder="搜索对话"
+                            prop:value=move || history_query.get()
+                            on:input=move |event| history_query.set(event_target_value(&event))
+                        />
+                        <button class="button button-primary" on:click=move |_| create_conversation()>
+                            "新对话"
+                        </button>
+                    </div>
+                    <div class="history-list">
+                        {move || {
+                            let query = history_query.get().to_lowercase();
+                            let mut list = conversations.get();
+                            list.sort_by(|left, right| {
+                                right
+                                    .pinned
+                                    .cmp(&left.pinned)
+                                    .then_with(|| {
+                                        right
+                                            .updated
+                                            .partial_cmp(&left.updated)
+                                            .unwrap_or(std::cmp::Ordering::Equal)
+                                    })
+                            });
+                            if !query.is_empty() {
+                                list.retain(|conversation| {
+                                    conversation.title.to_lowercase().contains(&query)
+                                        || conversation.turns.iter().any(|turn| {
+                                            turn.question.to_lowercase().contains(&query)
+                                                || turn.answer.to_lowercase().contains(&query)
+                                        })
+                                });
+                            }
+                            if list.is_empty() {
+                                return view! { <p class="history-empty">"没有找到对话"</p> }
+                                    .into_any();
+                            }
+
+                            list.into_iter()
+                                .map(|conversation| {
+                                    let id = conversation.id.clone();
+                                    let title = conversation.title.clone();
+                                    let pinned = conversation.pinned;
+                                    let count = conversation.turns.len();
+                                    let is_active = active.get() == id;
+                                    let is_renaming = renaming
+                                        .get()
+                                        .map(|(renaming_id, _)| renaming_id == id)
+                                        .unwrap_or(false);
+                                    let rename_value = renaming
+                                        .get()
+                                        .filter(|(renaming_id, _)| *renaming_id == id)
+                                        .map(|(_, value)| value)
+                                        .unwrap_or_default();
+                                    let deleting = confirm_delete.get() == Some(id.clone());
+
+                                    let id_for_open = id.clone();
+                                    let id_for_pin = id.clone();
+                                    let id_for_rename = id.clone();
+                                    let title_for_rename = title.clone();
+                                    let id_for_input = id.clone();
+                                    let id_for_key = id.clone();
+                                    let id_for_blur = id.clone();
+                                    let id_for_delete = id.clone();
+                                    let id_for_confirm = id.clone();
+
+                                    view! {
+                                        <div class="history-row" class:active=is_active>
+                                            <button
+                                                class="history-pin"
+                                                title=if pinned { "取消置顶" } else { "置顶" }
+                                                on:click=move |_| toggle_pin(id_for_pin.clone())
+                                            >
+                                                {if pinned { "★" } else { "☆" }}
+                                            </button>
+                                            {if is_renaming {
+                                                view! {
+                                                    <input
+                                                        class="history-rename"
+                                                        prop:value=rename_value
+                                                        on:input=move |event: web_sys::Event| {
+                                                            renaming.set(Some((
+                                                                id_for_input.clone(),
+                                                                event_target_value(&event),
+                                                            )));
+                                                        }
+                                                        on:keydown=move |event: web_sys::KeyboardEvent| {
+                                                            if event.key() == "Enter" {
+                                                                let value = renaming
+                                                                    .get()
+                                                                    .map(|(_, value)| value)
+                                                                    .unwrap_or_default();
+                                                                commit_rename(id_for_key.clone(), value);
+                                                            } else if event.key() == "Escape" {
+                                                                renaming.set(None);
+                                                            }
+                                                        }
+                                                        on:blur=move |_| {
+                                                            let value = renaming
+                                                                .get()
+                                                                .map(|(_, value)| value)
+                                                                .unwrap_or_default();
+                                                            commit_rename(id_for_blur.clone(), value);
+                                                        }
+                                                    />
+                                                }
+                                                    .into_any()
+                                            } else {
+                                                view! {
+                                                    <button
+                                                        class="history-open"
+                                                        on:click=move |_| switch_conversation(id_for_open.clone())
+                                                    >
+                                                        <span class="history-name">{title.clone()}</span>
+                                                        <span class="history-count">
+                                                            {format!("{count} 轮")}
+                                                        </span>
+                                                    </button>
+                                                }
+                                                    .into_any()
+                                            }}
+                                            <button
+                                                class="history-act"
+                                                title="重命名"
+                                                on:click=move |_| {
+                                                    renaming.set(Some((
+                                                        id_for_rename.clone(),
+                                                        title_for_rename.clone(),
+                                                    )));
+                                                }
+                                            >
+                                                "✎"
+                                            </button>
+                                            <button
+                                                class="history-act danger"
+                                                class:confirming=deleting
+                                                title=if deleting { "再点一次删除" } else { "删除" }
+                                                on:click=move |_| {
+                                                    if confirm_delete.get() == Some(id_for_delete.clone()) {
+                                                        delete_conversation(id_for_delete.clone());
+                                                    } else {
+                                                        confirm_delete.set(Some(id_for_confirm.clone()));
+                                                    }
+                                                }
+                                            >
+                                                {if deleting { "确认" } else { "✕" }}
+                                            </button>
+                                        </div>
+                                    }
+                                })
+                                .collect_view()
+                                .into_any()
+                        }}
+                    </div>
+                </div>
+            </Show>
 
             <button
                 class="panel-expand"

@@ -1909,6 +1909,23 @@ window.PDFScope = {
     }
   },
 
+  /// The conversation library of one document.
+  loadConversations(key) {
+    try {
+      return window.localStorage.getItem(`pdfscope.conversations.${key}`);
+    } catch {
+      return null;
+    }
+  },
+
+  saveConversations(key, json) {
+    try {
+      window.localStorage.setItem(`pdfscope.conversations.${key}`, json);
+    } catch {
+      // Quota or privacy mode: the conversation still lives in memory.
+    }
+  },
+
   /// The transcript of one document, persisted in the webview's local storage.
   loadTranscript(key) {
     try {
