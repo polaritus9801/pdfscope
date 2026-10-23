@@ -418,6 +418,131 @@ pub fn AiPanel(
         reasoning.set(String::new());
     };
 
+    let draft_key_for = move |id: &str| format!("{}.{}", document_key.get(), id);
+
+    let label_for = move |key: &str| -> Option<String> {
+        if let Some(id) = key.strip_prefix("p:").and_then(|id| id.parse::<u64>().ok()) {
+            passages
+                .get()
+                .iter()
+                .find(|passage| passage.id == id)
+                .map(|passage| format!("p.{}", passage.page))
+        } else if let Some(id) = key.strip_prefix("r:").and_then(|id| id.parse::<u64>().ok()) {
+            regions
+                .get()
+                .iter()
+                .find(|region| region.id == id)
+                .map(|region| format!("图 p.{}", region.page))
+        } else if let Some(page) = key
+            .strip_prefix("page:")
+            .and_then(|page| page.parse::<u32>().ok())
+        {
+            Some(format!("p.{page}"))
+        } else if let Some(id) = key.strip_prefix("a:").and_then(|id| id.parse::<u64>().ok()) {
+            answers
+                .get()
+                .iter()
+                .find(|answer| answer.id == id)
+                .map(|answer| answer.label.clone())
+        } else if let Some(id) = key
+            .strip_prefix("img:")
+            .and_then(|id| id.parse::<u64>().ok())
+        {
+            images
+                .get()
+                .iter()
+                .find(|image| image.id == id)
+                .map(|image| truncate(&image.name, 14))
+        } else if let Some(id) = key
+            .strip_prefix("file:")
+            .and_then(|id| id.parse::<u64>().ok())
+        {
+            files
+                .get()
+                .iter()
+                .find(|file| file.id == id)
+                .map(|file| truncate(&file.name, 14))
+        } else {
+            None
+        }
+    };
+
+    let draft_parts = move |text: &str| -> js_sys::Array {
+        let parts = js_sys::Array::new();
+        let push_text = |value: &str| {
+            if value.is_empty() {
+                return;
+            }
+            let part = js_sys::Object::new();
+            let _ =
+                js_sys::Reflect::set(&part, &JsValue::from_str("text"), &JsValue::from_str(value));
+            parts.push(&part);
+        };
+
+        let mut rest = text;
+        while let Some(start) = rest.find("@{") {
+            push_text(&rest[..start]);
+            let after = &rest[start + 2..];
+            let Some(end) = after.find('}') else {
+                break;
+            };
+            let key = &after[..end];
+            if let Some(label) = label_for(key) {
+                let part = js_sys::Object::new();
+                let _ =
+                    js_sys::Reflect::set(&part, &JsValue::from_str("key"), &JsValue::from_str(key));
+                let _ = js_sys::Reflect::set(
+                    &part,
+                    &JsValue::from_str("label"),
+                    &JsValue::from_str(&label),
+                );
+                parts.push(&part);
+            }
+            rest = &after[end + 1..];
+        }
+        push_text(rest);
+        parts
+    };
+
+    let save_draft_now = move |text: &str| {
+        if temporary.get().is_some() {
+            return;
+        }
+        let id = active.get();
+        if id.is_empty() {
+            return;
+        }
+        let key = draft_key_for(&id);
+        let _ = composer(
+            "saveDraftSoon",
+            &[JsValue::from_str(&key), JsValue::from_str(text)],
+        );
+    };
+
+    let restore_draft = move |id: &str| {
+        if temporary.get().is_some() || id.is_empty() {
+            let _ = composer("clear", &[JsValue::from_bool(true)]);
+            question.set(String::new());
+            mentions.set(Vec::new());
+            known_mentions.set(Vec::new());
+            return;
+        }
+        let key = draft_key_for(id);
+        let text = composer("loadDraft", &[JsValue::from_str(&key)])
+            .and_then(|value| value.as_string())
+            .unwrap_or_default();
+        let parts = draft_parts(&text);
+        let _ = composer("setRich", &[parts.into()]);
+    };
+
+    let drop_draft = move |id: &str| {
+        if id.is_empty() {
+            return;
+        }
+        let key = draft_key_for(id);
+        let _ = composer("removeDraft", &[JsValue::from_str(&key)]);
+    };
+
     // The editor reports text and the attachment keys of its pills.
     Effect::new(move |_| {
         let callback =
@@ -458,7 +583,8 @@ pub fn AiPanel(
 
                 known_mentions.set(current.clone());
                 mentions.set(current);
-                question.set(text);
+                question.set(text.clone());
+                save_draft_now(&text);
             });
         if let Some(window) = web_sys::window() {
             let _ = js_sys::Reflect::set(
@@ -588,8 +714,9 @@ pub fn AiPanel(
         let first = list[0].id.clone();
         let first_turns = list[0].turns.clone();
         conversations.set(list);
-        active.set(first);
+        active.set(first.clone());
         turns.set(first_turns);
+        restore_draft(&first);
         show_all.set(false);
         sync_ready.set(true);
         save_conversations();
@@ -1066,6 +1193,8 @@ pub fn AiPanel(
         answers.set(Vec::new());
         images.set(Vec::new());
         files.set(Vec::new());
+        let sent_id = active.get();
+        drop_draft(&sent_id);
         composer_clear();
     });
 
@@ -1260,10 +1389,11 @@ pub fn AiPanel(
         else {
             return;
         };
-        active.set(id);
+        active.set(id.clone());
         turns.set(conversation.turns);
         temporary.set(None);
         reset_transient();
+        restore_draft(&id);
         history_open.set(false);
         sync_ready.set(true);
     };
@@ -1282,10 +1412,11 @@ pub fn AiPanel(
                 turns: Vec::new(),
             });
         });
-        active.set(id);
+        active.set(id.clone());
         turns.set(Vec::new());
         temporary.set(None);
         reset_transient();
+        restore_draft(&id);
         history_open.set(false);
         save_conversations();
     };
@@ -1294,6 +1425,7 @@ pub fn AiPanel(
         if streaming.get() {
             return;
         }
+        drop_draft(&id);
         conversations.update(|list| list.retain(|entry| entry.id != id));
         confirm_delete.set(None);
         if active.get() == id {
@@ -1310,6 +1442,7 @@ pub fn AiPanel(
                 active.set(next.id.clone());
                 turns.set(next.turns);
                 reset_transient();
+                restore_draft(&next.id);
             } else {
                 create_conversation();
             }

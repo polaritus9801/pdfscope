@@ -292,6 +292,16 @@ Office files are read with a small ZIP reader (central directory, stored and raw
   keeps the last 30, is de-duplicated against the immediately previous send, and persists in local
   storage.
 
+## 7m. Progress — drafts and duplicate references
+
+- Every conversation stores its own draft (`pdfscope.draft.<document>.<conversation>`), written 300 ms
+  after typing stops. Switching restores it as **rich content**: markers are turned back into pills
+  when their attachment still exists and dropped when it does not, so a restart with no attachments
+  cannot produce orphan pills. Sending a question or deleting a conversation removes its draft;
+  temporary conversations are never written.
+- The same character span (passage) or the same rectangle (region) is refused instead of becoming a
+  second identical attachment; pages were already deduplicated by the page-set algebra.
+
 ## 8. Gaps beyond the first inventory
 
 A second pass over mature assistants adds these, which the program should cover rather than
@@ -345,6 +355,9 @@ Run these against the desktop build with a configured model and (for §6) a Tavi
 6b. ↑ at the start of an empty field recalls the previous question; ↓ walks back down and clears past
     the newest; the history survives a restart.
 7. Delete the attachment with the shelf ✕: the pill disappears too, one undo step.
+7b. Type a draft, switch conversations and return: text and pills are back; send it and the draft is
+    gone; restart with no attachments and the text returns without orphan pills.
+7c. Select the same span twice: the second attempt adds nothing.
 
 ### Shelf
 8. Text, region, image, file, page and answer rows appear only when non-empty and scroll sideways.
@@ -394,9 +407,8 @@ for source cards in the desktop webview.
 
 - **Chip reordering is not built.** Dragging a chip always inserts a pill into the question; dropping it
   on another chip does not change the shelf order. Insertion order is the send order.
-- **Duplicate detection is not built.** Selecting the same passage twice (or attaching the same image
-  or file twice) produces two attachments; the `@` picker reuses an existing attachment instead of
-  adding another, so the common path avoids it.
+- Duplicate detection covers passages and regions; attaching the same image or file twice still
+  produces two attachments (the `@` picker reuses existing ones on the common path).
 - **Copy uses the clipboard, not a file.** 导出 copies Markdown; it does not write a `.md` file, because
   the webview has no file-save bridge yet.
 - **Source cards open via `window.open`.** If the desktop webview refuses new windows, the card is

@@ -694,6 +694,16 @@ fn App() -> impl IntoView {
                 return;
             }
             if image.starts_with("data:image/") {
+                let duplicate = regions.get().iter().any(|region| {
+                    region.page == page
+                        && (region.rect.0 - x).abs() < 0.002
+                        && (region.rect.1 - y).abs() < 0.002
+                        && (region.rect.2 - width).abs() < 0.002
+                        && (region.rect.3 - height).abs() < 0.002
+                });
+                if duplicate {
+                    return;
+                }
                 undo_push.run(());
                 regions.update(|list| {
                     list.push(Region {

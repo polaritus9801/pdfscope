@@ -112,15 +112,16 @@ function insertText(text) {
   emit();
 }
 
+function makeToken(key, label) {
+  const token = makeToken(key, label);
+  return token;
+}
+
 function insertToken(key, label) {
   if (!root) return;
   removeTrailingAt();
 
-  const token = document.createElement("span");
-  token.className = "mention";
-  token.contentEditable = "false";
-  token.dataset.key = key;
-  token.textContent = `@${label}`;
+  const token = makeToken(key, label);
 
   const range = caretInRoot();
   if (!range) {
@@ -228,6 +229,50 @@ window.Composer = {
     return probe.toString().length === 0;
   },
 
+  /// Rebuilds the field from ordered parts: `{ text }` or `{ key, label }`.
+  setRich(parts) {
+    if (!root) return;
+    const nodes = [];
+    for (const part of parts ?? []) {
+      if (part && part.key && part.label) {
+        nodes.push(makeToken(part.key, part.label));
+        nodes.push(document.createTextNode(" "));
+      } else if (part && typeof part.text === "string" && part.text.length > 0) {
+        nodes.push(document.createTextNode(part.text));
+      }
+    }
+    root.replaceChildren(...nodes);
+    emit();
+  },
+
+  loadDraft(key) {
+    try {
+      return window.localStorage.getItem(`pdfscope.draft.${key}`) ?? "";
+    } catch {
+      return "";
+    }
+  },
+
+  saveDraftSoon(key, text) {
+    clearTimeout(draftTimer);
+    draftTimer = setTimeout(() => {
+      try {
+        window.localStorage.setItem(`pdfscope.draft.${key}`, text);
+      } catch {
+        // A draft is a convenience; losing it is acceptable.
+      }
+    }, 300);
+  },
+
+  removeDraft(key) {
+    clearTimeout(draftTimer);
+    try {
+      window.localStorage.removeItem(`pdfscope.draft.${key}`);
+    } catch {
+      // Nothing to remove.
+    }
+  },
+
   loadPromptHistory() {
     try {
       return window.localStorage.getItem("pdfscope.prompts");
@@ -274,6 +319,7 @@ window.Composer = {
 
 
 // Keyboard navigation for the mention picker (which is rendered by the interface).
+let draftTimer = null;
 let mentionIndex = -1;
 
 function mentionItems() {

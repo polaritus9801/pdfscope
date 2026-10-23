@@ -122,6 +122,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Per-conversation drafts that restore text and pills after switching or restarting, and duplicate
+  passage/region prevention.
+
+
 - A send-time context budget guard (configurable, 128k default) and ↑/↓ recall of previous questions.
 
 

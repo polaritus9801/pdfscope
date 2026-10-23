@@ -195,6 +195,18 @@ pub(crate) fn PageView(
 
     let add_reference = Callback::new(move |_: ()| {
         if let Some(current) = selection.get() {
+            // The same character span is one reference, however many times it is selected.
+            let duplicate = passages.get().iter().any(|passage| {
+                passage.page == current.page
+                    && passage.start == current.start
+                    && passage.end == current.end
+                    && current.start < current.end
+            });
+            if duplicate {
+                selection.set(None);
+                let _ = call("clearSelection", &[]);
+                return;
+            }
             undo_push.run(());
             let rects = current.rects.clone();
             // The frame must be exactly the box around the lines it draws, whatever came in the payload.
