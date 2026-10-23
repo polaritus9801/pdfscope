@@ -2158,8 +2158,7 @@ pub fn AiPanel(
                 title="展开 AI 面板"
                 on:click=move |_| collapsed.set(false)
             >
-                <span class="panel-expand-label">"展开"</span>
-                {icon("chevron-left", 16)}
+                {icon("chevron-left", 18)}
             </button>
 
             <div class="panel-body">

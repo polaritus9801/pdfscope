@@ -105,72 +105,57 @@ fn provider_colour(preset: &str) -> &'static str {
     }
 }
 
-/// A 24-grid provider mark. Unknown providers fall back to a monogram tile.
-pub(crate) fn provider_mark(preset: &str, size: u32) -> AnyView {
+/// The official brand SVG shipped in `public/brands`, if this provider has one.
+fn brand_slug(preset: &str) -> Option<&'static str> {
     let lowered = preset.to_lowercase();
-    let colour = provider_colour(preset);
-
     if lowered.contains("deepseek") {
-        view! {
-            <svg viewBox="0 0 24 24" width=size height=size fill=colour aria-hidden="true">
-                <path d="M2.5 14.5c3.4.2 5-1.7 7.7-1.7 2.6 0 3.8 1.8 6.8 1.8 2 0 3.3-.7 4.5-1.8-.7 3.4-3.7 5.7-8 5.7-5.3 0-8.9-2.4-11-4z"/>
-                <path d="M18.6 7.2c1.5 0 2.7 1.1 2.9 2.6-1.1-.5-2.2-.6-3.2-.2.6-.7.7-1.6.3-2.4z"/>
-                <circle cx="7.3" cy="13.6" r="0.8" fill="#ffffff"/>
-            </svg>
-        }
-        .into_any()
+        Some("deepseek")
     } else if lowered.contains("openai") {
-        view! {
-            <svg viewBox="0 0 24 24" width=size height=size fill="none" stroke=colour stroke-width="1.7" stroke-linejoin="round" aria-hidden="true">
-                <path d="M12 3l7.2 4.2v9.6L12 21l-7.2-4.2V7.2z"/>
-                <path d="M12 7.2l3.6 2.1v4.2L12 16.8l-3.6-2.1V9.3z"/>
-            </svg>
-        }
-        .into_any()
+        Some("openai")
     } else if lowered.contains("anthropic") || lowered.contains("claude") {
-        view! {
-            <svg viewBox="0 0 24 24" width=size height=size fill="none" stroke=colour stroke-width="2" stroke-linecap="round" aria-hidden="true">
-                <path d="M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9"/>
-            </svg>
-        }
-        .into_any()
-    } else if lowered.contains("mimo") {
-        // Xiaomi's mark: an orange square with the white "mi".
-        view! {
-            <svg viewBox="0 0 24 24" width=size height=size aria-hidden="true">
-                <rect x="1.5" y="1.5" width="21" height="21" rx="5" fill="#FF6900"/>
-                <path d="M6.2 15.6V9h1.7l1.9 3.2L11.7 9h1.7v6.6M15.5 9v6.6M15.5 7.3h.01"
-                    fill="none" stroke="#ffffff" stroke-width="1.4"
-                    stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-        }
-        .into_any()
-    } else if lowered.contains("moonshot") {
-        view! {
-            <svg viewBox="0 0 24 24" width=size height=size fill=colour aria-hidden="true">
-                <path d="M15.5 3.2a8.8 8.8 0 1 0 6 15.1 7.2 7.2 0 0 1-6-15.1z"/>
-            </svg>
-        }
-        .into_any()
+        Some("anthropic")
     } else if lowered.contains("gemini") || lowered.contains("google") {
-        view! {
-            <svg viewBox="0 0 24 24" width=size height=size fill=colour aria-hidden="true">
-                <path d="M12 2l2.6 7.4L22 12l-7.4 2.6L12 22l-2.6-7.4L2 12l7.4-2.6z"/>
-            </svg>
-        }
-        .into_any()
+        Some("gemini")
+    } else if lowered.contains("mimo") {
+        Some("xiaomi")
+    } else if lowered.contains("moonshot") {
+        Some("moonshot")
+    } else if lowered.contains("openrouter") {
+        Some("openrouter")
+    } else if lowered.contains("ollama") {
+        Some("ollama")
     } else {
-        let letter = preset
-            .chars()
-            .next()
-            .unwrap_or('A')
-            .to_uppercase()
-            .to_string();
-        view! {
-            <span class="provider-letter" style=format!("background:{colour}")>{letter}</span>
-        }
-        .into_any()
+        None
     }
+}
+
+/// An official brand mark as a square SVG; unknown providers fall back to a monogram tile.
+pub(crate) fn provider_mark(preset: &str, size: u32) -> AnyView {
+    if let Some(slug) = brand_slug(preset) {
+        return view! {
+            <img
+                class="provider-mark"
+                src=format!("/brands/{slug}.svg")
+                width=size
+                height=size
+                alt=""
+                draggable="false"
+            />
+        }
+        .into_any();
+    }
+
+    let colour = provider_colour(preset);
+    let letter = preset
+        .chars()
+        .next()
+        .unwrap_or('A')
+        .to_uppercase()
+        .to_string();
+    view! {
+        <span class="provider-letter" style=format!("background:{colour}")>{letter}</span>
+    }
+    .into_any()
 }
 
 /// A rounded tile holding the provider mark.

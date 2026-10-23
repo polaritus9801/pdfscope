@@ -347,12 +347,12 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Fixed
 
-- Tool shortcuts no longer fire while typing in the composer; held modifiers show the borrowed
-  mode's cursor and page wash; the page under the pointer stays lit during a page drag.
+- Tool shortcuts no longer fire while typing in the composer; held modifiers temporarily switch to
+  that tool's real behaviour; the page under the pointer stays lit through drags and edge auto-scroll.
 - The composer's inner focus rectangle is gone, its card border is stronger, the divider no longer
-  paints a purple bar, the collapsed rail is one full-height 展开 button, and dragging the panel is
-  frame-coalesced with a stable document anchor.
-- MiMo uses Xiaomi's mark; model rows and settings chips carry provider tiles.
+  paints a purple bar, and the collapsed rail is one full-height icon-only button.
+- Official SVG marks are downloaded for every provider; model rows and settings chips carry them.
+- Panel drag scales the document continuously instead of snapping at release.
 
 Spec: docs/specs/0025-panel-interaction-fixes.md
 

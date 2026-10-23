@@ -32,6 +32,7 @@ let rememberPosition = true;
 let defaultZoom = 100;
 let pageMode = "continuous";
 let toolMode = "pointer";
+let borrowedMode = null;
 let gestureShift = false;
 let pointerHeld = false;
 let spreadOffset = false;
@@ -117,22 +118,36 @@ function clearPointerPage() {
   pointerPage = null;
 }
 
-/// Holding a modifier borrows a mode's cursor and page affordance without changing the tool.
+/// Holding a modifier temporarily switches to that mode; releasing it switches back to pointer.
+/// This makes the borrowed gesture behave exactly like the sticky mode, not merely look like it.
 function syncBorrow(event) {
-  const stage = stageElement();
-  if (!stage) return;
   if (event.target?.closest?.("input, textarea, select, [contenteditable='true']")) return;
+
   let mode = "";
-  if (toolMode === "pointer") {
-    if (event.shiftKey) mode = "text";
-    else if (event.metaKey || event.ctrlKey) mode = "pages";
-    else if (event.altKey) mode = "box";
+  if (event.shiftKey) mode = "text";
+  else if (event.metaKey || event.ctrlKey) mode = "pages";
+  else if (event.altKey) mode = "box";
+
+  if (borrowedMode) {
+    if (mode === borrowedMode) return;
+    const previous = borrowedMode;
+    borrowedMode = null;
+    if (toolMode === previous) setTool("pointer");
+    if (!mode || toolMode !== "pointer") return;
+  } else if (pointerHeld) {
+    return;
   }
-  if (mode) {
-    stage.dataset.borrow = mode;
-  } else {
-    delete stage.dataset.borrow;
-  }
+
+  if (!mode || toolMode !== "pointer") return;
+  borrowedMode = mode;
+  setTool(mode);
+}
+
+function endBorrow() {
+  if (!borrowedMode) return;
+  const previous = borrowedMode;
+  borrowedMode = null;
+  if (toolMode === previous) setTool("pointer");
 }
 
 function nextFrame() {
@@ -703,7 +718,7 @@ function applyDisplayScale(scale, origin) {
     stage.scrollLeft = 0;
   }
 
-  syncCurrentPage();
+  if (!document.body.classList.contains("panel-dragging")) syncCurrentPage();
   scheduleUpdate(false);
 }
 
@@ -748,6 +763,7 @@ function centerAtRest() {
 
 function scheduleUpdate(render = false) {
   updateRender = updateRender || render;
+  if (document.body.classList.contains("panel-dragging")) return;
   if (frame) return;
   frame = requestAnimationFrame(() => {
     frame = 0;
@@ -1550,6 +1566,7 @@ function finishPageGesture(clientX, clientY) {
   document.removeEventListener("pointermove", onPageMove, true);
   document.removeEventListener("pointerup", onPageUp, true);
 
+  markPointerPage(clientX, clientY);
   const moved = Math.hypot(clientX - startX, clientY - startY) >= 4;
   const hit = pageShellOf(document.elementFromPoint(clientX, clientY));
   const to = hit ? Number(hit.dataset.page) : from;
@@ -1587,6 +1604,8 @@ function autoScrollPages() {
       updatePagePreview(pageGesture.lastX, pageGesture.lastY);
     }
   }
+  // The page under the pointer can change while the column scrolls under a stationary cursor.
+  markPointerPage(pageGesture.lastX, pageGesture.lastY);
 
   pageGesture.scrollFrame = requestAnimationFrame(autoScrollPages);
 }
@@ -1661,8 +1680,7 @@ window.addEventListener("keyup", (event) => {
 });
 window.addEventListener("blur", () => {
   ctrlKeyDown = false;
-  const stage = stageElement();
-  if (stage) delete stage.dataset.borrow;
+  endBorrow();
   clearPointerPage();
 });
 
@@ -2088,6 +2106,8 @@ function beginPanelResize() {
     anchorY: stage.scrollTop + stage.clientHeight / 2,
     clientX: 0,
     width: panel.getBoundingClientRect().width,
+    baseScale: displayScale,
+    baseWidth,
   };
   document.body.classList.add("panel-dragging");
   window.addEventListener("pointermove", onPanelResizeMove, true);
@@ -2109,8 +2129,24 @@ function applyPanelResize() {
   const width = Math.min(720, Math.max(320, window.innerWidth - panelDrag.clientX));
   panelDrag.width = width;
   panelDrag.panel.style.width = `${width}px`;
+
+  // Reflow the stage continuously: keep the 100% layout, but visually scale the column so the page
+  // width follows the divider instead of snapping only when the drag ends.
   const stage = panelDrag.stage;
-  stage.scrollLeft = Math.max(0, panelDrag.anchorX - stage.clientWidth / 2);
+  if (panelDrag.baseWidth > 0) {
+    const content = stageContentWidth(stage);
+    const scale = Math.min(
+      MAX_SCALE,
+      Math.max(MIN_SCALE, (panelDrag.baseScale * content) / panelDrag.baseWidth),
+    );
+    const stageBox = stage.getBoundingClientRect();
+    applyDisplayScale(scale, {
+      x: stageBox.left + stage.clientWidth / 2,
+      y: stageBox.top + stage.clientHeight / 2,
+    });
+  } else {
+    stage.scrollLeft = Math.max(0, panelDrag.anchorX - stage.clientWidth / 2);
+  }
 }
 
 function finishPanelResize() {
@@ -2122,13 +2158,19 @@ function finishPanelResize() {
   if (panelDrag.clientX > 0) applyPanelResize();
   const width = Math.round(panelDrag.width);
   panelDrag.panel.style.width = `${width}px`;
+  const restoreScale = panelDrag.baseScale;
   window.removeEventListener("pointermove", onPanelResizeMove, true);
   window.removeEventListener("pointerup", finishPanelResize, true);
   window.removeEventListener("blur", finishPanelResize, true);
   document.body.classList.remove("panel-dragging");
   panelDrag = null;
+
+  // The continuous visual scale is replaced by the new base layout at the same visual size.
+  setDisplayScale(restoreScale);
+  targetScale = restoreScale;
+  updateScalerSize();
+  runResizeCheck();
   window.__pdfscopePanelResized?.(width);
-  scheduleResizeCheck();
   return width;
 }
 
@@ -2200,6 +2242,7 @@ window.PDFScope = {
 
   /// pointer | text | box | pages. Text and box tools stay active until pointer is chosen.
   setTool(name) {
+    if (borrowedMode && name !== borrowedMode) borrowedMode = null;
     toolMode = ["text", "box", "pages"].includes(name) ? name : "pointer";
     if (stageElement()) {
       stageElement().dataset.tool = toolMode;

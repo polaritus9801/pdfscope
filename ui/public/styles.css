@@ -3727,24 +3727,6 @@ body.selection-quiet .textLayer :is(span, br)::selection {
   color: var(--accent);
 }
 
-/* Borrowed modes: the cursor and the page wash match the mode being borrowed. */
-.stage[data-borrow="pages"] .page {
-  cursor: pointer;
-}
-
-.stage[data-borrow="pages"] .textLayer {
-  user-select: none;
-  -webkit-user-select: none;
-}
-
-.stage[data-borrow="box"] .page {
-  cursor: crosshair;
-}
-
-.stage[data-borrow="text"] .page {
-  cursor: text;
-}
-
 /* JS marks the page under the pointer, which also holds while dragging or borrowing. */
 .stage[data-tool="pages"] .page.pointer-page::after,
 .stage[data-borrow="pages"] .page.pointer-page::after {
@@ -3791,4 +3773,25 @@ body.panel-dragging .panel-resize::after {
 /* The borrowed page mode lights the page immediately, before the pointer moves. */
 .stage[data-borrow="pages"] .page:hover::after {
   opacity: 1;
+}
+
+/* Official brand SVGs, square and scalable. */
+.provider-mark {
+  display: block;
+  object-fit: contain;
+}
+
+/* The OpenAI symbol is official black; invert only it on a dark surface. */
+.provider-mark[src$="openai.svg"] {
+  filter: var(--logo-filter, none);
+}
+
+[data-theme="dark"] {
+  --logo-filter: invert(1);
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-theme="system"] {
+    --logo-filter: invert(1);
+  }
 }
