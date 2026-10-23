@@ -47,3 +47,26 @@ one icon language, designed states. Behaviour, request logic and the reader stay
   the key row carries an 已配置 badge; the model popover gains the provider mark in its header.
 - All phases landed. Behaviour is unchanged apart from the per-answer `model` display field and the
   clear-all path, which now also removes the corresponding pills while keeping the typed text.
+
+
+## Regression — opening a PDF burned 100% CPU
+
+Sampling the WebKit content process showed the main thread inside
+`FileChooser::chooseFiles → dispatchChangeEvent → performMicrotaskCheckpoint → wasm`, recursing
+rather than rendering the PDF.
+
+The document-load effect called `restore_draft`, which read the attachment signals to label pills.
+The composer's input callback then removed "missing" attachments with `update`, which notifies even
+when nothing changed; that notification re-ran the load effect, which restored the same stale draft
+again. A draft containing an image/file pill whose attachment no longer existed (images and files are
+session-only) therefore looped forever.
+
+Fixes:
+
+- every signal read used to label or restore a draft is untracked, so the load effect depends only on
+  the document key;
+- attachment removal checks that the entry still exists and never calls `update` for a no-op;
+- file pills are now removed like image pills (they were previously ignored);
+- a restored draft is written back immediately in its cleaned form.
+
+Verified with `just check`; the running app must be rebuilt/restarted to pick it up.

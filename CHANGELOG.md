@@ -347,6 +347,11 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Fixed
 
+- Opening a PDF could pin a webview at 100% CPU: restoring a draft with image/file pills fed the
+  document-load effect through attachment writes. Draft reads are now untracked and no-op removals no
+  longer notify.
+
+
 - A failed web search no longer consumes references or clears the draft; rename blur cannot reset a
   title; conversation actions are refused while streaming.
 

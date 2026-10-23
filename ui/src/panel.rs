@@ -464,18 +464,18 @@ pub fn AiPanel(
         reasoning.set(String::new());
     };
 
-    let draft_key_for = move |id: &str| format!("{}.{}", document_key.get(), id);
+    let draft_key_for = move |id: &str| format!("{}.{}", document_key.get_untracked(), id);
 
     let label_for = move |key: &str| -> Option<String> {
         if let Some(id) = key.strip_prefix("p:").and_then(|id| id.parse::<u64>().ok()) {
             passages
-                .get()
+                .get_untracked()
                 .iter()
                 .find(|passage| passage.id == id)
                 .map(|passage| format!("p.{}", passage.page))
         } else if let Some(id) = key.strip_prefix("r:").and_then(|id| id.parse::<u64>().ok()) {
             regions
-                .get()
+                .get_untracked()
                 .iter()
                 .find(|region| region.id == id)
                 .map(|region| format!("图 p.{}", region.page))
@@ -486,7 +486,7 @@ pub fn AiPanel(
             Some(format!("p.{page}"))
         } else if let Some(id) = key.strip_prefix("a:").and_then(|id| id.parse::<u64>().ok()) {
             answers
-                .get()
+                .get_untracked()
                 .iter()
                 .find(|answer| answer.id == id)
                 .map(|answer| answer.label.clone())
@@ -495,7 +495,7 @@ pub fn AiPanel(
             .and_then(|id| id.parse::<u64>().ok())
         {
             images
-                .get()
+                .get_untracked()
                 .iter()
                 .find(|image| image.id == id)
                 .map(|image| truncate(&image.name, 14))
@@ -504,7 +504,7 @@ pub fn AiPanel(
             .and_then(|id| id.parse::<u64>().ok())
         {
             files
-                .get()
+                .get_untracked()
                 .iter()
                 .find(|file| file.id == id)
                 .map(|file| truncate(&file.name, 14))
@@ -551,10 +551,10 @@ pub fn AiPanel(
     };
 
     let save_draft_now = move |text: &str| {
-        if temporary.get().is_some() {
+        if temporary.get_untracked().is_some() {
             return;
         }
-        let id = active.get();
+        let id = active.get_untracked();
         if id.is_empty() {
             return;
         }
@@ -566,7 +566,7 @@ pub fn AiPanel(
     };
 
     let restore_draft = move |id: &str| {
-        if temporary.get().is_some() || id.is_empty() {
+        if temporary.get_untracked().is_some() || id.is_empty() {
             let _ = composer("clear", &[JsValue::from_bool(true)]);
             question.set(String::new());
             mentions.set(Vec::new());
@@ -578,7 +578,17 @@ pub fn AiPanel(
             .and_then(|value| value.as_string())
             .unwrap_or_default();
         let parts = draft_parts(&text);
+        let had_markers = text.contains("@{");
         let _ = composer("setRich", &[parts.into()]);
+        if had_markers {
+            // The editor now holds only the markers whose attachments still exist; persist that
+            // cleaned version right away so a restart cannot restore phantom pills.
+            let cleaned = question.get_untracked();
+            let _ = composer(
+                "saveDraftSoon",
+                &[JsValue::from_str(&key), JsValue::from_str(&cleaned)],
+            );
+        }
     };
 
     let drop_draft = move |id: &str| {
@@ -590,12 +600,12 @@ pub fn AiPanel(
     };
 
     let partial_key = move || {
-        let id = active.get();
+        let id = active.get_untracked();
         (!id.is_empty()).then(|| draft_key_for(&id))
     };
 
     let save_partial_now = move || {
-        if temporary.get().is_some() {
+        if temporary.get_untracked().is_some() {
             return;
         }
         let Some(key) = partial_key() else {
@@ -626,7 +636,7 @@ pub fn AiPanel(
     };
 
     let restore_partial = move |id: &str| {
-        if temporary.get().is_some() || id.is_empty() {
+        if temporary.get_untracked().is_some() || id.is_empty() {
             return;
         }
         let key = draft_key_for(id);
@@ -668,30 +678,50 @@ pub fn AiPanel(
 
                 let previous = known_mentions.get();
                 for key in previous.iter().filter(|key| !current.contains(key)) {
+                    // Remove only what still exists. `update` notifies even when the list is
+                    // unchanged, and a restore that re-emits the same keys used to turn that
+                    // notification into a reactive loop.
                     if let Some(id) = key.strip_prefix("p:").and_then(|id| id.parse::<u64>().ok()) {
-                        undo_push.run(());
-                        passages.update(|list| list.retain(|entry| entry.id != id));
+                        if passages.get_untracked().iter().any(|entry| entry.id == id) {
+                            undo_push.run(());
+                            passages.update(|list| list.retain(|entry| entry.id != id));
+                        }
                     } else if let Some(id) =
                         key.strip_prefix("r:").and_then(|id| id.parse::<u64>().ok())
                     {
-                        undo_push.run(());
-                        regions.update(|list| list.retain(|entry| entry.id != id));
+                        if regions.get_untracked().iter().any(|entry| entry.id == id) {
+                            undo_push.run(());
+                            regions.update(|list| list.retain(|entry| entry.id != id));
+                        }
                     } else if let Some(page) = key
                         .strip_prefix("page:")
                         .and_then(|page| page.parse::<u32>().ok())
                     {
-                        undo_push.run(());
-                        page_set.update(|set| set.retain(|entry| *entry != page));
+                        if page_set.get_untracked().contains(&page) {
+                            undo_push.run(());
+                            page_set.update(|set| set.retain(|entry| *entry != page));
+                        }
                     } else if let Some(id) =
                         key.strip_prefix("a:").and_then(|id| id.parse::<u64>().ok())
                     {
-                        undo_push.run(());
-                        answers.update(|list| list.retain(|entry| entry.id != id));
+                        if answers.get_untracked().iter().any(|entry| entry.id == id) {
+                            undo_push.run(());
+                            answers.update(|list| list.retain(|entry| entry.id != id));
+                        }
                     } else if let Some(id) = key
                         .strip_prefix("img:")
                         .and_then(|id| id.parse::<u64>().ok())
                     {
-                        images.update(|list| list.retain(|entry| entry.id != id));
+                        if images.get_untracked().iter().any(|entry| entry.id == id) {
+                            images.update(|list| list.retain(|entry| entry.id != id));
+                        }
+                    } else if let Some(id) = key
+                        .strip_prefix("file:")
+                        .and_then(|id| id.parse::<u64>().ok())
+                    {
+                        if files.get_untracked().iter().any(|entry| entry.id == id) {
+                            files.update(|list| list.retain(|entry| entry.id != id));
+                        }
                     }
                 }
 
