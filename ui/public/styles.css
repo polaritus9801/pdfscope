@@ -3506,3 +3506,133 @@ body.selection-quiet .textLayer :is(span, br)::selection {
 .history-pin.active {
   color: var(--accent);
 }
+
+/* P3 states: skeleton, structured error, focus and quiet motion. */
+.answer-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;  /* size */
+  padding: var(--space-1) 0;
+}
+
+.answer-skeleton span {
+  height: 10px;  /* size */
+  background: linear-gradient(
+    90deg,
+    var(--surface-sunken) 25%,
+    color-mix(in srgb, var(--surface-sunken) 55%, var(--surface)) 50%,
+    var(--surface-sunken) 75%
+  );
+  background-size: 200% 100%;
+  border-radius: 4px;  /* size */
+  animation: skeleton-shimmer 1.2s ease-in-out infinite;
+}
+
+.answer-skeleton span:nth-child(2) {
+  width: 86%;
+}
+
+.answer-skeleton span:nth-child(3) {
+  width: 62%;
+}
+
+@keyframes skeleton-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.error-card {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: color-mix(in srgb, var(--danger) 7%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, var(--border));
+  border-radius: var(--radius-md);
+}
+
+.error-icon {
+  flex: none;
+  display: inline-flex;
+  color: var(--danger);
+}
+
+.error-copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;  /* size */
+  min-width: 0;
+}
+
+.error-copy strong {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.error-copy span {
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+}
+
+.error-actions {
+  display: flex;
+  flex: none;
+  gap: 2px;  /* size */
+}
+
+.empty-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;  /* size */
+  margin-top: var(--space-2);
+  padding: 7px 12px;  /* size */
+  color: var(--ink);
+  font-size: var(--text-xs);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.empty-action:hover {
+  background: var(--surface-sunken);
+  border-color: var(--accent);
+}
+
+.panel button:focus-visible,
+.panel input:focus-visible,
+.panel select:focus-visible,
+.panel .editor:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;  /* size */
+}
+
+.turn {
+  animation: turn-in 140ms ease both;
+}
+
+@keyframes turn-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);  /* size */
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .answer-skeleton span,
+  .turn {
+    animation: none;
+  }
+}

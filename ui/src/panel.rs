@@ -2131,7 +2131,21 @@ pub fn AiPanel(
             <div class="panel-body">
                 {move || {
                     if !configured.get() {
-                        view! { <p class="panel-hint">"未配置模型 · 前往设置"</p> }.into_any()
+                        view! {
+                            <div class="empty-state">
+                                {provider_tile(provider_preset.get(), 40)}
+                                <h3>"先连接一个模型"</h3>
+                                <p>"在设置里填入接口、模型与 Key，然后回来提问。"</p>
+                                <button
+                                    class="empty-action"
+                                    on:click=move |_| open.set(true)
+                                >
+                                    {icon("settings", 14)}
+                                    "打开设置"
+                                </button>
+                            </div>
+                        }
+                            .into_any()
                     } else if turns.get().is_empty() && answer.get().is_empty() && !streaming.get() {
                         view! {
                             <div class="empty-state">
@@ -2198,18 +2212,28 @@ pub fn AiPanel(
                                         return ().into_any();
                                     }
                                     view! {
-                                        <div class="error-card">
-                                            <span>{status.get()}</span>
-                                            <button
-                                                class="action"
-                                                on:click=move |_| {
-                                                    if let Some(last) = turns.get().last().cloned() {
-                                                        send_text(last.question);
-                                                    }
-                                                }
-                                            >
-                                                "重试"
-                                            </button>
+                                        <div class="error-card" role="alert">
+                                            <span class="error-icon">{icon("alert", 18)}</span>
+                                            <div class="error-copy">
+                                                <strong>"这次没有成功"</strong>
+                                                <span>{status.get()}</span>
+                                            </div>
+                                            <div class="error-actions">
+                                                {icon_action(
+                                                    "retry",
+                                                    "重试",
+                                                    move |_event: web_sys::MouseEvent| {
+                                                        if let Some(last) = turns.get().last().cloned() {
+                                                            send_text(last.question);
+                                                        }
+                                                    },
+                                                )}
+                                                {icon_action(
+                                                    "settings",
+                                                    "打开设置",
+                                                    move |_event: web_sys::MouseEvent| open.set(true),
+                                                )}
+                                            </div>
                                         </div>
                                     }
                                         .into_any()
@@ -2524,6 +2548,13 @@ pub fn AiPanel(
                                                 </span>
                                             </div>
                                             {detail}
+                                            <Show when=move || streaming.get() && answer.get().is_empty()>
+                                                <div class="answer-skeleton" aria-hidden="true">
+                                                    <span></span>
+                                                    <span></span>
+                                                    <span></span>
+                                                </div>
+                                            </Show>
                                             <div
                                                 class="answer-text markdown"
                                                 aria-live="polite"

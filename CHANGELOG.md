@@ -130,6 +130,9 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Skeleton, structured error, focus rings and reduced-motion-aware transitions in the AI panel.
+
+
 - The context shelf gains a count header, clear-all, type icons and collapsed page ranges.
 
 

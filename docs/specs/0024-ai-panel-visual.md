@@ -40,4 +40,7 @@ one icon language, designed states. Behaviour, request logic and the reader stay
 - P2 landed: the shelf has a `上下文 · N 项` header and 清空, rows use type icons, page chips collapse
   into inclusive ranges (`p.12–14`) that remove the whole range, and the remaining text glyphs (✕ ✎ ★)
   are icons.
-- Next: P3 states.
+- P3 landed: a three-line skeleton before the first token, a structured error card (icon, cause, retry
+  and settings), focus-visible rings across the panel, a quiet turn entrance and skeleton shimmer,
+  all disabled under `prefers-reduced-motion`.
+- Next: P4 settings.

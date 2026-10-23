@@ -41,6 +41,7 @@ pub(crate) fn icon(name: &'static str, size: u32) -> impl IntoView {
         "search" => r#"<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/>"#,
         "close" => r#"<path d="M6 6l12 12M18 6L6 18"/>"#,
         "check" => r#"<path d="M5 12l5 5 9-10"/>"#,
+        "alert" => r#"<path d="M12 3l9 17H3z"/><path d="M12 9v5M12 17h.01"/>"#,
         "page" => r#"<path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4"/>"#,
         "pages" => {
             r#"<rect x="7" y="3.5" width="10" height="14" rx="1.5"/><path d="M10 20.5h7a2 2 0 0 0 2-2V8"/>"#
