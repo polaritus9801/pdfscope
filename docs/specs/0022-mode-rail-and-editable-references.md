@@ -547,6 +547,21 @@ the single undo snapshot before the first change.
 Marks are keyed by passage and line index and their geometry is a reactive style, so dragging updates
 the same nodes instead of replacing them, and a changed selection cannot leave a stale copy behind.
 
+### Follow-up: the flatter second layer
+
+It was the **native text selection**, not a second passage. The stylesheet gives
+`.textLayer span::selection` the same lilac as a passage mark; the browser paints it at the text's em
+box, a little flatter than the line box a mark uses, so after adding a reference the two sat on top of
+each other.
+
+`clearSelection` removed the ranges once, before the click's default action finished, and the browser
+could paint the old selection again afterwards. It now clears synchronously, on the next animation
+frame, and once more after 60 ms.
+
+Independently, a passage's frame is now derived from the union of its line boxes (`geo::union_of`,
+four unit tests) instead of trusting the payload's own union, so the frame and the marks can never
+disagree.
+
 ## Deviations
 
 - The reference undo stack is cleared when a question is sent: references become part of that turn's

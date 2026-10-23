@@ -2159,7 +2159,16 @@ window.PDFScope = {
 
   clearSelection() {
     hadSelection = false;
-    window.getSelection()?.removeAllRanges();
+    // The click that adds a reference can finish after this call and make the browser paint the old
+    // native selection again. Clear now, on the next frame, and once more just after the click's
+    // default action so no second (flatter) highlight can survive under the passage mark.
+    const clear = () => {
+      window.getSelection()?.removeAllRanges();
+      document.getSelection()?.removeAllRanges();
+    };
+    clear();
+    requestAnimationFrame(clear);
+    setTimeout(clear, 60);
     window.__pdfscopeCleared?.();
   },
 

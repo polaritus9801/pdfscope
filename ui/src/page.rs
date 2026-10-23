@@ -196,6 +196,9 @@ pub(crate) fn PageView(
     let add_reference = Callback::new(move |_: ()| {
         if let Some(current) = selection.get() {
             undo_push.run(());
+            let rects = current.rects.clone();
+            // The frame must be exactly the box around the lines it draws, whatever came in the payload.
+            let rect = pdfscope_core::geo::union_of(&rects).unwrap_or(current.rect);
             passages.update(|list| {
                 list.push(Passage {
                     id: {
@@ -205,8 +208,8 @@ pub(crate) fn PageView(
                     },
                     page: current.page,
                     quote: current.text.clone(),
-                    rect: current.rect,
-                    rects: current.rects.clone(),
+                    rect,
+                    rects,
                     start: current.start,
                     end: current.end,
                 });

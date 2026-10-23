@@ -511,6 +511,8 @@ fn App() -> impl IntoView {
             let auto = read_flag(&value, "auto").unwrap_or(false);
             if auto {
                 undo_push.run(());
+                let rects = parsed.rects.clone();
+                let rect = pdfscope_core::geo::union_of(&rects).unwrap_or(parsed.rect);
                 passages.update(|list| {
                     list.push(Passage {
                         id: {
@@ -520,8 +522,8 @@ fn App() -> impl IntoView {
                         },
                         page: parsed.page,
                         quote: parsed.text.clone(),
-                        rect: parsed.rect,
-                        rects: parsed.rects.clone(),
+                        rect,
+                        rects,
                         start: parsed.start,
                         end: parsed.end,
                     })
@@ -645,14 +647,15 @@ fn App() -> impl IntoView {
             let y = read_number(&rect_value, "y").unwrap_or(0.0);
             let width = read_number(&rect_value, "width").unwrap_or(0.0);
             let height = read_number(&rect_value, "height").unwrap_or(0.0);
-            if width <= 0.0 || height <= 0.0 {
+            let rect = pdfscope_core::geo::union_of(&rects).unwrap_or((x, y, width, height));
+            if rect.2 <= 0.0 || rect.3 <= 0.0 {
                 return;
             }
 
             passages.update(|list| {
                 if let Some(entry) = list.iter_mut().find(|entry| entry.id == id) {
                     entry.quote = text;
-                    entry.rect = (x, y, width, height);
+                    entry.rect = rect;
                     if !rects.is_empty() {
                         entry.rects = rects;
                     }

@@ -306,3 +306,69 @@ mod resize_tests {
         assert_eq!(moved, direct);
     }
 }
+
+/// The smallest rectangle containing all of `rects`, or `None` when there are none.
+///
+/// The interface trusts a selection's own union, but a malformed payload must never be able to paint
+/// a frame larger than the boxes it contains.
+pub fn union_of(rects: &[(f64, f64, f64, f64)]) -> Option<(f64, f64, f64, f64)> {
+    let mut left = f64::INFINITY;
+    let mut top = f64::INFINITY;
+    let mut right = f64::NEG_INFINITY;
+    let mut bottom = f64::NEG_INFINITY;
+    let mut seen = false;
+
+    for &(x, y, width, height) in rects {
+        if !(x.is_finite() && y.is_finite() && width.is_finite() && height.is_finite()) {
+            continue;
+        }
+        if width <= 0.0 || height <= 0.0 {
+            continue;
+        }
+        left = left.min(x);
+        top = top.min(y);
+        right = right.max(x + width);
+        bottom = bottom.max(y + height);
+        seen = true;
+    }
+
+    if !seen {
+        return None;
+    }
+    Some((left, top, right - left, bottom - top))
+}
+
+#[cfg(test)]
+mod union_tests {
+    use super::*;
+
+    #[test]
+    fn an_empty_list_has_no_union() {
+        assert_eq!(union_of(&[]), None);
+    }
+
+    #[test]
+    fn one_rectangle_is_its_own_union() {
+        let (x, y, w, h) = union_of(&[(0.1, 0.2, 0.3, 0.4)]).unwrap();
+        assert!((x - 0.1).abs() < 1e-9);
+        assert!((y - 0.2).abs() < 1e-9);
+        assert!((w - 0.3).abs() < 1e-9);
+        assert!((h - 0.4).abs() < 1e-9);
+    }
+
+    #[test]
+    fn several_lines_cover_the_smallest_box() {
+        let union = union_of(&[(0.1, 0.1, 0.2, 0.05), (0.05, 0.2, 0.4, 0.05)]);
+        let (x, y, w, h) = union.unwrap();
+        assert!((x - 0.05).abs() < 1e-9);
+        assert!((y - 0.1).abs() < 1e-9);
+        assert!((w - 0.4).abs() < 1e-9);
+        assert!((h - 0.15).abs() < 1e-9);
+    }
+
+    #[test]
+    fn invalid_boxes_are_ignored() {
+        assert_eq!(union_of(&[(f64::NAN, 0.0, 0.1, 0.1)]), None);
+        assert_eq!(union_of(&[(0.0, 0.0, 0.0, 0.1)]), None);
+    }
+}

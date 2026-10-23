@@ -243,6 +243,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Fixed
 
+- The extra flatter layer under a reference was the native text selection; it is cleared after the
+  click settles, and frames are derived from their line boxes.
+
+
 - Grip dragging now has a single source of truth: the interface state drives marks, frame and grips
   reactively, so no second highlight layer can appear and the grips stay on the selection.
 
