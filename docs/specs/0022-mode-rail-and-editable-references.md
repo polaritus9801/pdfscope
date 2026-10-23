@@ -547,7 +547,7 @@ the single undo snapshot before the first change.
 Marks are keyed by passage and line index and their geometry is a reactive style, so dragging updates
 the same nodes instead of replacing them, and a changed selection cannot leave a stale copy behind.
 
-### Follow-up: the flatter second layer
+### Follow-up: the flatter second layer (second attempt)
 
 It was the **native text selection**, not a second passage. The stylesheet gives
 `.textLayer span::selection` the same lilac as a passage mark; the browser paints it at the text's em
@@ -558,9 +558,11 @@ each other.
 could paint the old selection again afterwards. It now clears synchronously, on the next animation
 frame, and once more after 60 ms.
 
-Independently, a passage's frame is now derived from the union of its line boxes (`geo::union_of`,
-four unit tests) instead of trusting the payload's own union, so the frame and the marks can never
-disagree.
+Two more sources were possible and are handled as well: a Range can report a line box plus smaller
+run boxes inside it (around styled or subscript spans), so rects are merged into one box per line
+before painting; and while the old selection is being cleared, native paint is muted until the next
+pointer press, so a late repaint cannot show. The frame is derived from the union of the merged line
+boxes (`geo::union_of`, four tests) instead of the payload union.
 
 ## Deviations
 

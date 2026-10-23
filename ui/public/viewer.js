@@ -1278,7 +1278,7 @@ function rangeGeometry(page, range) {
   let bottom = -Infinity;
   const rects = [];
 
-  for (const line of range.getClientRects()) {
+  for (const line of mergedClientRects(range.getClientRects())) {
     if (line.width === 0 || line.height === 0) continue;
     left = Math.min(left, line.left);
     top = Math.min(top, line.top);
@@ -1305,6 +1305,44 @@ function rangeGeometry(page, range) {
   };
 }
 
+/// Coalesces overlapping client rects into one box per line.
+///
+/// A Range can report a line box and, inside it, smaller boxes for the runs of a line (this happens
+/// around styled or subscript spans). Painting all of them would draw a second, flatter highlight
+/// inside the first.
+function mergedClientRects(rects) {
+  const merged = [];
+  for (const rect of rects) {
+    if (!(rect.width > 0) || !(rect.height > 0)) continue;
+
+    let target = null;
+    for (const line of merged) {
+      const overlap = Math.min(line.bottom, rect.bottom) - Math.max(line.top, rect.top);
+      const smaller = Math.min(line.bottom - line.top, rect.height);
+      if (smaller > 0 && overlap / smaller > 0.5) {
+        target = line;
+        break;
+      }
+    }
+
+    if (!target) {
+      merged.push({ left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom });
+      continue;
+    }
+    target.left = Math.min(target.left, rect.left);
+    target.top = Math.min(target.top, rect.top);
+    target.right = Math.max(target.right, rect.right);
+    target.bottom = Math.max(target.bottom, rect.bottom);
+  }
+
+  return merged.map((line) => ({
+    left: line.left,
+    top: line.top,
+    width: line.right - line.left,
+    height: line.bottom - line.top,
+  }));
+}
+
 function normalisedSelectionRect() {
   const selection = window.getSelection();
   if (!selection || selection.isCollapsed || selection.rangeCount === 0) return null;
@@ -1326,7 +1364,7 @@ function normalisedSelectionRect() {
   let bottom = -Infinity;
   const unit = (value) => Math.min(Math.max(value, 0), 1);
   const rects = [];
-  for (const rect of range.getClientRects()) {
+  for (const rect of mergedClientRects(range.getClientRects())) {
     if (rect.width === 0 || rect.height === 0) continue;
     left = Math.min(left, rect.left);
     top = Math.min(top, rect.top);
@@ -2169,6 +2207,15 @@ window.PDFScope = {
     clear();
     requestAnimationFrame(clear);
     setTimeout(clear, 60);
+    // Even if the browser paints the old selection again, it cannot show as a second layer. The
+    // quiet window ends on the next press, or after a second and a half at the latest.
+    document.body.classList.add("selection-quiet");
+    const release = () => {
+      document.body.classList.remove("selection-quiet");
+      document.removeEventListener("pointerdown", release, true);
+    };
+    document.addEventListener("pointerdown", release, true);
+    setTimeout(release, 1500);
     window.__pdfscopeCleared?.();
   },
 

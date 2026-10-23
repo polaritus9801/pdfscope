@@ -243,8 +243,8 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Fixed
 
-- The extra flatter layer under a reference was the native text selection; it is cleared after the
-  click settles, and frames are derived from their line boxes.
+- Overlapping Range boxes are merged into one box per line, and native selection paint is muted while
+  the old selection is cleared, so no flatter second layer can survive under a reference.
 
 
 - Grip dragging now has a single source of truth: the interface state drives marks, frame and grips

@@ -2338,3 +2338,9 @@ body.grip-dragging .text-grip {
   pointer-events: none !important;
 }
 
+
+/* Just after a reference is added the old native selection is being cleared; keep it invisible so it
+   cannot show as a flatter second layer under the passage mark. */
+body.selection-quiet .textLayer :is(span, br)::selection {
+  background: transparent;
+}
