@@ -45,6 +45,8 @@ one icon language, designed states. Behaviour, request logic and the reader stay
   all disabled under `prefers-reduced-motion`.
 - P4 landed: the search provider is a two-column card list with marks, a hint and a selected check;
   the key row carries an 已配置 badge; the model popover gains the provider mark in its header.
+  The 厂商 field in settings is now a custom menu too: its trigger and every row carry the official
+  provider SVG, and the model-list chips follow the current selection before saving.
 - All phases landed. Behaviour is unchanged apart from the per-answer `model` display field and the
   clear-all path, which now also removes the corresponding pills while keeping the typed text.
 

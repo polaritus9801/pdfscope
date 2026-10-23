@@ -59,6 +59,7 @@ pub(crate) fn SettingsSheet(
 
     let form_model = RwSignal::new("mimo-v2.6-flash".to_owned());
     let form_model_choices = RwSignal::new(String::new());
+    let preset_menu = RwSignal::new(false);
 
     let form_key = RwSignal::new(String::new());
 
@@ -623,29 +624,58 @@ pub(crate) fn SettingsSheet(
 
                                         <label class="settings-row">
                                             <span>"厂商"</span>
-                                            <select
-                                                on:change=move |event| {
-                                                    let chosen = event_target_value(&event);
-                                                    if let Some((protocol, base)) = preset(&chosen) {
-                                                        form_protocol.set(protocol.to_owned());
-                                                        form_base.set(base.to_owned());
-                                                    }
-                                                    form_preset.set(chosen);
-                                                }
-                                            >
-                                                {PRESET_LABELS
-                                                    .iter()
-                                                    .map(|label| {
-                                                        let value = *label;
-                                                        let selected = move || form_preset.get() == value;
-                                                        view! {
-                                                            <option value=value selected=selected>
-                                                                {value}
-                                                            </option>
-                                                        }
-                                                    })
-                                                    .collect_view()}
-                                            </select>
+                                            <div class="preset-field">
+                                                <button
+                                                    type="button"
+                                                    class="preset-trigger"
+                                                    on:click=move |_| preset_menu.update(|open| *open = !*open)
+                                                >
+                                                    {move || provider_tile(form_preset.get(), 20)}
+                                                    <span class="preset-trigger-label">
+                                                        {move || form_preset.get()}
+                                                    </span>
+                                                    {icon("chevron-down", 14)}
+                                                </button>
+                                                <Show when=move || preset_menu.get()>
+                                                    <div
+                                                        class="preset-backdrop"
+                                                        on:pointerdown=move |_| preset_menu.set(false)
+                                                    ></div>
+                                                    <div class="preset-menu">
+                                                        {PRESET_LABELS
+                                                            .iter()
+                                                            .map(|label| {
+                                                                let value = (*label).to_owned();
+                                                                let chosen = value.clone();
+                                                                let chosen_for_class = chosen.clone();
+                                                                let selected_class = move || form_preset.get() == chosen_for_class;
+                                                                let selected_show = move || form_preset.get() == chosen;
+                                                                view! {
+                                                                    <button
+                                                                        type="button"
+                                                                        class="preset-option"
+                                                                        class:selected=selected_class
+                                                                        on:click=move |_| {
+                                                                            if let Some((protocol, base)) = preset(&value) {
+                                                                                form_protocol.set(protocol.to_owned());
+                                                                                form_base.set(base.to_owned());
+                                                                            }
+                                                                            form_preset.set(value.clone());
+                                                                            preset_menu.set(false);
+                                                                        }
+                                                                    >
+                                                                        {provider_tile((*label).to_owned(), 20)}
+                                                                        <span class="preset-option-label">{*label}</span>
+                                                                        <Show when=selected_show>
+                                                                            {icon("check", 14)}
+                                                                        </Show>
+                                                                    </button>
+                                                                }
+                                                            })
+                                                            .collect_view()}
+                                                    </div>
+                                                </Show>
+                                            </div>
                                         </label>
 
                                         <label class="settings-row">
@@ -687,7 +717,7 @@ pub(crate) fn SettingsSheet(
                                                     .map(|name| {
                                                         view! {
                                                             <span class="model-choice">
-                                                                {provider_tile(provider_preset.get(), 16)}
+                                                                {provider_tile(form_preset.get(), 16)}
                                                                 <span>{name}</span>
                                                             </span>
                                                         }
