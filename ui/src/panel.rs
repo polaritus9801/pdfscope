@@ -219,6 +219,9 @@ struct Conversation {
     updated: f64,
     #[serde(default)]
     pinned: bool,
+    /// Model override for this conversation, when the reader picked one.
+    #[serde(default)]
+    model: Option<String>,
     turns: Vec<Turn>,
 }
 
@@ -262,6 +265,7 @@ pub fn AiPanel(
     page_set: RwSignal<Vec<u32>>,
     page_limit: RwSignal<u32>,
     context_limit: RwSignal<u32>,
+    model_choices: RwSignal<Vec<String>>,
     answers: RwSignal<Vec<crate::AnswerRef>>,
     next_answer: RwSignal<u64>,
     document_key: RwSignal<String>,
@@ -300,6 +304,7 @@ pub fn AiPanel(
     let prompt_history = RwSignal::new(Vec::<String>::new());
     let history_cursor = RwSignal::new(Option::<usize>::None);
     let last_asked = RwSignal::new(String::new());
+    let session_model = RwSignal::new(Option::<String>::None);
     let request_started = RwSignal::new(0_u64);
     let next_file = RwSignal::new(0_u64);
     let editor_ref = NodeRef::<leptos::html::Div>::new();
@@ -698,6 +703,7 @@ pub fn AiPanel(
                 id: id.clone(),
                 updated: js_sys::Date::now(),
                 pinned: false,
+                model: None,
                 turns: legacy,
             });
         }
@@ -713,9 +719,11 @@ pub fn AiPanel(
 
         let first = list[0].id.clone();
         let first_turns = list[0].turns.clone();
+        let first_model = list[0].model.clone();
         conversations.set(list);
         active.set(first.clone());
         turns.set(first_turns);
+        session_model.set(first_model);
         restore_draft(&first);
         show_all.set(false);
         sync_ready.set(true);
@@ -778,6 +786,7 @@ pub fn AiPanel(
         let current_page = page.get();
         let total = pages.get();
         let pictures = images.get();
+        let model_override = session_model.get();
         let mode = scope_mode.get();
         let explicit = page_set.get();
 
@@ -1110,6 +1119,10 @@ pub fn AiPanel(
                 }
             });
 
+            let model_value = model_override
+                .clone()
+                .map(|name| JsValue::from_str(&name))
+                .unwrap_or(JsValue::NULL);
             let _ = bridge(
                 "ask",
                 &[
@@ -1118,6 +1131,7 @@ pub fn AiPanel(
                     images.into(),
                     pages_array.into(),
                     history.into(),
+                    model_value,
                     callback.as_ref().clone(),
                 ],
             );
@@ -1390,6 +1404,7 @@ pub fn AiPanel(
             return;
         };
         active.set(id.clone());
+        session_model.set(conversation.model.clone());
         turns.set(conversation.turns);
         temporary.set(None);
         reset_transient();
@@ -1409,10 +1424,12 @@ pub fn AiPanel(
                 title: "新对话".to_owned(),
                 updated: js_sys::Date::now(),
                 pinned: false,
+                model: None,
                 turns: Vec::new(),
             });
         });
         active.set(id.clone());
+        session_model.set(None);
         turns.set(Vec::new());
         temporary.set(None);
         reset_transient();
@@ -1440,6 +1457,7 @@ pub fn AiPanel(
             });
             if let Some(next) = remaining.into_iter().next() {
                 active.set(next.id.clone());
+                session_model.set(next.model.clone());
                 turns.set(next.turns);
                 reset_transient();
                 restore_draft(&next.id);
@@ -1457,6 +1475,7 @@ pub fn AiPanel(
         let id = format!("temp-{}", js_sys::Date::now() as u64);
         temporary.set(Some(id.clone()));
         active.set(id);
+        session_model.set(None);
         turns.set(Vec::new());
         reset_transient();
         history_open.set(false);
@@ -1484,6 +1503,7 @@ pub fn AiPanel(
                 id: id.clone(),
                 updated: js_sys::Date::now(),
                 pinned: false,
+                model: session_model.get(),
                 turns: prefix.clone(),
             });
         });
@@ -1609,7 +1629,53 @@ pub fn AiPanel(
                     </svg>
                 </button>
                 <span class="panel-title">"AI"</span>
-                <span class="panel-model">{move || model.get()}</span>
+                {move || {
+                    let choices = model_choices.get();
+                    if choices.is_empty() {
+                        return view! { <span class="panel-model">{model.get()}</span> }.into_any();
+                    }
+                    let current = session_model.get().unwrap_or_default();
+                    let options = choices
+                        .into_iter()
+                        .map(|choice| {
+                            let selected = choice == current;
+                            let value = choice.clone();
+                            let label = choice.clone();
+                            view! {
+                                <option value=value selected=selected>
+                                    {label}
+                                </option>
+                            }
+                        })
+                        .collect_view();
+                    view! {
+                        <select
+                            class="panel-model-select"
+                            title="本对话使用的模型"
+                            on:change=move |event| {
+                                let value = event_target_value(&event);
+                                let next = if value.is_empty() { None } else { Some(value) };
+                                session_model.set(next.clone());
+                                let id = active.get();
+                                conversations.update(|list| {
+                                    if let Some(conversation) =
+                                        list.iter_mut().find(|entry| entry.id == id)
+                                    {
+                                        conversation.model = next;
+                                        conversation.updated = js_sys::Date::now();
+                                    }
+                                });
+                                save_conversations();
+                            }
+                        >
+                            <option value="" selected=current.is_empty()>
+                                {format!("默认 · {}", model.get())}
+                            </option>
+                            {options}
+                        </select>
+                    }
+                        .into_any()
+                }}
                 <Show when=move || temporary.get().is_some()>
                     <span class="temp-badge" title="这个对话不会被保存">"临时"</span>
                 </Show>
@@ -3113,6 +3179,7 @@ pub fn AiPanel(
                 model=model
                 page_limit=page_limit
                 context_limit=context_limit
+                model_choices=model_choices
             />
 
         </aside>

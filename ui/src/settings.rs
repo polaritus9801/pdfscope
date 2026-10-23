@@ -22,6 +22,19 @@ fn apply_request_timeout(seconds: &str) {
     );
 }
 
+/// Splits the comma-separated model list into unique, trimmed names.
+fn parse_choices(text: &str) -> Vec<String> {
+    let mut choices: Vec<String> = Vec::new();
+    for part in text.split(',') {
+        let part = part.trim();
+        if part.is_empty() || choices.iter().any(|choice| choice == part) {
+            continue;
+        }
+        choices.push(part.to_owned());
+    }
+    choices
+}
+
 #[component]
 pub(crate) fn SettingsSheet(
     open: RwSignal<bool>,
@@ -30,6 +43,7 @@ pub(crate) fn SettingsSheet(
     model: RwSignal<String>,
     page_limit: RwSignal<u32>,
     context_limit: RwSignal<u32>,
+    model_choices: RwSignal<Vec<String>>,
 ) -> impl IntoView {
     let testing = RwSignal::new(false);
 
@@ -42,6 +56,7 @@ pub(crate) fn SettingsSheet(
     let form_base = RwSignal::new("https://api.xiaomimimo.com/v1".to_owned());
 
     let form_model = RwSignal::new("mimo-v2.6-flash".to_owned());
+    let form_model_choices = RwSignal::new(String::new());
 
     let form_key = RwSignal::new(String::new());
 
@@ -85,6 +100,9 @@ pub(crate) fn SettingsSheet(
                     model.set(stored.clone());
                     form_model.set(stored);
                 }
+                let choices = text_of(&value, "model_choices").unwrap_or_default();
+                model_choices.set(parse_choices(&choices));
+                form_model_choices.set(choices);
                 if let Some(stored) = text_of(&value, "preset") {
                     form_preset.set(stored);
                 }
@@ -186,6 +204,11 @@ pub(crate) fn SettingsSheet(
             &payload,
             &JsValue::from_str("model"),
             &JsValue::from_str(&form_model.get()),
+        );
+        let _ = js_sys::Reflect::set(
+            &payload,
+            &JsValue::from_str("model_choices"),
+            &JsValue::from_str(&form_model_choices.get()),
         );
 
         let _ = js_sys::Reflect::set(
@@ -292,6 +315,7 @@ pub(crate) fn SettingsSheet(
                         open.set(false);
                         configured.set(true);
                         model.set(form_model.get());
+                        model_choices.set(parse_choices(&form_model_choices.get()));
                         apply_theme(&form_theme.get());
                         apply_font_size(&form_font_size.get());
                         page_limit.set(form_page_limit.get());
@@ -638,6 +662,21 @@ pub(crate) fn SettingsSheet(
                                                 on:input=move |event| form_model.set(event_target_value(&event))
                                             />
                                         </label>
+
+                                        <label class="settings-row">
+                                            <span>"可选模型"</span>
+                                            <input
+                                                type="text"
+                                                placeholder="逗号分隔，例如 deepseek-flash, deepseek-v4-pro"
+                                                prop:value=move || form_model_choices.get()
+                                                on:input=move |event| {
+                                                    form_model_choices.set(event_target_value(&event))
+                                                }
+                                            />
+                                        </label>
+                                        <p class="settings-hint">
+                                            "填写后每个对话可以在顶栏切换模型；留空则固定使用上面的模型。"
+                                        </p>
 
                                         <label class="settings-row">
                                             <span>"响应超时（秒）"</span>

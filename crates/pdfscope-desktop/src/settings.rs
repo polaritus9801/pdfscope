@@ -62,6 +62,9 @@ pub(crate) struct Settings {
     pub(crate) base_url: String,
     /// Model identifier.
     pub(crate) model: String,
+    /// Comma-separated models offered per conversation.
+    #[serde(default)]
+    pub(crate) model_choices: String,
     /// Instructions sent with every question.
     #[serde(default = "default_prompt")]
     pub(crate) system_prompt: String,
@@ -142,6 +145,7 @@ impl Default for Settings {
             protocol: "openai".to_owned(),
             base_url: "https://api.xiaomimimo.com/v1".to_owned(),
             model: "mimo-v2.6-flash".to_owned(),
+            model_choices: String::new(),
             system_prompt: default_prompt(),
             theme: default_theme(),
             max_tokens: None,
@@ -170,6 +174,9 @@ pub(crate) struct SettingsInput {
     pub(crate) base_url: String,
     /// Model identifier.
     pub(crate) model: String,
+    /// Comma-separated models offered per conversation.
+    #[serde(default)]
+    pub(crate) model_choices: Option<String>,
     /// Instructions sent with every question.
     #[serde(default)]
     pub(crate) system_prompt: Option<String>,
@@ -224,6 +231,9 @@ pub(crate) struct SettingsView {
     pub(crate) base_url: String,
     /// Model identifier.
     pub(crate) model: String,
+    /// Comma-separated models offered per conversation.
+    #[serde(default)]
+    pub(crate) model_choices: String,
     /// Instructions sent with every question.
     pub(crate) system_prompt: String,
     /// `system`, `light` or `dark`.
@@ -389,6 +399,7 @@ pub(crate) fn load_settings(app: tauri::AppHandle) -> Result<SettingsView, Strin
         protocol: settings.protocol,
         base_url: settings.base_url,
         model: settings.model,
+        model_choices: settings.model_choices.clone(),
         system_prompt: settings.system_prompt,
         theme: settings.theme,
         max_tokens: settings.max_tokens,
@@ -437,6 +448,7 @@ pub(crate) fn save_settings(app: tauri::AppHandle, settings: SettingsInput) -> R
         protocol: settings.protocol,
         base_url: settings.base_url.trim_end_matches('/').to_owned(),
         model: settings.model,
+        model_choices: settings.model_choices.unwrap_or_default(),
         system_prompt: settings
             .system_prompt
             .filter(|prompt| !prompt.trim().is_empty())

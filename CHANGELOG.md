@@ -126,6 +126,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Per-conversation model switching from a settings-defined model list, carried into the request as an
+  override.
+
+
 - `[来源 n]` markers inside a web answer are clickable inline citations, in addition to the source
   cards below it.
 

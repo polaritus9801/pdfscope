@@ -2891,3 +2891,23 @@ body.selection-quiet .textLayer :is(span, br)::selection {
   background: var(--accent-soft);
   border-radius: 3px;  /* size */
 }
+
+/* Model picker in the panel header; only shown when the settings list models. */
+.panel-model-select {
+  flex: 1;
+  min-width: 0;
+  max-width: 160px;  /* size */
+  height: 24px;  /* size */
+  padding: 0 var(--space-1);
+  font: inherit;
+  font-size: var(--text-xs);
+  color: var(--ink-muted);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.panel-model-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}

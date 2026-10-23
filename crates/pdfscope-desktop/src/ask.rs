@@ -192,6 +192,9 @@ pub(crate) fn build_request(
 }
 
 /// Starts a streamed answer and reports it through `ask:event`.
+// Tauri commands take their arguments positionally; splitting these into a struct would only move
+// the same fields behind a wrapper.
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub(crate) async fn ask(
     app: tauri::AppHandle,
@@ -200,6 +203,7 @@ pub(crate) async fn ask(
     regions: Vec<RegionInput>,
     context: Vec<PageContext>,
     history: Vec<HistoryTurn>,
+    model: Option<String>,
     control: tauri::State<'_, AskControl>,
 ) -> Result<(), String> {
     if question.trim().is_empty() {
@@ -215,15 +219,12 @@ pub(crate) async fn ask(
 
     let timeout = (settings.request_timeout > 0)
         .then(|| std::time::Duration::from_secs(u64::from(settings.request_timeout)));
-    let config = ProviderConfig::new(
-        settings.preset,
-        protocol,
-        settings.base_url,
-        settings.model,
-        key,
-    )
-    .map_err(|error| error.to_string())?
-    .with_timeout(timeout);
+    let model = model
+        .filter(|name| !name.trim().is_empty())
+        .unwrap_or(settings.model);
+    let config = ProviderConfig::new(settings.preset, protocol, settings.base_url, model, key)
+        .map_err(|error| error.to_string())?
+        .with_timeout(timeout);
 
     // Four turns is enough to resolve pronouns without spending the context on history.
     let history: Vec<HistoryTurn> = history

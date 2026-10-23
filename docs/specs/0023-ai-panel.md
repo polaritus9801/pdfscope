@@ -304,6 +304,17 @@ Office files are read with a small ZIP reader (central directory, stored and raw
 - The same character span (passage) or the same rectangle (region) is refused instead of becoming a
   second identical attachment; pages were already deduplicated by the page-set algebra.
 
+## 7n. Progress — model per conversation
+
+- 设置 → 接口 gains 可选模型, a comma-separated list (trimmed, de-duplicated, empty by default).
+  When it is non-empty the header shows a model picker: the default follows the global model, each
+  other entry overrides it for that conversation. The choice is stored on `Conversation.model`, so it
+  survives switching and restart, and a branch inherits its parent's model. Temporary conversations
+  use the picker without persistence.
+- `ask` accepts a `model` override from the webview; the desktop command uses it for `ProviderConfig`
+  and falls back to the settings model when absent. The command has an explicit
+  `too_many_arguments` allow because Tauri passes them positionally.
+
 ## 8. Gaps beyond the first inventory
 
 A second pass over mature assistants adds these, which the program should cover rather than
@@ -400,6 +411,8 @@ Run these against the desktop build with a configured model and (for §6) a Tavi
     restart.
 23. The scope control shows three icons, an accent segment and a reference count badge; tooltips carry
     `全文 · N 页` and counts.
+24. Add two models in 设置 → 可选模型: the header becomes a picker; switching affects only that
+    conversation, survives a restart, and a branch inherits it.
 
 ### Runtime-only checks
 These cannot be verified by `just check` and need a human: caret behaviour in the contenteditable
