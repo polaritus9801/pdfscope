@@ -961,24 +961,44 @@ pub fn AiPanel(
                 context.push((*number, fetch_page_text(*number).await));
             }
 
-            // Check the real size of what is about to be sent, including page text fetched above.
-            let mut estimated_chars = asked.chars().count();
-            for (_, text) in &context {
-                estimated_chars += text.chars().count();
-            }
+            // Trim page context to the configured budget before refusing: references and images are
+            // what the reader chose explicitly, pages are bulk that can be shortened.
+            let mut base_chars = asked.chars().count();
             for passage in &passages_now {
-                estimated_chars += passage.quote.chars().count();
+                base_chars += passage.quote.chars().count();
             }
-            let estimate = estimate_tokens(estimated_chars, regions_now.len() + pictures.len(), 0);
+            let images_count = regions_now.len() + pictures.len();
             let limit = context_limit.get();
+            let requested_pages = context.len();
+            let mut kept: Vec<(u32, String)> = Vec::new();
+            let mut kept_chars = base_chars;
+
+            for (number, text) in context {
+                let candidate = kept_chars + text.chars().count();
+                if limit > 0 && estimate_tokens(candidate, images_count, 0) > limit as usize {
+                    break;
+                }
+                kept_chars = candidate;
+                kept.push((number, text));
+            }
+            let trimmed = kept.len() < requested_pages;
+            context = kept;
+
+            let estimate = estimate_tokens(kept_chars, images_count, 0);
             if limit > 0 && estimate > limit as usize {
                 status.set(format!(
-                    "上下文约 {estimate} tokens，超过上限 {limit}；请减少页面或引用，或在设置里调大"
+                    "引用与附件本身约 {estimate} tokens，超过上限 {limit}；请减少引用或调大上限"
                 ));
                 failed.set(true);
                 streaming.set(false);
                 pending_clear.set(false);
                 return;
+            }
+            if trimmed {
+                notice.set(Some(format!(
+                    "上下文超出上限，已自动发送前 {} 页",
+                    context.len()
+                )));
             }
 
             // Only a request that actually starts consumes the references. A failed search or a

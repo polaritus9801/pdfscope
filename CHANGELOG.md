@@ -10,6 +10,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Changed
 
+- The context budget trims page context to fit before refusing; only oversized references/attachments
+  stop a request.
+
+
 - 导出 writes a Markdown file into Downloads (collision-safe, path in the toast) instead of only
   copying to the clipboard; browsers fall back to copying.
 

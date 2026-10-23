@@ -288,8 +288,9 @@ Office files are read with a small ZIP reader (central directory, stored and raw
 ## 7l. Progress — budget guard and prompt history
 
 - 设置 → 接口 gains 上下文上限（tokens）, default 128 000, zero disables it. The check runs **after**
-  the page text is fetched and before anything is consumed: the request is refused with its estimate,
-  and the draft, references and attachments stay in place for a retry.
+  page text is fetched and before anything is consumed. Page context is trimmed from the end until it
+  fits, with a notice saying how many pages were kept; only when the references and attachments alone
+  exceed the limit is the request refused, leaving the draft and shelf untouched.
 - The composer recalls previous questions with ↑ at the start of the field and ↓ back down; the list
   keeps the last 30, is de-duplicated against the immediately previous send, and persists in local
   storage.
@@ -410,8 +411,8 @@ Run these against the desktop build with a configured model and (for §6) a Tavi
 19. Without a key, the globe search ends the turn with a message and keeps the draft and references.
 20. With a key, an answer shows numbered 来源 cards; an empty result says so and still answers.
 21. Turn the globe off: the next request does not search.
-21b. Set 上下文上限 low, send a whole-document question: the send is refused with an estimate and the
-     draft and references remain; raising the limit lets it through.
+21b. Set 上下文上限 low, send a whole-document question: pages are trimmed with a notice; if the
+     references alone exceed the limit the send is refused and the draft and shelf remain.
 
 ### Panel
 22. The panel is flush with the window edge, its left border is the divider, and dragging it keeps the
@@ -444,6 +445,9 @@ unique paths. Browser builds fall back to the clipboard.
 - Duplicate detection covers passages and regions; attaching the same image or file twice still
   produces two attachments (the `@` picker reuses existing ones on the common path).
 - Export writes into the system Downloads directory; there is no folder picker yet.
+- Global conversation search covers the open document's whole conversation library; it cannot search
+  conversations of a PDF that is not currently open, because documents are identified by name and the
+  reader has no path to reopen them programmatically.
 - **Source cards open via `window.open`.** If the desktop webview refuses new windows, both the cards
   and inline markers are inert; there is no clipboard fallback for them yet.
 - **Images and files are outside the reference undo snapshot**; passages, regions, pages and answers
