@@ -1967,11 +1967,11 @@ window.PDFScope = {
       const last = geometry.rects[geometry.rects.length - 1];
       if (startGrip && first) {
         startGrip.style.left = `${(pageRect.left + first.x * pageRect.width - frameRect.left) / frameRect.width * 100}%`;
-        startGrip.style.top = `${(pageRect.top + (first.y + first.height) * pageRect.height - frameRect.top) / frameRect.height * 100}%`;
+        startGrip.style.top = `${(pageRect.top + (first.y + first.height / 2) * pageRect.height - frameRect.top) / frameRect.height * 100}%`;
       }
       if (endGrip && last) {
         endGrip.style.left = `${(pageRect.left + (last.x + last.width) * pageRect.width - frameRect.left) / frameRect.width * 100}%`;
-        endGrip.style.top = `${(pageRect.top + (last.y + last.height) * pageRect.height - frameRect.top) / frameRect.height * 100}%`;
+        endGrip.style.top = `${(pageRect.top + (last.y + last.height / 2) * pageRect.height - frameRect.top) / frameRect.height * 100}%`;
       }
     };
 

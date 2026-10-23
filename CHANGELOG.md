@@ -243,6 +243,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Fixed
 
+- Text selections no longer stack stale highlight boxes after an edit, and the endpoint grips sit on
+  the line's centre.
+
+
 - Text grips now edit character ranges across lines and follow the caret; page-scroll previews stay
   anchored to content; double-click no longer opens a file while one is open.
 

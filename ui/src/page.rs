@@ -264,6 +264,36 @@ pub(crate) fn PageView(
         anchor.set(None);
     };
 
+    let rect_of = move |kind: u8, id: u64| -> Option<(f64, f64, f64, f64)> {
+        if kind == 0 {
+            passages
+                .get()
+                .iter()
+                .find(|entry| entry.id == id)
+                .map(|entry| entry.rect)
+        } else {
+            regions
+                .get()
+                .iter()
+                .find(|entry| entry.id == id)
+                .map(|entry| entry.rect)
+        }
+    };
+    let tight_of = move |id: u64| -> Vec<(f64, f64, f64, f64)> {
+        passages
+            .get()
+            .iter()
+            .find(|entry| entry.id == id)
+            .map(|entry| {
+                if entry.rects.is_empty() {
+                    vec![entry.rect]
+                } else {
+                    entry.rects.clone()
+                }
+            })
+            .unwrap_or_default()
+    };
+
     let id = format!("page-{number}");
     let style = format!("aspect-ratio: {width} / {height};");
     let page_attribute = number.to_string();
@@ -366,29 +396,33 @@ pub(crate) fn PageView(
         >
             <div class="page-layer"></div>
 
-            {move || {
-                let mut marks = Vec::new();
-                for passage in passages.get() {
-                    if passage.page != number {
-                        continue;
+            <For
+                each=move || {
+                    let mut marks = Vec::<(String, (f64, f64, f64, f64))>::new();
+                    for passage in passages.get() {
+                        if passage.page != number {
+                            continue;
+                        }
+                        let boxes = if passage.rects.is_empty() {
+                            vec![passage.rect]
+                        } else {
+                            passage.rects.clone()
+                        };
+                        for (index, rect) in boxes.into_iter().enumerate() {
+                            let key = format!(
+                                "{}:{}:{:.5}:{:.5}:{:.5}:{:.5}",
+                                passage.id, index, rect.0, rect.1, rect.2, rect.3
+                            );
+                            marks.push((key, rect));
+                        }
                     }
-                    let boxes = if passage.rects.is_empty() {
-                        vec![passage.rect]
-                    } else {
-                        passage.rects.clone()
-                    };
-                    for rect in boxes {
-                        marks.push(view! {
-                            <div
-                                class="passage-mark"
-                                data-passage=passage.id
-                                style=rect_style(rect)
-                            ></div>
-                        });
-                    }
+                    marks
                 }
-                marks.collect_view()
-            }}
+                key=|(key, _)| key.clone()
+                children=move |(_, rect)| {
+                    view! { <div class="passage-mark" style=rect_style(rect)></div> }
+                }
+            />
 
             <div class="page-bar" aria-hidden="true"></div>
             <div
@@ -417,58 +451,45 @@ pub(crate) fn PageView(
                 let mut frames = Vec::new();
                 for passage in passages.get() {
                     if passage.page == number {
-                        frames.push((
-                            0_u8,
-                            passage.id,
-                            passage.rect,
-                            passage.rects,
-                            passage.start,
-                            passage.end,
-                        ));
+                        frames.push((0_u8, passage.id, passage.rect, passage.start, passage.end));
                     }
                 }
                 for region in regions.get() {
                     if region.page == number {
-                        frames.push((1_u8, region.id, region.rect, Vec::new(), 0, 0));
+                        frames.push((1_u8, region.id, region.rect, 0, 0));
                     }
                 }
                 frames
                     .into_iter()
-                    .map(|(kind, id, rect, tight, start, end)| {
-                        let first = tight.first().copied().unwrap_or(rect);
-                        let last = tight.last().copied().unwrap_or(rect);
-                        let unit = |value: f64, origin: f64, span: f64| {
-                            if span <= 0.0 {
-                                0.0
+                    .map(|(kind, id, rect, start, end)| {
+                        let grip_style = move |at_end: bool| -> String {
+                            let union = rect_of(0, id).unwrap_or(rect);
+                            let tight = tight_of(id);
+                            let point = if at_end {
+                                tight
+                                    .last()
+                                    .map(|line| (line.0 + line.2, line.1 + line.3 / 2.0))
                             } else {
-                                (value - origin) / span * 100.0
-                            }
-                        };
-                        // While a passage endpoint is dragged the marks cannot follow (the text is
-                        // re-read on release), so the grips move to the frame's own edges instead of
-                        // staying behind at the old text positions.
-                        let dragging = drag
-                            .get()
-                            .map(|entry| entry.0 == kind && entry.1 == id)
-                            .unwrap_or(false);
-                        let start_position = if kind == 0 && dragging {
-                            "left:0%; top:100%;".to_owned()
-                        } else {
+                                tight.first().map(|line| (line.0, line.1 + line.3 / 2.0))
+                            };
+                            let Some((x, y)) = point else {
+                                return String::new();
+                            };
+                            let unit = |value: f64, origin: f64, span: f64| {
+                                if span <= 0.0 {
+                                    0.0
+                                } else {
+                                    (value - origin) / span * 100.0
+                                }
+                            };
                             format!(
                                 "left:{:.2}%; top:{:.2}%;",
-                                unit(first.0, rect.0, rect.2),
-                                unit(first.1 + first.3, rect.1, rect.3),
+                                unit(x, union.0, union.2),
+                                unit(y, union.1, union.3)
                             )
                         };
-                        let end_position = if kind == 0 && dragging {
-                            "left:100%; top:100%;".to_owned()
-                        } else {
-                            format!(
-                                "left:{:.2}%; top:{:.2}%;",
-                                unit(last.0 + last.2, rect.0, rect.2),
-                                unit(last.1 + last.3, rect.1, rect.3),
-                            )
-                        };
+                        let start_position = move || grip_style(false);
+                        let end_position = move || grip_style(true);
                         let is_active = move || {
                             active_ref.get() == Some((kind, id))
                                 || focused_ref.get() == Some((kind, id))
@@ -484,7 +505,7 @@ pub(crate) fn PageView(
                                 class:active=is_active
                                 class:focused=is_focused
                                 class:editable=editable
-                                style=rect_style(rect)
+                                style=move || rect_style(rect_of(kind, id).unwrap_or(rect))
                                 on:mouseenter=move |_| active_ref.set(Some((kind, id)))
                                 on:mouseleave=move |_| {
                                     if focused_ref.get() != Some((kind, id)) {
@@ -502,7 +523,7 @@ pub(crate) fn PageView(
                                         return;
                                     };
                                     let _ = target.set_pointer_capture(event.pointer_id());
-                                    begin_drag(event, kind, id, rect, 0);
+                                    begin_drag(event, kind, id, rect_of(kind, id).unwrap_or(rect), 0);
                                 }
                                 on:pointermove=drag_move
                                 on:pointerup=move |_| finish_drag(id)

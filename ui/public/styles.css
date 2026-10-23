@@ -2053,8 +2053,8 @@ mark.find-hit {
 .text-grip {
   position: absolute;
   display: none;
-  width: 10px;  /* size */
-  height: 26px;  /* size */
+  width: 9px;  /* size */
+  height: 20px;  /* size */
   touch-action: none;
   background: var(--accent);
   border-radius: var(--radius-full);

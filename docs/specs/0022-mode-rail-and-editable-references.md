@@ -523,6 +523,18 @@ the starting edge along the viewport or drops the outline from pages already cov
 the covered pages now agree with the committed result. Double-click opens a file only when no document
 is open.
 
+### Follow-up: the doubled selection and grip alignment
+
+The second layer was not a nested reference: it was a **stale node**. Marks were rendered as a plain
+`Vec` of views whose `style` was a fixed string, so Leptos reused the existing elements and never
+rewrote their geometry; a longer selection appended boxes while the old ones stayed. Marks are now a
+`<For>` keyed by passage id plus the rectangle itself, so changed geometry replaces its boxes, and the
+frame's position and the grips' positions are reactive attributes that read the current passage. A
+region drag also starts from the rectangle read at press time instead of one captured at render.
+
+The grips sit at the vertical centre of the first and last line now, because dragging them is caret
+logic, not point logic.
+
 ## Deviations
 
 - The reference undo stack is cleared when a question is sent: references become part of that turn's
