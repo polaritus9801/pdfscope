@@ -118,6 +118,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- The @ picker is keyboard-driven (↑/↓/Enter/Esc), and any sent question can be edited and resent,
+  replacing that turn and the ones after it.
+
+
 - Chips drag into the question field as inline pills, and 引用此回答 can quote just the selection
   inside an answer.
 

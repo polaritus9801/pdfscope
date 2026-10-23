@@ -168,6 +168,17 @@ window.Composer = {
     });
   },
 
+  setPlainText(text) {
+    if (!root) return;
+    root.replaceChildren(document.createTextNode(text ?? ""));
+    emit();
+    root.focus();
+  },
+
+  focus() {
+    root?.focus();
+  },
+
   clear(silent = false) {
     if (!root) return;
     root.replaceChildren();
@@ -224,3 +235,38 @@ window.Composer = {
     allowMention = Boolean(value);
   },
 };
+
+
+// Keyboard navigation for the mention picker (which is rendered by the interface).
+let mentionIndex = -1;
+
+function mentionItems() {
+  return [...document.querySelectorAll(".mention-picker .mention-item")];
+}
+
+window.Mention = {
+  // The interface reaches all composer commands through one object.
+
+  reset() {
+    mentionIndex = -1;
+    for (const item of mentionItems()) item.classList.remove("active");
+  },
+
+  step(delta) {
+    const items = mentionItems();
+    if (items.length === 0) return;
+    mentionIndex = (mentionIndex + delta + items.length) % items.length;
+    items.forEach((item, index) => item.classList.toggle("active", index === mentionIndex));
+    items[mentionIndex].scrollIntoView({ block: "nearest" });
+  },
+
+  choose() {
+    const items = mentionItems();
+    const item = items[mentionIndex >= 0 ? mentionIndex : 0];
+    item?.click();
+  },
+};
+
+window.Composer.mentionStep = (delta) => window.Mention.step(delta);
+window.Composer.mentionChoose = () => window.Mention.choose();
+window.Composer.mentionReset = () => window.Mention.reset();

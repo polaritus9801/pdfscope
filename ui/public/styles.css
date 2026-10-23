@@ -2459,7 +2459,8 @@ body.selection-quiet .textLayer :is(span, br)::selection {
   cursor: pointer;
 }
 
-.mention-item:hover {
+.mention-item:hover,
+.mention-item.active {
   background: var(--accent-soft);
 }
 
@@ -2595,4 +2596,21 @@ body.selection-quiet .textLayer :is(span, br)::selection {
   background: var(--surface);
   border-radius: 50%;
   box-shadow: var(--shadow-1);
+}
+
+/* Editing a sent question: the next send replaces that turn and everything after it. */
+.editing-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: var(--radius-sm);
+}
+
+.editing-banner .link {
+  flex: none;
 }

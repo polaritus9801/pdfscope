@@ -167,7 +167,9 @@ before sending).
   the editor inserts its pill at the drop caret (the renderer converts the point to a caret with
   `caretRangeFromPoint`). `引用此回答` quotes the text selected inside that answer when there is a
   selection, otherwise the whole answer.
-- Still to come in P1: keyboard navigation in the picker.
+- **Picker keyboard and edit-and-resend** — landed. The picker responds to ↑/↓ (wrapping, with the
+  active row highlighted) and Enter picks; Esc closes it. Every turn has 编辑, which puts its question
+  back in the editor behind a banner and, on send, replaces that turn and everything after it.
 
 ## 8. Gaps beyond the first inventory
 

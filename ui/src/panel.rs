@@ -226,6 +226,7 @@ pub fn AiPanel(
     let mentions = RwSignal::new(Vec::<String>::new());
     let known_mentions = RwSignal::new(Vec::<String>::new());
     let mention_open = RwSignal::new(false);
+    let editing = RwSignal::new(Option::<usize>::None);
     let editor_ref = NodeRef::<leptos::html::Div>::new();
     let failed = RwSignal::new(false);
     let history = RwSignal::new(Vec::<Stored>::new());
@@ -370,6 +371,11 @@ pub fn AiPanel(
         }
         open.forget();
         close.forget();
+    });
+
+    Effect::new(move |_| {
+        let _ = mention_open.get();
+        let _ = composer("mentionReset", &[]);
     });
 
     // Hand the editor element to the renderer once it exists.
@@ -755,6 +761,10 @@ pub fn AiPanel(
         if text.trim().is_empty() {
             return;
         }
+        if let Some(index) = editing.get() {
+            turns.update(|list| list.truncate(index));
+            editing.set(None);
+        }
         send_text(text);
         answers.set(Vec::new());
         composer_clear();
@@ -1085,6 +1095,27 @@ pub fn AiPanel(
                                                     }
                                                 });
 
+                                            let edit_text = turn
+                                                .question
+                                                .split("\n\n[引用的先前回答]")
+                                                .next()
+                                                .unwrap_or_default()
+                                                .to_owned();
+                                            let edit = view! {
+                                                <button
+                                                    class="action"
+                                                    on:click=move |_| {
+                                                        editing.set(Some(index));
+                                                        let _ = composer(
+                                                            "setPlainText",
+                                                            &[JsValue::from_str(&edit_text)],
+                                                        );
+                                                    }
+                                                >
+                                                    "编辑"
+                                                </button>
+                                            };
+
                                             let answer_for_cite = turn.answer.clone();
                                             let cite = view! {
                                                 <button
@@ -1117,6 +1148,7 @@ pub fn AiPanel(
                                                     {body}
                                                     <div class="turn-actions">
                                                         {located}
+                                                        {edit}
                                                         {cite}
                                                         <button
                                                             class="action"
@@ -1546,6 +1578,27 @@ pub fn AiPanel(
                         .get()
                         .map(|message| view! { <p class="range-summary range-error">{message}</p> })
                 }}
+                <Show when=move || editing.get().is_some()>
+                    <div class="editing-banner">
+                        <span>
+                            {move || {
+                                format!(
+                                    "正在编辑第 {} 条问题 · 发送后替换其后的回答",
+                                    editing.get().unwrap_or(0) + 1
+                                )
+                            }}
+                        </span>
+                        <button
+                            class="link"
+                            on:click=move |_| {
+                                editing.set(None);
+                                composer_clear();
+                            }
+                        >
+                            "取消"
+                        </button>
+                    </div>
+                </Show>
                 {move || {
                     if !mention_open.get() {
                         return ().into_any();
@@ -1704,6 +1757,31 @@ pub fn AiPanel(
                     on:keydown=move |event: web_sys::KeyboardEvent| {
                         if event.is_composing() {
                             return;
+                        }
+                        if mention_open.get() {
+                            match event.key().as_str() {
+                                "ArrowDown" => {
+                                    event.prevent_default();
+                                    let _ = composer("mentionStep", &[JsValue::from_f64(1.0)]);
+                                    return;
+                                }
+                                "ArrowUp" => {
+                                    event.prevent_default();
+                                    let _ = composer("mentionStep", &[JsValue::from_f64(-1.0)]);
+                                    return;
+                                }
+                                "Enter" => {
+                                    event.prevent_default();
+                                    let _ = composer("mentionChoose", &[]);
+                                    return;
+                                }
+                                "Escape" => {
+                                    event.prevent_default();
+                                    mention_open.set(false);
+                                    return;
+                                }
+                                _ => {}
+                            }
                         }
                         let modified = event.meta_key()
                             || event.ctrl_key()
