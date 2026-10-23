@@ -471,6 +471,19 @@ and drag through one path: a thin solid purple box follows the pointer from pres
 page it covers gets the same outline while the gesture is live. The purple page bar still appears only
 after release, when the set is committed.
 
+### Follow-up: the three blockers
+
+- **Selections reported nothing.** `normalisedSelectionRect` used `unit()` four lines before its
+  `const` initialiser — a temporal-dead-zone error, so no payload ever reached the interface and both
+  the selection bar and text-mode adding looked dead. The helper is declared first now.
+- **Inert references were not inert.** `setTool` never wrote `data-tool` on the stage, so the CSS that
+  gives frames `pointer-events: none` never matched. It does now, which is what lets text selection,
+  box capture and page clicks pass through an unfocused frame.
+- **Page mode** gained the hover wash (a 16 % lilac overlay, lighter than a committed selection), and a
+  gesture's meaning is decided by its **starting page**: start on an unselected page and the batch
+  adds, start on a selected one and it subtracts. The live outline and marquee turn **white** while
+  subtracting; click and drag share the same rule.
+
 ## Deviations
 
 - The reference undo stack is cleared when a question is sent: references become part of that turn's

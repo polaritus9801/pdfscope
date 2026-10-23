@@ -243,6 +243,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Fixed
 
+- Text selection reports again; unfocused references really let the pointer through; page mode has a
+  hover wash and subtracts a batch when the gesture starts on a selected page, with white feedback.
+
+
 - Passages highlight the exact lines selected instead of whole text-layer spans; endpoints are
   character-accurate, the ✕ sits outside the frame, references are focus-to-edit outside the pointer
   tool, and page drags show a live preview box with per-page outlines.

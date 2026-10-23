@@ -1246,6 +1246,7 @@ function normalisedSelectionRect() {
   let top = Infinity;
   let right = -Infinity;
   let bottom = -Infinity;
+  const unit = (value) => Math.min(Math.max(value, 0), 1);
   const rects = [];
   for (const rect of range.getClientRects()) {
     if (rect.width === 0 || rect.height === 0) continue;
@@ -1262,7 +1263,6 @@ function normalisedSelectionRect() {
   }
   if (!Number.isFinite(left)) return null;
 
-  const unit = (value) => Math.min(Math.max(value, 0), 1);
   const x = unit((left - box.left) / box.width);
   const y = unit((top - box.top) / box.height);
   const width = unit((right - left) / box.width);
@@ -1331,6 +1331,7 @@ function updatePagePreview(clientX, clientY) {
   marquee.style.top = `${top}px`;
   marquee.style.width = `${width}px`;
   marquee.style.height = `${height}px`;
+  marquee.classList.toggle("subtract", Boolean(pageGesture.subtract));
 
   const leftmost = Math.min(pageGesture.startX, clientX);
   const rightmost = Math.max(pageGesture.startX, clientX);
@@ -1342,16 +1343,18 @@ function updatePagePreview(clientX, clientY) {
     const covers =
       box.right >= leftmost && box.left <= rightmost && box.bottom >= topmost && box.top <= bottommost;
     page.classList.toggle("range-preview", covers);
+    // The batch inherits the gesture's meaning so the outline can say add (accent) or subtract (white).
+    page.classList.toggle("subtract", covers && pageGesture.subtract);
   }
 }
 
-function finishPageGesture(clientX, clientY, subtract) {
+function finishPageGesture(clientX, clientY) {
   if (!pageGesture) return;
-  const { page: from, startX, startY } = pageGesture;
+  const { page: from, startX, startY, subtract } = pageGesture;
   pageGesture = null;
 
   for (const page of document.querySelectorAll(".page.range-preview")) {
-    page.classList.remove("range-preview");
+    page.classList.remove("range-preview", "subtract");
   }
   document.querySelector(".page-marquee")?.remove();
   document.removeEventListener("pointermove", onPageMove, true);
@@ -1375,7 +1378,7 @@ function onPageMove(event) {
 }
 
 function onPageUp(event) {
-  finishPageGesture(event.clientX, event.clientY, event.altKey);
+  finishPageGesture(event.clientX, event.clientY);
 }
 
 document.addEventListener(
@@ -1392,6 +1395,8 @@ document.addEventListener(
       page: Number(page.dataset.page),
       startX: event.clientX,
       startY: event.clientY,
+      // Drag, click and modifier borrow all follow the page the gesture starts on.
+      subtract: page.classList.contains("in-scope"),
     };
     updatePagePreview(event.clientX, event.clientY);
     document.addEventListener("pointermove", onPageMove, true);
@@ -1670,6 +1675,9 @@ window.PDFScope = {
   /// pointer | text | box | pages. Text and box tools stay active until pointer is chosen.
   setTool(name) {
     toolMode = ["text", "box", "pages"].includes(name) ? name : "pointer";
+    if (stageElement()) {
+      stageElement().dataset.tool = toolMode;
+    }
     if (toolMode === "box") {
       armCapture();
     } else {

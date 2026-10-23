@@ -2294,3 +2294,30 @@ mark.find-hit {
 .ref-frame[data-kind="region"].active:not(.editable) {
   background: rgb(203 184 236 / 30%);
 }
+
+/* The page under the pointer in page mode: a wash lighter than a committed selection. */
+.stage[data-tool="pages"] .page::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background: rgb(203 184 236 / 16%);
+  border-radius: inherit;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--duration) var(--ease);
+}
+
+.stage[data-tool="pages"] .page:hover:not(.in-scope)::after {
+  opacity: 1;
+}
+
+/* A subtracting gesture is white, so it cannot be mistaken for an adding one. */
+.page.range-preview.subtract {
+  outline-color: #ffffff;  /* size */
+}
+
+.page-marquee.subtract {
+  border-color: #ffffff;  /* size */
+  background: rgb(255 255 255 / 12%);
+}
