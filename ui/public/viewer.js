@@ -1909,6 +1909,15 @@ window.PDFScope = {
     }
   },
 
+  /// The text the reader has selected inside one element, if the selection starts there.
+  selectedTextWithin(id) {
+    const element = document.getElementById(id);
+    const selection = window.getSelection();
+    if (!element || !selection || selection.isCollapsed || !selection.anchorNode) return "";
+    if (!element.contains(selection.anchorNode)) return "";
+    return selection.toString().trim();
+  },
+
   /// The document point under the centre of the stage, in the stage's content coordinates.
   captureStageAnchor() {
     const stage = stageElement();

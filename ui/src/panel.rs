@@ -1035,6 +1035,7 @@ pub fn AiPanel(
                                             } else {
                                                 view! {
                                                     <div
+                                                        id=format!("answer-{index}")
                                                         class="answer-text markdown"
                                                         inner_html=pdfscope_core::to_html(&turn.answer)
                                                     ></div>
@@ -1298,8 +1299,18 @@ pub fn AiPanel(
                                             view! {
                                                 <div
                                                     class="attach-chip"
+                                                    draggable="true"
                                                     title=passage.quote.clone()
                                                     on:click=move |_| jump(page_number)
+                                                    on:dragstart=move |event: web_sys::DragEvent| {
+                                                        if let Some(data) = event.data_transfer() {
+                                                            let _ = data.set_data(
+                                                                "text/plain",
+                                                                &format!("p:{}\np.{}", id, page_number),
+                                                            );
+                                                            data.set_effect_allowed("copy");
+                                                        }
+                                                    }
                                                 >
                                                     <span class="chip-kind">"文"</span>
                                                     <span class="chip-text">{truncate(&passage.quote, 36)}</span>
@@ -1336,8 +1347,18 @@ pub fn AiPanel(
                                             view! {
                                                 <div
                                                     class="attach-thumb"
+                                                    draggable="true"
                                                     title=format!("p.{} · 截图", region.page)
                                                     on:click=move |_| jump(page_number)
+                                                    on:dragstart=move |event: web_sys::DragEvent| {
+                                                        if let Some(data) = event.data_transfer() {
+                                                            let _ = data.set_data(
+                                                                "text/plain",
+                                                                &format!("r:{}\n图 p.{}", id, page_number),
+                                                            );
+                                                            data.set_effect_allowed("copy");
+                                                        }
+                                                    }
                                                 >
                                                     <img src=region.image.clone() alt="" />
                                                     <span
@@ -1370,7 +1391,17 @@ pub fn AiPanel(
                                             view! {
                                                 <div
                                                     class="attach-chip"
+                                                    draggable="true"
                                                     on:click=move |_| jump(page_number)
+                                                    on:dragstart=move |event: web_sys::DragEvent| {
+                                                        if let Some(data) = event.data_transfer() {
+                                                            let _ = data.set_data(
+                                                                "text/plain",
+                                                                &format!("page:{}\np.{}", page_number, page_number),
+                                                            );
+                                                            data.set_effect_allowed("copy");
+                                                        }
+                                                    }
                                                 >
                                                     <span class="chip-kind">"页"</span>
                                                     <span class="chip-page">{format!("p.{page_number}")}</span>
@@ -1403,7 +1434,20 @@ pub fn AiPanel(
                                         .map(|answer| {
                                             let id = answer.id;
                                             view! {
-                                                <div class="attach-chip" title=answer.quote.clone()>
+                                                <div
+                                                    class="attach-chip"
+                                                    draggable="true"
+                                                    title=answer.quote.clone()
+                                                    on:dragstart=move |event: web_sys::DragEvent| {
+                                                        if let Some(data) = event.data_transfer() {
+                                                            let _ = data.set_data(
+                                                                "text/plain",
+                                                                &format!("a:{}\n{}", id, answer.label),
+                                                            );
+                                                            data.set_effect_allowed("copy");
+                                                        }
+                                                    }
+                                                >
                                                     <span class="chip-kind">"✦"</span>
                                                     <span class="chip-text">{truncate(&answer.quote, 32)}</span>
                                                     <span
@@ -1628,6 +1672,35 @@ pub fn AiPanel(
                     role="textbox"
                     aria-label="问题"
                     data-placeholder="问点什么…"
+                    on:dragover=move |event: web_sys::DragEvent| {
+                        event.prevent_default();
+                        if let Some(data) = event.data_transfer() {
+                            data.set_drop_effect("copy");
+                        }
+                    }
+                    on:drop=move |event: web_sys::DragEvent| {
+                        event.prevent_default();
+                        let Some(data) = event.data_transfer() else {
+                            return;
+                        };
+                        let Ok(payload) = data.get_data("text/plain") else {
+                            return;
+                        };
+                        let mut parts = payload.splitn(2, '\n');
+                        let Some(key) = parts.next() else {
+                            return;
+                        };
+                        let label = parts.next().unwrap_or(key);
+                        let _ = composer(
+                            "insertTokenAt",
+                            &[
+                                JsValue::from_f64(f64::from(event.client_x())),
+                                JsValue::from_f64(f64::from(event.client_y())),
+                                JsValue::from_str(key),
+                                JsValue::from_str(label),
+                            ],
+                        );
+                    }
                     on:keydown=move |event: web_sys::KeyboardEvent| {
                         if event.is_composing() {
                             return;

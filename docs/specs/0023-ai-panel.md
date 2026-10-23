@@ -163,8 +163,11 @@ before sending).
   region shows as a thumbnail. Every answer now offers `引用此回答`, which adds a `✦` answer chip,
   is undoable through the same snapshot, appears in the `@` picker, and is appended to the request as
   `[引用的先前回答]` with numbered quotes.
-- Still to come in P1: drag-to-insert, quoting a selection inside an answer, keyboard navigation in
-  the picker.
+- **Drag-to-insert and partial answer quotes** — landed. Every shelf chip is draggable; dropping it on
+  the editor inserts its pill at the drop caret (the renderer converts the point to a caret with
+  `caretRangeFromPoint`). `引用此回答` quotes the text selected inside that answer when there is a
+  selection, otherwise the whole answer.
+- Still to come in P1: keyboard navigation in the picker.
 
 ## 8. Gaps beyond the first inventory
 

@@ -118,6 +118,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Chips drag into the question field as inline pills, and 引用此回答 can quote just the selection
+  inside an answer.
+
+
 - Answers can be quoted as context (`引用此回答`), and references now sit in a horizontally scrolling
   context shelf with one row per kind.
 

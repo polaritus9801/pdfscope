@@ -197,6 +197,29 @@ window.Composer = {
 
   insertToken,
 
+  /// Inserts a pill at a viewport point, for a chip dropped into the field.
+  insertTokenAt(clientX, clientY, key, label) {
+    if (!root) return;
+    const document = root.ownerDocument;
+    let range = null;
+    if (typeof document.caretRangeFromPoint === "function") {
+      range = document.caretRangeFromPoint(clientX, clientY);
+    } else if (typeof document.caretPositionFromPoint === "function") {
+      const position = document.caretPositionFromPoint(clientX, clientY);
+      if (position) {
+        range = document.createRange();
+        range.setStart(position.offsetNode, position.offset);
+        range.collapse(true);
+      }
+    }
+    if (range && root.contains(range.commonAncestorContainer)) {
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+    insertToken(key, label);
+  },
+
   setMentionsAllowed(value) {
     allowMention = Boolean(value);
   },
