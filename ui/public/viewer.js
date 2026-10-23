@@ -1569,11 +1569,27 @@ function updatePagePreview(clientX, clientY) {
   }
 }
 
+function cancelPageGesture() {
+  if (!pageGesture) return;
+  const { scrollFrame } = pageGesture;
+  pageGesture = null;
+  if (scrollFrame) cancelAnimationFrame(scrollFrame);
+  stageElement()?.classList.remove("page-gesture");
+  for (const page of document.querySelectorAll(".page.range-preview")) {
+    page.classList.remove("range-preview", "subtract");
+  }
+  document.querySelector(".page-marquee")?.remove();
+  document.removeEventListener("pointermove", onPageMove, true);
+  document.removeEventListener("pointerup", onPageUp, true);
+  clearPointerPage();
+}
+
 function finishPageGesture(clientX, clientY) {
   if (!pageGesture) return;
   const { page: from, startX, startY, subtract, scrollFrame } = pageGesture;
   pageGesture = null;
   if (scrollFrame) cancelAnimationFrame(scrollFrame);
+  stageElement()?.classList.remove("page-gesture");
 
   for (const page of document.querySelectorAll(".page.range-preview")) {
     page.classList.remove("range-preview", "subtract");
@@ -1635,6 +1651,8 @@ function onPageUp(event) {
   finishPageGesture(event.clientX, event.clientY);
 }
 
+document.addEventListener("pointercancel", cancelPageGesture, true);
+
 document.addEventListener(
   "pointerdown",
   (event) => {
@@ -1646,6 +1664,9 @@ document.addEventListener(
 
     event.preventDefault();
     const stage = stageElement();
+    if (!stage) return;
+    stage.classList.add("page-gesture");
+    markPointerPage(event.clientX, event.clientY);
     const stageBox = stage.getBoundingClientRect();
     pageGesture = {
       page: Number(page.dataset.page),
@@ -1697,6 +1718,7 @@ window.addEventListener("keyup", (event) => {
 window.addEventListener("blur", () => {
   ctrlKeyDown = false;
   endBorrow();
+  cancelPageGesture();
   clearPointerPage();
 });
 
@@ -2265,6 +2287,10 @@ window.PDFScope = {
       delete stageElement().dataset.borrow;
     }
     clearPointerPage();
+    if (toolMode === "pages" && lastPointer) {
+      // Switching while the pointer already rests on a page must light it without a move.
+      markPointerPage(lastPointer.x, lastPointer.y);
+    }
     if (toolMode === "box") {
       armCapture();
     } else {

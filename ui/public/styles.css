@@ -2365,9 +2365,6 @@ mark.find-hit {
   transition: opacity var(--duration) var(--ease);
 }
 
-.stage[data-tool="pages"] .page:hover::after {
-  opacity: 1;
-}
 
 /* A subtracting gesture is a very light grey, distinct from the accent without vanishing. */
 .page.range-preview.subtract {
@@ -3728,9 +3725,17 @@ body.selection-quiet .textLayer :is(span, br)::selection {
 }
 
 /* JS marks the page under the pointer, which also holds while dragging or borrowing. */
-.stage[data-tool="pages"] .page.pointer-page::after,
-.stage[data-borrow="pages"] .page.pointer-page::after {
+.stage[data-tool="pages"] .page.pointer-page::after {
   opacity: 1;
+}
+
+/* During a page drag the wash has one owner and no fade, so two pages can never light together. */
+.stage.page-gesture .page::after {
+  transition: none;
+}
+
+.stage.page-gesture .page:not(.pointer-page)::after {
+  opacity: 0;
 }
 
 /* The optional model list is a row of chips, each with its provider mark. */
@@ -3770,10 +3775,6 @@ body.panel-dragging .panel-resize::after {
   background: var(--accent);
 }
 
-/* The borrowed page mode lights the page immediately, before the pointer moves. */
-.stage[data-borrow="pages"] .page:hover::after {
-  opacity: 1;
-}
 
 /* Official brand SVGs, square and scalable. */
 .provider-mark {

@@ -69,20 +69,20 @@ ResizeObserver also refit pages repeatedly. Dragging now runs in JS and **scales
 `just check` green; visual and pointer behaviour need a human pass.
 
 
-## Investigation — two pages lit during a 1→3 drag (not changed)
+## Two pages lit during a fast 1→3 drag — fixed
 
-Two independent effects can make page 2 and page 3 look lit at the same time:
+The wash had two owners (`:hover` and `.pointer-page`) and a 120 ms opacity transition, so a fast
+drag faded page 2 out while page 3 faded in; the covered page 2 also carried the `.range-preview`
+outline, which read as a second highlight. WebKit could additionally pin `:hover` to the pointer-down
+page for the duration of a prevented drag.
 
-1. **The wash owns two sources.** `:hover` and the JS `.pointer-page` class can both be active, and
-   the page wash has `transition: opacity 120ms`. Moving quickly from page 2 to page 3 starts page 2's
-   fade-out and page 3's fade-in in the same 120ms, so both are visibly washed. A slow drag makes the
-   overlap invisible, which matches the roughly 50% reproduction rate.
-2. **Page 2 is also a range-preview.** Every page intersecting the marquee gets `.range-preview` with
-   a 2 px accent outline. That is intended range feedback, but it reads as a second highlighted page
-   next to the pointer wash.
+The wash now has one owner:
 
-WebKit can also keep `:hover` on the pointer-down page during a prevented drag, which would leave
-page 2 hovered until release. The robust fix is to make the wash single-owner: remove the `:hover`
-wash in page mode, add a `.page-gesture` class while dragging, and disable the opacity transition
-while that class is present; `.pointer-page` remains the only page with a wash. That change is
-deliberately not made in this commit.
+- the `:hover` wash in page mode is removed; `.pointer-page` is the only element that can be washed;
+- starting a gesture adds `.page-gesture` to the stage, which disables the opacity transition and
+  forces every page except `.pointer-page` to zero opacity;
+- `.range-preview` keeps its outline only;
+- the page under the pointer is marked on pointerdown, pointermove, every auto-scroll frame and at
+  gesture end; blur and pointercancel cancel the gesture and clear the class;
+- switching to page mode with a resting pointer lights the page immediately from the last pointer
+  position.
