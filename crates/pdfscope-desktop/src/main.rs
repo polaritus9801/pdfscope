@@ -7,6 +7,7 @@
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 mod ask;
+mod export;
 mod settings;
 
 use anyhow::Context;
@@ -57,6 +58,7 @@ fn main() -> anyhow::Result<()> {
             settings::save_settings,
             settings::test_settings,
             settings::web_search,
+            export::save_export,
             ask::ask,
             ask::stop_ask
         ])

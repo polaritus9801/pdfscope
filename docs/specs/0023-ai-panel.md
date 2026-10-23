@@ -375,7 +375,8 @@ Run these against the desktop build with a configured model and (for §6) a Tavi
     Enter; pin sorts first; delete needs a second click.
 14. Switch, restart, and reopen the document: the same conversations and pinned order return.
 15. 临时 shows the badge, is absent from the list, and disappears when switched away.
-16. 导出 copies the active conversation as Markdown.
+16. 导出 writes the active conversation as a `.md` file into Downloads (a second export becomes
+    `name (1).md`); the toast shows the path. In a browser build it falls back to copying Markdown.
 
 ### Files and images
 17. Attach two images, a `.md`, a PDF, a DOCX, a PPTX and an XLSX: each appears as its own row and is
@@ -403,14 +404,20 @@ field, pill deletion across wrapped lines, the real Tavily response shape, and w
 for source cards in the desktop webview.
 
 
+## 12. Progress — export to a file
+
+`导出` now calls a Tauri command that sanitises the conversation title into a filename, refuses to
+overwrite an existing export (`name (1).md`, …), writes UTF-8 into Downloads and returns the path,
+which the toast shows. Four unit tests cover forbidden characters, empty titles, the length cap and
+unique paths. Browser builds fall back to the clipboard.
+
 ## 12. Deviations
 
 - **Chip reordering is not built.** Dragging a chip always inserts a pill into the question; dropping it
   on another chip does not change the shelf order. Insertion order is the send order.
 - Duplicate detection covers passages and regions; attaching the same image or file twice still
   produces two attachments (the `@` picker reuses existing ones on the common path).
-- **Copy uses the clipboard, not a file.** 导出 copies Markdown; it does not write a `.md` file, because
-  the webview has no file-save bridge yet.
+- Export writes into the system Downloads directory; there is no folder picker yet.
 - **Source cards open via `window.open`.** If the desktop webview refuses new windows, the card is
   inert; copying the URL is the fallback the reader has today.
 - **Images and files are outside the reference undo snapshot**; passages, regions, pages and answers

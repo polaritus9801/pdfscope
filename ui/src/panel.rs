@@ -1667,7 +1667,7 @@ pub fn AiPanel(
                         </button>
                         <button
                             class="button"
-                            title="把当前对话复制为 Markdown"
+                            title="把当前对话导出为 Markdown 文件"
                             on:click=move |_| {
                                 let pairs: Vec<(String, String)> = conversations
                                     .get()
@@ -1686,8 +1686,33 @@ pub fn AiPanel(
                                     notify.run("当前对话还没有内容".to_owned());
                                     return;
                                 }
-                                copy_to_clipboard(&markdown);
-                                notify.run("已复制 Markdown".to_owned());
+                                let title = conversations
+                                    .get()
+                                    .into_iter()
+                                    .find(|conversation| conversation.id == active.get())
+                                    .map(|conversation| conversation.title)
+                                    .unwrap_or_else(|| "对话".to_owned());
+                                let filename = format!("{title}.md");
+                                let Some(promise) = bridge(
+                                    "exportMarkdown",
+                                    &[JsValue::from_str(&filename), JsValue::from_str(&markdown)],
+                                ) else {
+                                    copy_to_clipboard(&markdown);
+                                    notify.run("已复制 Markdown".to_owned());
+                                    return;
+                                };
+                                spawn_local(async move {
+                                    match JsFuture::from(js_sys::Promise::from(promise)).await {
+                                        Ok(value) => {
+                                            let path = value.as_string().unwrap_or_default();
+                                            notify.run(format!("已导出到 {path}"));
+                                        }
+                                        Err(_) => {
+                                            copy_to_clipboard(&markdown);
+                                            notify.run("文件导出不可用，已复制 Markdown".to_owned());
+                                        }
+                                    }
+                                });
                             }
                         >
                             "导出"

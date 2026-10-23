@@ -10,6 +10,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Changed
 
+- 导出 writes a Markdown file into Downloads (collision-safe, path in the toast) instead of only
+  copying to the clipboard; browsers fall back to copying.
+
+
 - Web search offers DeepSeek Search (default, reusing the model key), Tavily, Brave, Exa and Serper,
   with a provider picker and per-provider keys.
 
