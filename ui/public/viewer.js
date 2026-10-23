@@ -1312,6 +1312,8 @@ let pageGesture = null;
 /// every page it covers. A click is the same code with a zero-sized box, so there is one path.
 function updatePagePreview(clientX, clientY) {
   if (!pageGesture) return;
+  pageGesture.lastX = clientX;
+  pageGesture.lastY = clientY;
   const stage = stageElement();
   if (!stage) return;
 
@@ -1350,8 +1352,9 @@ function updatePagePreview(clientX, clientY) {
 
 function finishPageGesture(clientX, clientY) {
   if (!pageGesture) return;
-  const { page: from, startX, startY, subtract } = pageGesture;
+  const { page: from, startX, startY, subtract, scrollFrame } = pageGesture;
   pageGesture = null;
+  if (scrollFrame) cancelAnimationFrame(scrollFrame);
 
   for (const page of document.querySelectorAll(".page.range-preview")) {
     page.classList.remove("range-preview", "subtract");
@@ -1371,6 +1374,34 @@ function finishPageGesture(clientX, clientY) {
   } else {
     window.__pdfscopeTogglePage?.(from);
   }
+}
+
+const SCROLL_EDGE = 64;
+const SCROLL_STEP = 24;
+
+function autoScrollPages() {
+  if (!pageGesture) return;
+  const stage = stageElement();
+  if (!stage) return;
+
+  const box = stage.getBoundingClientRect();
+  const y = pageGesture.lastY;
+  let delta = 0;
+  if (y < box.top + SCROLL_EDGE) {
+    delta = -SCROLL_STEP * Math.min(1, (box.top + SCROLL_EDGE - y) / SCROLL_EDGE);
+  } else if (y > box.bottom - SCROLL_EDGE) {
+    delta = SCROLL_STEP * Math.min(1, (y - (box.bottom - SCROLL_EDGE)) / SCROLL_EDGE);
+  }
+
+  if (delta !== 0) {
+    const before = stage.scrollTop;
+    stage.scrollTop += delta;
+    if (stage.scrollTop !== before) {
+      updatePagePreview(pageGesture.lastX, pageGesture.lastY);
+    }
+  }
+
+  pageGesture.scrollFrame = requestAnimationFrame(autoScrollPages);
 }
 
 function onPageMove(event) {
@@ -1399,6 +1430,7 @@ document.addEventListener(
       subtract: page.classList.contains("in-scope"),
     };
     updatePagePreview(event.clientX, event.clientY);
+    pageGesture.scrollFrame = requestAnimationFrame(autoScrollPages);
     document.addEventListener("pointermove", onPageMove, true);
     document.addEventListener("pointerup", onPageUp, true);
   },

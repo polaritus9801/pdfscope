@@ -1987,6 +1987,7 @@ mark.find-hit {
 .ref-frame[data-kind="passage"] {
   outline: none;
   background: transparent;
+  cursor: default;
 }
 
 .ref-frame[data-kind="passage"]:hover {
@@ -2052,8 +2053,9 @@ mark.find-hit {
 .text-grip {
   position: absolute;
   display: none;
-  width: 8px;  /* size */
-  height: 20px;  /* size */
+  width: 10px;  /* size */
+  height: 26px;  /* size */
+  touch-action: none;
   background: var(--accent);
   border-radius: var(--radius-full);
   transform: translate(-50%, -50%);
@@ -2308,16 +2310,16 @@ mark.find-hit {
   transition: opacity var(--duration) var(--ease);
 }
 
-.stage[data-tool="pages"] .page:hover:not(.in-scope)::after {
+.stage[data-tool="pages"] .page:hover::after {
   opacity: 1;
 }
 
-/* A subtracting gesture is white, so it cannot be mistaken for an adding one. */
+/* A subtracting gesture is a very light grey, distinct from the accent without vanishing. */
 .page.range-preview.subtract {
-  outline-color: #ffffff;  /* size */
+  outline-color: #d2d2d9;  /* size */
 }
 
 .page-marquee.subtract {
-  border-color: #ffffff;  /* size */
-  background: rgb(255 255 255 / 12%);
+  border-color: #d2d2d9;  /* size */
+  background: rgb(120 120 134 / 10%);
 }

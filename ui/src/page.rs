@@ -151,20 +151,17 @@ pub(crate) fn PageView(
         else {
             return;
         };
-        // Capture on the frame, not the handle: one set of move/up handlers serves every handle.
-        let frame = if mode == 0 {
-            target.clone()
-        } else {
-            target.parent_element().unwrap_or(target.clone())
-        };
-        let Some(page) = frame.parent_element() else {
+        // Capture on the element that was pressed: a grip receives its own move/up events, and the
+        // page is found from the tree rather than assumed to be the frame's parent.
+        let capture = target.clone();
+        let Some(page) = capture.closest(".page").ok().flatten() else {
             return;
         };
         let box_rect = page.get_bounding_client_rect();
         if box_rect.width() <= 0.0 || box_rect.height() <= 0.0 {
             return;
         }
-        if let Some(element) = frame.dyn_into::<web_sys::HtmlElement>().ok() {
+        if let Some(element) = capture.dyn_into::<web_sys::HtmlElement>().ok() {
             let _ = element.set_pointer_capture(event.pointer_id());
         }
         drag_moved.set(false);
@@ -466,16 +463,31 @@ pub(crate) fn PageView(
                                 (value - origin) / span * 100.0
                             }
                         };
-                        let start_position = format!(
-                            "left:{:.2}%; top:{:.2}%;",
-                            unit(first.0, rect.0, rect.2),
-                            unit(first.1 + first.3, rect.1, rect.3),
-                        );
-                        let end_position = format!(
-                            "left:{:.2}%; top:{:.2}%;",
-                            unit(last.0 + last.2, rect.0, rect.2),
-                            unit(last.1 + last.3, rect.1, rect.3),
-                        );
+                        // While a passage endpoint is dragged the marks cannot follow (the text is
+                        // re-read on release), so the grips move to the frame's own edges instead of
+                        // staying behind at the old text positions.
+                        let dragging = drag
+                            .get()
+                            .map(|entry| entry.0 == kind && entry.1 == id)
+                            .unwrap_or(false);
+                        let start_position = if kind == 0 && dragging {
+                            "left:0%; top:100%;".to_owned()
+                        } else {
+                            format!(
+                                "left:{:.2}%; top:{:.2}%;",
+                                unit(first.0, rect.0, rect.2),
+                                unit(first.1 + first.3, rect.1, rect.3),
+                            )
+                        };
+                        let end_position = if kind == 0 && dragging {
+                            "left:100%; top:100%;".to_owned()
+                        } else {
+                            format!(
+                                "left:{:.2}%; top:{:.2}%;",
+                                unit(last.0 + last.2, rect.0, rect.2),
+                                unit(last.1 + last.3, rect.1, rect.3),
+                            )
+                        };
                         let is_active = move || {
                             active_ref.get() == Some((kind, id))
                                 || focused_ref.get() == Some((kind, id))
@@ -498,7 +510,7 @@ pub(crate) fn PageView(
                                     }
                                 }
                                 on:pointerdown=move |event: web_sys::PointerEvent| {
-                                    if !editable() {
+                                    if !editable() || kind == 0 {
                                         return;
                                     }
                                     let Some(target) = event
@@ -556,6 +568,9 @@ pub(crate) fn PageView(
                                                 event.stop_propagation();
                                                 begin_drag(event, kind, id, rect, 1);
                                             }
+                                            on:pointermove=drag_move
+                                            on:pointerup=move |_| finish_drag(kind, id)
+                                            on:pointercancel=move |_| finish_drag(kind, id)
                                             on:click=move |event: web_sys::MouseEvent| event.stop_propagation()
                                         ></div>
                                         <div
@@ -566,6 +581,9 @@ pub(crate) fn PageView(
                                                 event.stop_propagation();
                                                 begin_drag(event, kind, id, rect, 2);
                                             }
+                                            on:pointermove=drag_move
+                                            on:pointerup=move |_| finish_drag(kind, id)
+                                            on:pointercancel=move |_| finish_drag(kind, id)
                                             on:click=move |event: web_sys::MouseEvent| event.stop_propagation()
                                         ></div>
                                     }

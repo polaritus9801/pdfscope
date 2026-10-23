@@ -484,6 +484,19 @@ after release, when the set is committed.
   adds, start on a selected one and it subtracts. The live outline and marquee turn **white** while
   subtracting; click and drag share the same rule.
 
+### Follow-up: page scrolling, grip dragging
+
+- A subtracting page gesture is a very light grey now, and the hover wash also applies to pages that
+  are already in the set.
+- Dragging a page gesture to the top or bottom edge of the stage scrolls it, faster the closer the
+  pointer is to the edge (64 px zone, up to 24 px per frame), and the marquee and page outlines follow
+  the scroll. Releasing outside a page commits the range up to the last page the gesture covered.
+- A passage frame never moves: selection is not a box. Only its two endpoint grips resize it.
+- The grips were unreachable because pointer capture sat on the frame while the presses started on the
+  grip. Capture now sits on the grip itself, which also carries the move/release handlers, so it
+  receives every event. While a grip is dragged the marks cannot follow (text is re-read on release),
+  so the grips travel to the frame's own edges until the drop.
+
 ## Deviations
 
 - The reference undo stack is cleared when a question is sent: references become part of that turn's

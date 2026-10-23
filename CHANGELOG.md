@@ -243,6 +243,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Fixed
 
+- Page gestures scroll at the stage edge and turn light grey when subtracting; passages no longer
+  move as boxes and their endpoint grips drag again.
+
+
 - Text selection reports again; unfocused references really let the pointer through; page mode has a
   hover wash and subtracts a batch when the gesture starts on a selected page, with white feedback.
 
