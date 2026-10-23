@@ -29,6 +29,7 @@ pub(crate) fn SettingsSheet(
     notify: Callback<String>,
     model: RwSignal<String>,
     page_limit: RwSignal<u32>,
+    context_limit: RwSignal<u32>,
 ) -> impl IntoView {
     let testing = RwSignal::new(false);
 
@@ -61,6 +62,7 @@ pub(crate) fn SettingsSheet(
     let form_mode = RwSignal::new("continuous".to_owned());
     let form_page_limit = RwSignal::new(0_u32);
     let form_timeout = RwSignal::new("0".to_owned());
+    let form_context_limit = RwSignal::new("128000".to_owned());
     let form_search_key = RwSignal::new(String::new());
     let form_search_provider = RwSignal::new("deepseek".to_owned());
     let search_key_stored = RwSignal::new(false);
@@ -124,6 +126,12 @@ pub(crate) fn SettingsSheet(
                         .unwrap_or_else(|| "0".to_owned()),
                 );
                 apply_request_timeout(&form_timeout.get());
+                form_context_limit.set(
+                    number_of(&value, "context_limit")
+                        .map(|limit| (limit as u32).to_string())
+                        .unwrap_or_else(|| "128000".to_owned()),
+                );
+                context_limit.set(form_context_limit.get().parse::<u32>().unwrap_or(128_000));
                 search_key_stored.set(
                     js_sys::Reflect::get(&value, &JsValue::from_str("has_search_key"))
                         .ok()
@@ -234,6 +242,13 @@ pub(crate) fn SettingsSheet(
         );
         let _ = js_sys::Reflect::set(
             &payload,
+            &JsValue::from_str("context_limit"),
+            &JsValue::from_f64(f64::from(
+                form_context_limit.get().parse::<u32>().unwrap_or(128_000),
+            )),
+        );
+        let _ = js_sys::Reflect::set(
+            &payload,
             &JsValue::from_str("search_provider"),
             &JsValue::from_str(&form_search_provider.get()),
         );
@@ -281,6 +296,8 @@ pub(crate) fn SettingsSheet(
                         apply_font_size(&form_font_size.get());
                         page_limit.set(form_page_limit.get());
                         apply_request_timeout(&form_timeout.get());
+                        context_limit
+                            .set(form_context_limit.get().parse::<u32>().unwrap_or(128_000));
                         if !form_search_key.get().trim().is_empty() {
                             search_key_stored.set(true);
                         }
@@ -633,6 +650,21 @@ pub(crate) fn SettingsSheet(
                                         </label>
                                         <p class="settings-hint">
                                             "0 表示不设限：模型思考多久都等。只有网络卡死时才会用到。"
+                                        </p>
+
+                                        <label class="settings-row">
+                                            <span>"上下文上限（tokens）"</span>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                prop:value=move || form_context_limit.get()
+                                                on:input=move |event| {
+                                                    form_context_limit.set(event_target_value(&event))
+                                                }
+                                            />
+                                        </label>
+                                        <p class="settings-hint">
+                                            "发送前按估算的上下文拦截；0 表示不检查。"
                                         </p>
 
                                         <label class="settings-row">

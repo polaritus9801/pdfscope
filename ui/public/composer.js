@@ -208,6 +208,42 @@ window.Composer = {
 
   insertToken,
 
+  /// Whether the caret sits at the very start of the field.
+  isAtStart() {
+    const range = caretInRoot();
+    if (!range || !range.collapsed) return false;
+    const probe = document.createRange();
+    probe.setStart(root, 0);
+    probe.setEnd(range.startContainer, range.startOffset);
+    return probe.toString().length === 0;
+  },
+
+  /// Whether the caret sits at the very end of the field.
+  isAtEnd() {
+    const range = caretInRoot();
+    if (!range || !range.collapsed) return false;
+    const probe = document.createRange();
+    probe.setStart(range.endContainer, range.endOffset);
+    probe.setEnd(root, root.childNodes.length);
+    return probe.toString().length === 0;
+  },
+
+  loadPromptHistory() {
+    try {
+      return window.localStorage.getItem("pdfscope.prompts");
+    } catch {
+      return null;
+    }
+  },
+
+  savePromptHistory(json) {
+    try {
+      window.localStorage.setItem("pdfscope.prompts", json);
+    } catch {
+      // History is a convenience; losing it is acceptable.
+    }
+  },
+
   /// Inserts a pill at a viewport point, for a chip dropped into the field.
   insertTokenAt(clientX, clientY, key, label) {
     if (!root) return;

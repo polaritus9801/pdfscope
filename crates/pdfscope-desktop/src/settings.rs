@@ -95,6 +95,9 @@ pub(crate) struct Settings {
     /// Search backend id (`deepseek`, `tavily`, `brave`, `exa`, `serper`).
     #[serde(default = "default_search_provider")]
     pub(crate) search_provider: String,
+    /// Largest estimated context a question may carry; zero disables the guard.
+    #[serde(default = "default_context_limit")]
+    pub(crate) context_limit: u32,
     /// Last window geometry, when the shell has recorded one.
     #[serde(default)]
     pub(crate) window: Option<WindowState>,
@@ -114,6 +117,10 @@ fn default_font_size() -> u16 {
 
 fn default_true() -> bool {
     true
+}
+
+fn default_context_limit() -> u32 {
+    128_000
 }
 
 fn default_search_provider() -> String {
@@ -146,6 +153,7 @@ impl Default for Settings {
             page_limit: 0,
             request_timeout: 0,
             search_provider: default_search_provider(),
+            context_limit: default_context_limit(),
             window: None,
         }
     }
@@ -195,6 +203,9 @@ pub(crate) struct SettingsInput {
     /// Search backend id.
     #[serde(default)]
     pub(crate) search_provider: Option<String>,
+    /// Largest estimated context; zero disables the guard.
+    #[serde(default)]
+    pub(crate) context_limit: Option<u32>,
     /// A new key, when the user typed one. `None` keeps the stored key.
     pub(crate) api_key: Option<String>,
     /// A new search key, when the user typed one. `None` keeps the stored key.
@@ -235,6 +246,8 @@ pub(crate) struct SettingsView {
     pub(crate) request_timeout: u32,
     /// Selected search backend id.
     pub(crate) search_provider: String,
+    /// Largest estimated context a question may carry; zero disables the guard.
+    pub(crate) context_limit: u32,
     /// Whether a key is stored. The key itself never crosses this boundary.
     pub(crate) has_key: bool,
     /// Whether a search-provider key is stored.
@@ -387,6 +400,7 @@ pub(crate) fn load_settings(app: tauri::AppHandle) -> Result<SettingsView, Strin
         page_limit: settings.page_limit,
         request_timeout: settings.request_timeout,
         search_provider: settings.search_provider.clone(),
+        context_limit: settings.context_limit,
         has_key: has_key(&app),
         has_search_key: search_key_for(&app, &settings.search_provider).is_some(),
     })
@@ -439,6 +453,7 @@ pub(crate) fn save_settings(app: tauri::AppHandle, settings: SettingsInput) -> R
         search_provider: settings
             .search_provider
             .unwrap_or_else(default_search_provider),
+        context_limit: settings.context_limit.unwrap_or_else(default_context_limit),
         window: stored_window,
     };
 

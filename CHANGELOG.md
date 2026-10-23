@@ -122,6 +122,9 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- A send-time context budget guard (configurable, 128k default) and ↑/↓ recall of previous questions.
+
+
 - Attach PDF, DOCX, PPTX, XLSX, text and code files; the renderer extracts their text (PDF.js and a
   dependency-free ZIP/XML reader) and folds it into the request with size and length limits.
 

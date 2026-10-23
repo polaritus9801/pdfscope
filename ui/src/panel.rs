@@ -261,6 +261,7 @@ pub fn AiPanel(
     scope_mode: RwSignal<u8>,
     page_set: RwSignal<Vec<u32>>,
     page_limit: RwSignal<u32>,
+    context_limit: RwSignal<u32>,
     answers: RwSignal<Vec<crate::AnswerRef>>,
     next_answer: RwSignal<u64>,
     document_key: RwSignal<String>,
@@ -296,6 +297,9 @@ pub fn AiPanel(
     let web = RwSignal::new(false);
     let sources = RwSignal::new(Vec::<Source>::new());
     let pending_clear = RwSignal::new(false);
+    let prompt_history = RwSignal::new(Vec::<String>::new());
+    let history_cursor = RwSignal::new(Option::<usize>::None);
+    let last_asked = RwSignal::new(String::new());
     let request_started = RwSignal::new(0_u64);
     let next_file = RwSignal::new(0_u64);
     let editor_ref = NodeRef::<leptos::html::Div>::new();
@@ -488,6 +492,14 @@ pub fn AiPanel(
     Effect::new(move |_| {
         let _ = mention_open.get();
         let _ = composer("mentionReset", &[]);
+    });
+
+    Effect::new(move |_| {
+        if let Some(json) = composer("loadPromptHistory", &[]).and_then(|value| value.as_string()) {
+            if let Ok(saved) = serde_json::from_str::<Vec<String>>(&json) {
+                prompt_history.set(saved.into_iter().take(30).collect());
+            }
+        }
     });
 
     // Hand the editor element to the renderer once it exists.
@@ -699,19 +711,6 @@ pub fn AiPanel(
                 }
             }
 
-            // Only a request that actually starts consumes the references. A failed web search
-            // must leave them in the shelf so the reader can retry without re-selecting.
-            if !passages_now.is_empty() || !regions_now.is_empty() {
-                history.update(|list| {
-                    list.extend(passages_now.iter().cloned().map(Stored::Passage));
-                    list.extend(regions_now.iter().cloned().map(Stored::Region));
-                });
-                passages.set(Vec::new());
-                regions.set(Vec::new());
-                reset_history.run(());
-            }
-            request_started.update(|count| *count += 1);
-
             // Page text is fetched here, not in Rust: the renderer owns the document.
             let mut context: Vec<(u32, String)> = Vec::new();
 
@@ -748,6 +747,39 @@ pub fn AiPanel(
             for number in &selected {
                 context.push((*number, fetch_page_text(*number).await));
             }
+
+            // Check the real size of what is about to be sent, including page text fetched above.
+            let mut estimated_chars = asked.chars().count();
+            for (_, text) in &context {
+                estimated_chars += text.chars().count();
+            }
+            for passage in &passages_now {
+                estimated_chars += passage.quote.chars().count();
+            }
+            let estimate = estimate_tokens(estimated_chars, regions_now.len() + pictures.len(), 0);
+            let limit = context_limit.get();
+            if limit > 0 && estimate > limit as usize {
+                status.set(format!(
+                    "上下文约 {estimate} tokens，超过上限 {limit}；请减少页面或引用，或在设置里调大"
+                ));
+                failed.set(true);
+                streaming.set(false);
+                pending_clear.set(false);
+                return;
+            }
+
+            // Only a request that actually starts consumes the references. A failed search or a
+            // guard trip must leave them in the shelf so the reader can retry without re-selecting.
+            if !passages_now.is_empty() || !regions_now.is_empty() {
+                history.update(|list| {
+                    list.extend(passages_now.iter().cloned().map(Stored::Passage));
+                    list.extend(regions_now.iter().cloned().map(Stored::Region));
+                });
+                passages.set(Vec::new());
+                regions.set(Vec::new());
+                reset_history.run(());
+            }
+            request_started.update(|count| *count += 1);
 
             let references = js_sys::Array::new();
             for passage in &passages_now {
@@ -1018,6 +1050,19 @@ pub fn AiPanel(
             return;
         }
         pending_clear.set(false);
+        let asked = last_asked.get();
+        if !asked.trim().is_empty() && prompt_history.get().last() != Some(&asked) {
+            prompt_history.update(|list| {
+                list.push(asked.clone());
+                while list.len() > 30 {
+                    list.remove(0);
+                }
+            });
+            if let Ok(json) = serde_json::to_string(prompt_history.get_untracked().as_slice()) {
+                let _ = composer("savePromptHistory", &[JsValue::from_str(&json)]);
+            }
+        }
+        history_cursor.set(None);
         answers.set(Vec::new());
         images.set(Vec::new());
         files.set(Vec::new());
@@ -1065,6 +1110,7 @@ pub fn AiPanel(
             turns.update(|list| list.truncate(index));
             editing.set(None);
         }
+        last_asked.set(text.clone());
         send_text(text);
         // Only a request that really started should clear the field; an early return (not
         // configured, empty question) must leave the draft alone.
@@ -2718,6 +2764,50 @@ pub fn AiPanel(
                                 _ => {}
                             }
                         }
+                        if !mention_open.get() && !streaming.get() {
+                            let at_start = composer("isAtStart", &[])
+                                .and_then(|value| value.as_bool())
+                                .unwrap_or(false);
+                            let at_end = composer("isAtEnd", &[])
+                                .and_then(|value| value.as_bool())
+                                .unwrap_or(false);
+                            if event.key() == "ArrowUp" && at_start {
+                                let history = prompt_history.get();
+                                if !history.is_empty() {
+                                    event.prevent_default();
+                                    let next = history_cursor
+                                        .get()
+                                        .map(|cursor| cursor.saturating_sub(1))
+                                        .unwrap_or(history.len() - 1);
+                                    history_cursor.set(Some(next));
+                                    let _ = composer(
+                                        "setPlainText",
+                                        &[JsValue::from_str(&history[next])],
+                                    );
+                                    return;
+                                }
+                            }
+                            if event.key() == "ArrowDown" && at_end {
+                                if let Some(cursor) = history_cursor.get() {
+                                    let history = prompt_history.get();
+                                    event.prevent_default();
+                                    if cursor + 1 < history.len() {
+                                        history_cursor.set(Some(cursor + 1));
+                                        let _ = composer(
+                                            "setPlainText",
+                                            &[JsValue::from_str(&history[cursor + 1])],
+                                        );
+                                    } else {
+                                        history_cursor.set(None);
+                                        let _ = composer(
+                                            "setPlainText",
+                                            &[JsValue::from_str("")],
+                                        );
+                                    }
+                                    return;
+                                }
+                            }
+                        }
                         let modified = event.meta_key()
                             || event.ctrl_key()
                             || event.alt_key()
@@ -2852,6 +2942,7 @@ pub fn AiPanel(
                 notify=notify
                 model=model
                 page_limit=page_limit
+                context_limit=context_limit
             />
 
         </aside>

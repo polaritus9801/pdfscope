@@ -283,6 +283,15 @@ Office files are read with a small ZIP reader (central directory, stored and raw
 200 000 characters, and each file is folded into the request with a 20 000-character
 `[附件文件 …]` block. Unsupported kinds and unreadable files produce a specific message.
 
+## 7l. Progress — budget guard and prompt history
+
+- 设置 → 接口 gains 上下文上限（tokens）, default 128 000, zero disables it. The check runs **after**
+  the page text is fetched and before anything is consumed: the request is refused with its estimate,
+  and the draft, references and attachments stay in place for a retry.
+- The composer recalls previous questions with ↑ at the start of the field and ↓ back down; the list
+  keeps the last 30, is de-duplicated against the immediately previous send, and persists in local
+  storage.
+
 ## 8. Gaps beyond the first inventory
 
 A second pass over mature assistants adds these, which the program should cover rather than
@@ -333,6 +342,8 @@ Run these against the desktop build with a configured model and (for §6) a Tavi
 4. Drag a shelf chip into the middle of a sentence: the pill lands at the drop point.
 5. Backspace over a pill: the attachment leaves the shelf; ⌘Z restores it once.
 6. Enter sends, Shift+Enter breaks a line, IME composition never sends mid-word.
+6b. ↑ at the start of an empty field recalls the previous question; ↓ walks back down and clears past
+    the newest; the history survives a restart.
 7. Delete the attachment with the shelf ✕: the pill disappears too, one undo step.
 
 ### Shelf
@@ -363,6 +374,8 @@ Run these against the desktop build with a configured model and (for §6) a Tavi
 19. Without a key, the globe search ends the turn with a message and keeps the draft and references.
 20. With a key, an answer shows numbered 来源 cards; an empty result says so and still answers.
 21. Turn the globe off: the next request does not search.
+21b. Set 上下文上限 low, send a whole-document question: the send is refused with an estimate and the
+     draft and references remain; raising the limit lets it through.
 
 ### Panel
 22. The panel is flush with the window edge, its left border is the divider, and dragging it keeps the

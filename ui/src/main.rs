@@ -62,6 +62,7 @@ fn App() -> impl IntoView {
     let edit_epoch = RwSignal::new(0_u64);
     let scope_mode = RwSignal::new(0_u8);
     let page_limit = RwSignal::new(0_u32);
+    let context_limit = RwSignal::new(128_000_u32);
     // kind 0 = start anchor, 1 = end anchor; the hovered page completes the preview.
     let anchor = RwSignal::new(Option::<(u8, u32)>::None);
     let hover_page = RwSignal::new(Option::<u32>::None);
@@ -1359,6 +1360,7 @@ fn App() -> impl IntoView {
                 scope_mode=scope_mode
                 page_set=page_set
                 page_limit=page_limit
+                context_limit=context_limit
                 answers=answers
                 next_answer=next_answer
                 document_key=file_name
