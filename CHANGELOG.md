@@ -130,6 +130,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Message identity rails, question bubbles, reasoning pills, icon-only answer actions and a designed
+  empty state in the AI panel.
+
+
 - A unified icon family and provider marks; the panel header now carries provider identity, a custom
   model popover and icon actions, and the composer is one card with a toolbar and circular send.
 

@@ -13,6 +13,19 @@ use crate::scope_ui::PageManager;
 use crate::settings::SettingsSheet;
 use crate::{Passage, Region, truncate};
 
+/// A compact icon action with a tooltip and an accessible name.
+fn icon_action(
+    name: &'static str,
+    label: &'static str,
+    on_click: impl Fn(web_sys::MouseEvent) + 'static,
+) -> impl IntoView {
+    view! {
+        <button class="icon-action" title=label aria-label=label on:click=on_click>
+            {icon(name, 15)}
+        </button>
+    }
+}
+
 /// The first question of a conversation, shortened for a list row.
 fn conversation_title(turns: &[Turn]) -> String {
     turns
@@ -210,6 +223,9 @@ pub(crate) struct Turn {
     /// Web results this answer was allowed to cite.
     #[serde(default)]
     sources: Vec<Source>,
+    /// The model that produced this answer, when known.
+    #[serde(default)]
+    model: Option<String>,
 }
 
 /// A half-finished answer saved while streaming, used for crash recovery.
@@ -426,6 +442,7 @@ pub fn AiPanel(
             seconds: think_seconds.get().max(0.1),
             interrupted: interrupted.get(),
             sources: sources.get(),
+            model: session_model.get(),
         };
         turns.update(|list| list.push(finished));
         // The answer keeps its own copy now; the shelf row is only for the live turn.
@@ -622,6 +639,7 @@ pub fn AiPanel(
                 seconds: partial.seconds.max(0.1),
                 interrupted: true,
                 sources: Vec::new(),
+                model: None,
             });
         });
         notify.run("已恢复上次被打断的回答".to_owned());
@@ -2108,7 +2126,40 @@ pub fn AiPanel(
                     if !configured.get() {
                         view! { <p class="panel-hint">"未配置模型 · 前往设置"</p> }.into_any()
                     } else if turns.get().is_empty() && answer.get().is_empty() && !streaming.get() {
-                        view! { <p class="panel-hint">"选中文字加入引用，然后提问"</p> }.into_any()
+                        view! {
+                            <div class="empty-state">
+                                {provider_tile(provider_preset.get(), 40)}
+                                <h3>"从这页开始问"</h3>
+                                <p>"选中文字或框选页面加入引用，再问任何问题。"</p>
+                                <div class="empty-suggestions">
+                                    <button
+                                        on:click=move |_| {
+                                            let _ = composer("setPlainText", &[JsValue::from_str("总结当前页的要点")]);
+                                            let _ = composer("focus", &[]);
+                                        }
+                                    >
+                                        "总结本页"
+                                    </button>
+                                    <button
+                                        on:click=move |_| {
+                                            let _ = composer("setPlainText", &[JsValue::from_str("解释我选中的段落")]);
+                                            let _ = composer("focus", &[]);
+                                        }
+                                    >
+                                        "解释选中段落"
+                                    </button>
+                                    <button
+                                        on:click=move |_| {
+                                            let _ = composer("setPlainText", &[JsValue::from_str("对比上一轮回答和当前页")]);
+                                            let _ = composer("focus", &[]);
+                                        }
+                                    >
+                                        "和上一轮对比"
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                            .into_any()
                     } else {
                         view! {
                             <div
@@ -2168,9 +2219,11 @@ pub fn AiPanel(
                                                 ().into_any()
                                             } else {
                                                 view! {
-                                                    <details class="think">
+                                                    <details class="think-pill">
                                                         <summary>
-                                                            {format!("思考 {:.1} 秒", turn.seconds.max(0.1))}
+                                                            {icon("brain", 14)}
+                                                            <span>{format!("思考 {:.1} 秒", turn.seconds.max(0.1))}</span>
+                                                            <span class="think-chevron">{icon("chevron-down", 12)}</span>
                                                         </summary>
                                                         <pre class="think-text">{turn.reasoning.clone()}</pre>
                                                     </details>
@@ -2211,39 +2264,29 @@ pub fn AiPanel(
                                                     Segment::Citation(target) => Some(target),
                                                     Segment::Text(_) => None,
                                                 });
-                                            let located = locate
-                                                .map(|target| {
-                                                    view! {
-                                                        <button
-                                                            class="action"
-                                                            on:click=move |_| jump(target)
-                                                        >
-                                                            "定位"
-                                                        </button>
-                                                    }
-                                                });
-                                            let regenerate = (index == last)
-                                                .then(|| {
-                                                    view! {
-                                                        <button
-                                                            class="action"
-                                                            on:click=move |_| send_text(retry.clone())
-                                                        >
-                                                            "重新生成"
-                                                        </button>
-                                                    }
-                                                });
-                                            let continued = (index == last && turn.interrupted)
-                                                .then(|| {
-                                                    view! {
-                                                        <button
-                                                            class="action"
-                                                            on:click=move |_| continue_last()
-                                                        >
-                                                            "继续生成"
-                                                        </button>
-                                                    }
-                                                });
+                                            let located = locate.map(|target| {
+                                                icon_action(
+                                                    "page",
+                                                    "定位到引用页",
+                                                    move |_event: web_sys::MouseEvent| jump(target),
+                                                )
+                                            });
+                                            let regenerate = (index == last).then(|| {
+                                                icon_action(
+                                                    "retry",
+                                                    "重新生成",
+                                                    move |_event: web_sys::MouseEvent| {
+                                                        send_text(retry.clone())
+                                                    },
+                                                )
+                                            });
+                                            let continued = (index == last && turn.interrupted).then(|| {
+                                                icon_action(
+                                                    "send",
+                                                    "继续生成",
+                                                    move |_event: web_sys::MouseEvent| continue_last(),
+                                                )
+                                            });
 
                                             let edit_text = turn
                                                 .question
@@ -2251,32 +2294,27 @@ pub fn AiPanel(
                                                 .next()
                                                 .unwrap_or_default()
                                                 .to_owned();
-                                            let edit = view! {
-                                                <button
-                                                    class="action"
-                                                    on:click=move |_| {
-                                                        if streaming.get() {
-                                                            return;
-                                                        }
-                                                        editing.set(Some(index));
-                                                        let _ = composer(
-                                                            "setPlainText",
-                                                            &[JsValue::from_str(&edit_text)],
-                                                        );
+                                            let edit = icon_action(
+                                                "edit",
+                                                "编辑并重发",
+                                                move |_event: web_sys::MouseEvent| {
+                                                    if streaming.get() {
+                                                        return;
                                                     }
-                                                >
-                                                    "编辑"
-                                                </button>
-                                            };
-                                            let branch = view! {
-                                                <button
-                                                    class="action"
-                                                    title="从这里开始一条新对话"
-                                                    on:click=move |_| branch_conversation(index)
-                                                >
-                                                    "分支"
-                                                </button>
-                                            };
+                                                    editing.set(Some(index));
+                                                    let _ = composer(
+                                                        "setPlainText",
+                                                        &[JsValue::from_str(&edit_text)],
+                                                    );
+                                                },
+                                            );
+                                            let branch = icon_action(
+                                                "branch",
+                                                "从这里开始一条新对话",
+                                                move |_event: web_sys::MouseEvent| {
+                                                    branch_conversation(index)
+                                                },
+                                            );
 
                                             let answer_sources = (!turn.sources.is_empty()).then(|| {
                                                 let sources = turn.sources.clone();
@@ -2309,11 +2347,10 @@ pub fn AiPanel(
                                             });
 
                                             let answer_for_copy_cite = turn.answer.clone();
-                                            let copy_with_citations = view! {
-                                                <button
-                                                    class="action"
-                                                    title="复制回答并附上引用页码"
-                                                    on:click=move |_| {
+                                            let copy_with_citations = icon_action(
+                                                "link",
+                                                "复制回答并附上引用页码",
+                                                move |_event: web_sys::MouseEvent| {
                                                         let mut pages: Vec<u32> = segments(&answer_for_copy_cite)
                                                             .into_iter()
                                                             .filter_map(|segment| match segment {
@@ -2336,40 +2373,51 @@ pub fn AiPanel(
                                                         }
                                                         copy_to_clipboard(&text);
                                                         notify.run("已复制（含页码）".to_owned());
-                                                    }
-                                                >
-                                                    "复制引用"
-                                                </button>
-                                            };
+                                                    },
+                                            );
 
                                             let answer_for_cite = turn.answer.clone();
-                                            let cite = view! {
-                                                <button
-                                                    class="action"
-                                                    on:click=move |_| {
-                                                        if answer_for_cite.trim().is_empty() {
-                                                            return;
-                                                        }
-                                                        undo_push.run(());
-                                                        let id = next_answer.get() + 1;
-                                                        next_answer.set(id);
-                                                        answers.update(|list| {
-                                                            list.push(crate::AnswerRef {
-                                                                id,
-                                                                label: format!("回答 {id}"),
-                                                                quote: answer_for_cite.clone(),
-                                                            });
-                                                        });
-                                                        notify.run("已引用这条回答".to_owned());
+                                            let cite = icon_action(
+                                                "quote",
+                                                "引用此回答",
+                                                move |_event: web_sys::MouseEvent| {
+                                                    if answer_for_cite.trim().is_empty() {
+                                                        return;
                                                     }
-                                                >
-                                                    "引用此回答"
-                                                </button>
-                                            };
+                                                    undo_push.run(());
+                                                    let id = next_answer.get() + 1;
+                                                    next_answer.set(id);
+                                                    answers.update(|list| {
+                                                        list.push(crate::AnswerRef {
+                                                            id,
+                                                            label: format!("回答 {id}"),
+                                                            quote: answer_for_cite.clone(),
+                                                        });
+                                                    });
+                                                    notify.run("已引用这条回答".to_owned());
+                                                },
+                                            );
 
+                                            let identity_model = turn
+                                                .model
+                                                .clone()
+                                                .unwrap_or_else(|| model.get());
+                                            let meta = if turn.interrupted {
+                                                "已打断".to_owned()
+                                            } else {
+                                                format!("{:.1} 秒", turn.seconds.max(0.1))
+                                            };
                                             view! {
                                                 <div class="turn">
-                                                    <p class="turn-question">{turn.question.clone()}</p>
+                                                    <div class="question-row">
+                                                        <p class="turn-question">{turn.question.clone()}</p>
+                                                    </div>
+                                                    <div class="answer-block">
+                                                    <div class="answer-identity">
+                                                        {provider_tile(provider_preset.get(), 22)}
+                                                        <span class="answer-model">{identity_model}</span>
+                                                        <span class="answer-meta">{meta}</span>
+                                                    </div>
                                                     {detail}
                                                     {body}
                                                     {answer_sources}
@@ -2378,18 +2426,18 @@ pub fn AiPanel(
                                                         {edit}
                                                         {branch}
                                                         {cite}
-                                                        <button
-                                                            class="action"
-                                                            on:click=move |_| {
+                                                        {icon_action(
+                                                            "copy",
+                                                            "复制",
+                                                            move |_event: web_sys::MouseEvent| {
                                                                 copy_to_clipboard(&copied);
                                                                 notify.run("已复制".to_owned());
-                                                            }
-                                                        >
-                                                            "复制"
-                                                        </button>
+                                                            },
+                                                        )}
                                                         {copy_with_citations}
                                                         {regenerate}
                                                         {continued}
+                                                    </div>
                                                     </div>
                                                 </div>
                                             }
@@ -2412,16 +2460,23 @@ pub fn AiPanel(
                                         };
                                         if streaming_now {
                                             view! {
-                                                <div class="think">
-                                                    <div class="think-head">{label}</div>
+                                                <div class="think-pill is-live">
+                                                    <div class="think-head">
+                                                        {icon("brain", 14)}
+                                                        <span>{label}</span>
+                                                    </div>
                                                     <pre class="think-text">{reasoning.get()}</pre>
                                                 </div>
                                             }
                                                 .into_any()
                                         } else {
                                             view! {
-                                                <details class="think">
-                                                    <summary>{label}</summary>
+                                                <details class="think-pill">
+                                                    <summary>
+                                                        {icon("brain", 14)}
+                                                        <span>{label}</span>
+                                                        <span class="think-chevron">{icon("chevron-down", 12)}</span>
+                                                    </summary>
                                                     <pre class="think-text">{reasoning.get()}</pre>
                                                 </details>
                                             }
@@ -2429,16 +2484,38 @@ pub fn AiPanel(
                                         }
                                     };
                                     view! {
-                                        <div class="turn current">
-                                            <p class="turn-question">
-                                                {move || {
-                                                    if continue_target.get().is_some() {
-                                                        "继续生成…".to_owned()
-                                                    } else {
-                                                        current_question.get()
-                                                    }
-                                                }}
-                                            </p>
+                                        <div class="turn current" class:is-streaming=move || streaming.get()>
+                                            <div class="question-row">
+                                                <p class="turn-question">
+                                                    {move || {
+                                                        if continue_target.get().is_some() {
+                                                            "继续生成…".to_owned()
+                                                        } else {
+                                                            current_question.get()
+                                                        }
+                                                    }}
+                                                </p>
+                                            </div>
+                                            <div class="answer-block">
+                                            <div class="answer-identity">
+                                                {provider_tile(provider_preset.get(), 22)}
+                                                <span class="answer-model">
+                                                    {move || {
+                                                        session_model
+                                                            .get()
+                                                            .unwrap_or_else(|| model.get())
+                                                    }}
+                                                </span>
+                                                <span class="answer-meta">
+                                                    {move || {
+                                                        if streaming.get() {
+                                                            "生成中…".to_owned()
+                                                        } else {
+                                                            format!("{:.1} 秒", think_seconds.get().max(0.1))
+                                                        }
+                                                    }}
+                                                </span>
+                                            </div>
                                             {detail}
                                             <div
                                                 class="answer-text markdown"
@@ -2446,15 +2523,15 @@ pub fn AiPanel(
                                                 inner_html=move || pdfscope_core::to_html(&answer.get())
                                             ></div>
                                             <div class="turn-actions">
-                                                <button
-                                                    class="action"
-                                                    on:click=move |_| {
-                                                    copy_to_clipboard(&answer.get());
-                                                    notify.run("已复制".to_owned());
-                                                }
-                                                >
-                                                    "复制"
-                                                </button>
+                                                {icon_action(
+                                                    "copy",
+                                                    "复制",
+                                                    move |_event: web_sys::MouseEvent| {
+                                                        copy_to_clipboard(&answer.get());
+                                                        notify.run("已复制".to_owned());
+                                                    },
+                                                )}
+                                            </div>
                                             </div>
                                         </div>
                                     }

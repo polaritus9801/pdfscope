@@ -32,3 +32,9 @@ one icon language, designed states. Behaviour, request logic and the reader stay
 ## Progress
 
 - P0 landed: icons/provider marks, header, model popover, composer card.
+- P1 landed: each answer has a provider tile, model name and duration; questions are right-aligned
+  bubbles; reasoning is a pill with a brain icon and chevron; answer actions are icon buttons with
+  tooltips and accessible names; the empty state has a mark, copy and three suggestion cards.
+  `Turn.model` records the model that produced each answer (serde-defaulted for old data), and the
+  streaming answer gets a caret.
+- Next: P2 context shelf.
