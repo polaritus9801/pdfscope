@@ -153,7 +153,12 @@ pub(crate) fn build_request(
     }
 
     for region in regions {
-        prompt.push_str(&format!("[截图 p.{}，见附带的图片]\n\n", region.page));
+        if region.page == 0 {
+            // An image the reader attached, not a captured page region.
+            prompt.push_str("[附加图片，见附带的图片]\n\n");
+        } else {
+            prompt.push_str(&format!("[截图 p.{}，见附带的图片]\n\n", region.page));
+        }
     }
 
     prompt.push_str("问题：");
@@ -162,10 +167,19 @@ pub(crate) fn build_request(
     let mut images = Vec::with_capacity(regions.len());
     for region in regions {
         if region.image.len() > MAX_BASE64 {
-            return Err(format!("p.{} 的截图太大，请框小一点", region.page));
+            return Err(if region.page == 0 {
+                "附加图片太大，请换一张小一点的".to_owned()
+            } else {
+                format!("p.{} 的截图太大，请框小一点", region.page)
+            });
         }
-        let image = Image::from_data_url(&region.image)
-            .ok_or_else(|| format!("p.{} 的截图格式无法识别", region.page))?;
+        let image = Image::from_data_url(&region.image).ok_or_else(|| {
+            if region.page == 0 {
+                "附加图片的格式无法识别".to_owned()
+            } else {
+                format!("p.{} 的截图格式无法识别", region.page)
+            }
+        })?;
         images.push(image);
     }
 
@@ -457,6 +471,25 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn an_attachment_without_a_page_is_labelled_as_a_picture() {
+        let request = build_request(
+            "q",
+            &[],
+            &[RegionInput {
+                page: 0,
+                image: "data:image/png;base64,AAAA".to_owned(),
+            }],
+            &[],
+            &[],
+            crate::settings::DEFAULT_SYSTEM_PROMPT,
+        )
+        .unwrap();
+        let prompt = &request.messages[0].content;
+        assert!(prompt.contains("[附加图片，见附带的图片]"), "got: {prompt}");
+        assert!(!prompt.contains("p.0"), "got: {prompt}");
     }
 
     #[test]

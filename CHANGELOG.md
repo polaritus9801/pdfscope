@@ -118,6 +118,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Attach images to a question from the composer; they show as thumbnails, become inline pills, count
+  toward the token hint, and are labelled as attachments by the request builder.
+
+
 - Export the current conversation as Markdown, a rough token estimate beside the composer, and
   复制引用 (answer plus its cited pages).
 

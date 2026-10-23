@@ -1909,6 +1909,26 @@ window.PDFScope = {
     }
   },
 
+  /// Reads the images chosen in a file input as data URLs.
+  async readImages(inputId) {
+    const input = document.getElementById(inputId);
+    const files = [...(input?.files ?? [])];
+    const out = [];
+
+    for (const file of files) {
+      if (!file.type.startsWith("image/")) continue;
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      out.push({ name: file.name, image: String(dataUrl) });
+    }
+    if (input) input.value = "";
+    return out;
+  },
+
   /// The conversation library of one document.
   loadConversations(key) {
     try {

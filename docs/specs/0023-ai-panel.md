@@ -192,6 +192,17 @@ before sending).
   characters per token plus a flat allowance per image and page. It is a budget hint, not a promise.
 - Every turn gains `复制引用`: the answer plus a deduplicated list of its cited pages.
 
+## 7e. Progress — image attachments
+
+- The composer has a paperclip control that reads one or more images as data URLs. They appear in
+  their own shelf row as thumbnails, can be inserted as `@` pills, are counted by the token estimate
+  and are removed by ✕ or by deleting their pill.
+- Images travel through the existing region channel with `page: 0`; `build_request` now labels them
+  `[附加图片，见附带的图片]` and gives attachment-specific size/format errors instead of talking
+  about page 0. A desktop test covers the label.
+- Images live only in the session (they are not written into persisted conversations), and adding an
+  image is not part of the reference undo snapshot. Both are deliberate for now.
+
 ## 8. Gaps beyond the first inventory
 
 A second pass over mature assistants adds these, which the program should cover rather than

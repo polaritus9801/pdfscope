@@ -212,6 +212,14 @@ struct Conversation {
     turns: Vec<Turn>,
 }
 
+/// An image the reader attached to a question.
+#[derive(Clone, PartialEq)]
+struct UserImage {
+    id: u64,
+    name: String,
+    image: String,
+}
+
 /// A reference that was used and moved to history.
 #[derive(Clone, PartialEq)]
 enum Stored {
@@ -263,6 +271,8 @@ pub fn AiPanel(
     let confirm_delete = RwSignal::new(Option::<String>::None);
     let sync_ready = RwSignal::new(false);
     let next_conversation = RwSignal::new(0_u64);
+    let images = RwSignal::new(Vec::<UserImage>::new());
+    let next_image = RwSignal::new(0_u64);
     let editor_ref = NodeRef::<leptos::html::Div>::new();
     let failed = RwSignal::new(false);
     let history = RwSignal::new(Vec::<Stored>::new());
@@ -295,9 +305,15 @@ pub fn AiPanel(
         for answer in answers.get() {
             characters += answer.quote.chars().count();
         }
-        estimate_tokens(characters, regions.get().len(), page_set.get().len())
+        estimate_tokens(
+            characters,
+            regions.get().len() + images.get().len(),
+            page_set.get().len(),
+        )
     };
-    let reference_count = move || passages.get().len() + regions.get().len() + page_set.get().len();
+    let reference_count = move || {
+        passages.get().len() + regions.get().len() + page_set.get().len() + images.get().len()
+    };
 
     let redeem = move |index: usize| {
         if let Some(entry) = history.get().get(index).cloned() {
@@ -383,6 +399,11 @@ pub fn AiPanel(
                     {
                         undo_push.run(());
                         answers.update(|list| list.retain(|entry| entry.id != id));
+                    } else if let Some(id) = key
+                        .strip_prefix("img:")
+                        .and_then(|id| id.parse::<u64>().ok())
+                    {
+                        images.update(|list| list.retain(|entry| entry.id != id));
                     }
                 }
 
@@ -470,6 +491,7 @@ pub fn AiPanel(
             conversations.set(Vec::new());
             active.set(String::new());
             turns.set(Vec::new());
+            images.set(Vec::new());
             sync_ready.set(true);
             return;
         }
@@ -578,6 +600,7 @@ pub fn AiPanel(
         }
         let current_page = page.get();
         let total = pages.get();
+        let pictures = images.get();
         let mode = scope_mode.get();
         let explicit = page_set.get();
 
@@ -647,6 +670,16 @@ pub fn AiPanel(
                     &item,
                     &JsValue::from_str("image"),
                     &JsValue::from_str(&region.image),
+                );
+                images.push(&item);
+            }
+            for picture in &pictures {
+                let item = js_sys::Object::new();
+                let _ = js_sys::Reflect::set(&item, &JsValue::from_str("page"), &JsValue::from(0));
+                let _ = js_sys::Reflect::set(
+                    &item,
+                    &JsValue::from_str("image"),
+                    &JsValue::from_str(&picture.image),
                 );
                 images.push(&item);
             }
@@ -909,6 +942,7 @@ pub fn AiPanel(
         }
         send_text(text);
         answers.set(Vec::new());
+        images.set(Vec::new());
         composer_clear();
     };
 
@@ -999,6 +1033,15 @@ pub fn AiPanel(
         if !removed {
             undo_push.run(());
             page_set.update(|set| set.retain(|entry| *entry != page_number));
+        }
+    };
+    let remove_image = move |id: u64| {
+        let key = format!("img:{id}");
+        let removed = composer("removeToken", &[JsValue::from_str(&key)])
+            .and_then(|value| value.as_bool())
+            .unwrap_or(false);
+        if !removed {
+            images.update(|list| list.retain(|entry| entry.id != id));
         }
     };
     let remove_answer = move |id: u64| {
@@ -1803,8 +1846,10 @@ pub fn AiPanel(
                     let shots = regions.get();
                     let pages_selected = page_set.get();
                     let cited = answers.get();
+                    let pictures = images.get();
                     if quotes.is_empty()
                         && shots.is_empty()
+                        && pictures.is_empty()
                         && pages_selected.is_empty()
                         && cited.is_empty()
                     {
@@ -1892,6 +1937,37 @@ pub fn AiPanel(
                                                         on:click=move |event: web_sys::MouseEvent| {
                                                             event.stop_propagation();
                                                             remove_region(id);
+                                                        }
+                                                    >
+                                                        "✕"
+                                                    </span>
+                                                </div>
+                                            }
+                                        })
+                                        .collect_view()}
+                                </div>
+                            </div>
+                        }
+                    });
+
+                    let image_row = (!pictures.is_empty()).then(|| {
+                        view! {
+                            <div class="shelf-row">
+                                <span class="shelf-label">"图片"</span>
+                                <div class="shelf-track">
+                                    {pictures
+                                        .into_iter()
+                                        .map(|picture| {
+                                            let id = picture.id;
+                                            view! {
+                                                <div class="attach-thumb" title=picture.name.clone()>
+                                                    <img src=picture.image.clone() alt="" />
+                                                    <span
+                                                        class="chip-x thumb-x"
+                                                        title="移除"
+                                                        on:click=move |event: web_sys::MouseEvent| {
+                                                            event.stop_propagation();
+                                                            remove_image(id);
                                                         }
                                                     >
                                                         "✕"
@@ -1998,6 +2074,7 @@ pub fn AiPanel(
                         <div class="context-shelf">
                             {quote_row}
                             {shot_row}
+                            {image_row}
                             {page_row}
                             {answer_row}
                         </div>
@@ -2154,6 +2231,25 @@ pub fn AiPanel(
                             </button>
                         }.into_any());
                     }
+                    for picture in images.get() {
+                        let key = format!("img:{}", picture.id);
+                        let label = truncate(&picture.name, 14);
+                        items.push(view! {
+                            <button
+                                class="mention-item"
+                                on:click=move |_| {
+                                    let _ = composer(
+                                        "insertToken",
+                                        &[JsValue::from_str(&key), JsValue::from_str(&label)],
+                                    );
+                                    mention_open.set(false);
+                                }
+                            >
+                                <span class="mention-kind">"图"</span>
+                                <span class="mention-label">{format!("{} · 附件图片", picture.name)}</span>
+                            </button>
+                        }.into_any());
+                    }
                     for answer in answers.get() {
                         let key = format!("a:{}", answer.id);
                         let label = answer.label.clone();
@@ -2295,6 +2391,49 @@ pub fn AiPanel(
                     }
                 ></div>
                 <div class="composer-row">
+                    <label class="icon-button attach-button" title="附加图片">
+                        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M20 11.5l-7.8 7.8a5 5 0 0 1-7.1-7.1l8.2-8.2a3.4 3.4 0 0 1 4.8 4.8l-8.2 8.2a1.8 1.8 0 0 1-2.5-2.5l7.4-7.4" />
+                        </svg>
+                        <input
+                            id="attach-input"
+                            class="file-input"
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            on:change=move |_| {
+                                let Some(promise) = crate::call(
+                                    "readImages",
+                                    &[JsValue::from_str("attach-input")],
+                                ) else {
+                                    return;
+                                };
+                                spawn_local(async move {
+                                    let Ok(value) = JsFuture::from(js_sys::Promise::from(promise)).await
+                                    else {
+                                        return;
+                                    };
+                                    let Ok(list) = value.dyn_into::<js_sys::Array>() else {
+                                        return;
+                                    };
+                                    for entry in list.iter() {
+                                        let name = crate::model::read_string(&entry, "name")
+                                            .unwrap_or_else(|| "图片".to_owned());
+                                        let image = crate::model::read_string(&entry, "image")
+                                            .unwrap_or_default();
+                                        if !image.starts_with("data:image/") {
+                                            continue;
+                                        }
+                                        let id = next_image.get() + 1;
+                                        next_image.set(id);
+                                        images.update(|list| {
+                                            list.push(UserImage { id, name, image })
+                                        });
+                                    }
+                                });
+                            }
+                        />
+                    </label>
                     <span class="status">{move || status.get()}</span>
                     <span class="token-meter" title="粗略估算，真实用量由模型决定">
                         {move || format!("约 {} tokens", token_estimate())}

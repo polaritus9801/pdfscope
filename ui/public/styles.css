@@ -2795,3 +2795,23 @@ body.selection-quiet .textLayer :is(span, br)::selection {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
+
+/* The attach control is a labelled hidden file input, styled like the other small buttons. */
+.attach-button {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 30px;  /* size */
+  height: 30px;  /* size */
+  color: var(--ink-muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.attach-button:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
