@@ -434,9 +434,11 @@ references, the composer says so before asking. The hidden fourth state is gone 
 
 ## Field fixes: a floating rail and the progress line
 
-- The rail sat in the layout with a capsule behind it, so a visible panel covered the left edge of the
-  page. It is now absolutely positioned over the stage and each of the four controls is its own round
-  floating button — no panel, and the stage gets its width back.
+- The rail sat in the layout, so its column covered the left edge of the page. It now floats over the
+  stage and keeps the approved shape: the pointer as a circle, and one capsule holding text, box and
+  pages. (An attempt to split it into four separate circles was rejected — the capsule is the design.)
+- The progress line is drawn by its container and sits flush with the header's bottom edge (3 px,
+  4 px while hovered); its dot is painted purple with no ring and appears only on hover or focus.
 - The page slider left the bottom strip (which is gone) and became a hairline on the bottom edge of
   the header: page 1 at the far left, the last page at the far right, with the accent fill showing
   progress. The handle appears only when the pointer is on the line or it has keyboard focus.

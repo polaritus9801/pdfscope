@@ -2,7 +2,6 @@
 
 use leptos::prelude::*;
 use leptos::task::spawn_local;
-use wasm_bindgen::closure::Closure;
 use wasm_bindgen::{JsCast, JsValue};
 
 use crate::model::{Passage, Region, Selection, rect_style, truncate};

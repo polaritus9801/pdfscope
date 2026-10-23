@@ -855,7 +855,16 @@ fn App() -> impl IntoView {
                         </svg>
                     </button>
                 </div>
-                <div class="page-seek" class:hidden=move || !ready.get()>
+                <div
+                    class="page-seek"
+                    class:hidden=move || !ready.get()
+                    style=move || {
+                        let total = f64::from(pages.get().max(1));
+                        let position = (f64::from(page.get()) - 1.0).clamp(0.0, total - 1.0);
+                        let percent = position / (total - 1.0).max(1.0) * 100.0;
+                        format!("--progress: {percent:.2}%")
+                    }
+                >
                     <input
                         class="seek-range"
                         type="range"
@@ -863,14 +872,9 @@ fn App() -> impl IntoView {
                         max=move || pages.get().max(1).to_string()
                         prop:value=move || page.get().to_string()
                         aria-label="阅读进度"
-                        style=move || {
-                            let total = f64::from(pages.get().max(1));
-                            let position = (f64::from(page.get()) - 1.0).clamp(0.0, total - 1.0);
-                            let percent = position / (total - 1.0).max(1.0) * 100.0;
-                            format!("--progress: {percent:.2}%")
-                        }
                         on:input=jump
                     />
+                    <span class="seek-dot" aria-hidden="true"></span>
                 </div>
             </header>
 

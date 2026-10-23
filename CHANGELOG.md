@@ -10,6 +10,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Changed
 
+- The rail keeps its circle-plus-capsule shape while floating; the progress hairline is flush with the
+  header edge, thicker on hover, with a plain purple dot.
+
+
 - The four tool buttons float over the stage without a capsule behind them, and the page slider moved
   from the bottom strip to a hairline on the header's bottom edge with a hover-only handle.
 

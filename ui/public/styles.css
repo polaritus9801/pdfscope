@@ -893,17 +893,21 @@ body {
 .rail-capsule {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  overflow: visible;
-  background: transparent;
-  border: none;
-  box-shadow: none;
+  gap: 0;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-2);
 }
 
 .rail-capsule .rail-tool {
-  border: 1px solid var(--border);
-  border-radius: 50%;
-  box-shadow: var(--shadow-2);
+  border: none;
+  border-radius: 0;
+}
+
+.rail-capsule .rail-tool + .rail-tool {
+  border-top: 1px solid var(--border);
 }
 
 .rail-pointer:hover:not(:disabled),
@@ -1544,80 +1548,67 @@ body {
   }
 }
 
-/* Reading progress: a real range input, so dragging and arrow keys both work. */
-/* Reading progress: a hairline on the header's bottom edge; the handle only appears nearby. */
+/* Reading progress: a hairline flush with the header's bottom edge. The line is drawn by the
+   container, so it sits exactly on the edge; the input is transparent but still drives dragging and
+   the arrow keys, and the dot is painted rather than borrowed from the native thumb. */
 .page-seek {
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
-  height: 14px;  /* size */
+  height: 16px;  /* size */
   z-index: 6;
 }
 
+.page-seek::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;  /* size */
+  background: linear-gradient(
+    to right,
+    var(--accent) var(--progress, 0%),
+    var(--border) var(--progress, 0%)
+  );
+  transition: height var(--duration) var(--ease);
+}
+
+.page-seek:hover::before,
+.page-seek:focus-within::before {
+  height: 4px;  /* size */
+}
+
 .seek-range {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   margin: 0;
   appearance: none;
   background: transparent;
   cursor: pointer;
+  opacity: 0;
 }
 
-.seek-range::-webkit-slider-runnable-track {
-  height: 2px;  /* size */
-  background: linear-gradient(
-    to right,
-    var(--accent) var(--progress, 0%),
-    var(--border) var(--progress, 0%)
-  );
-}
-
-.seek-range::-moz-range-track {
-  height: 2px;  /* size */
-  background: linear-gradient(
-    to right,
-    var(--accent) var(--progress, 0%),
-    var(--border) var(--progress, 0%)
-  );
-}
-
-.seek-range::-webkit-slider-thumb {
-  appearance: none;
+.seek-dot {
+  position: absolute;
+  bottom: -3px;  /* size */
+  left: var(--progress, 0%);
   width: 10px;  /* size */
   height: 10px;  /* size */
-  margin-top: -4px;  /* size */
+  margin-left: -5px;  /* size */
   background: var(--accent);
-  border: 2px solid var(--surface);  /* size */
   border-radius: 50%;
-  box-shadow: var(--shadow-1);
   opacity: 0;
+  pointer-events: none;
   transition: opacity var(--duration) var(--ease);
 }
 
-.seek-range:hover::-webkit-slider-thumb,
-.seek-range:focus-visible::-webkit-slider-thumb,
-.page-seek:hover .seek-range::-webkit-slider-thumb {
+.page-seek:hover .seek-dot,
+.page-seek:focus-within .seek-dot {
   opacity: 1;
-}
-
-.seek-range::-moz-range-thumb {
-  width: 10px;  /* size */
-  height: 10px;  /* size */
-  background: var(--accent);
-  border: 2px solid var(--surface);  /* size */
-  border-radius: 50%;
-  box-shadow: var(--shadow-1);
-  opacity: 0;
-}
-
-.seek-range:hover::-moz-range-thumb,
-.seek-range:focus-visible::-moz-range-thumb {
-  opacity: 1;
-}
-
-.seek-range:focus-visible {
-  outline: none;
 }
 
 /* Outline: an overlay beside the tool rail, so the column never narrows. */
