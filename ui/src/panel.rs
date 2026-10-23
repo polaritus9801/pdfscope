@@ -1056,7 +1056,11 @@ pub fn AiPanel(
             editing.set(None);
         }
         send_text(text);
-        pending_clear.set(true);
+        // Only a request that really started should clear the field; an early return (not
+        // configured, empty question) must leave the draft alone.
+        if streaming.get() {
+            pending_clear.set(true);
+        }
     };
 
     let continue_last = move || {

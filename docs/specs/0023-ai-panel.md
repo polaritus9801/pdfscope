@@ -257,6 +257,8 @@ Three state bugs found by reading the combined flows:
   the request started. Clearing now waits for `request_started`, which the request path bumps after
   the search; a failure leaves the draft, the pills and every attachment in place.
 - Switching conversations, branching and editing are refused while a turn streams.
+- The deferred clear is armed only when `send_text` really started streaming; an early return
+  (missing configuration, empty question) cannot leave a stale clear waiting for the next request.
 
 ## 8. Gaps beyond the first inventory
 
