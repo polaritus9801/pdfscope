@@ -3787,3 +3787,8 @@ body.panel-dragging .stage {
 body.panel-dragging .panel-resize::after {
   background: var(--accent);
 }
+
+/* The borrowed page mode lights the page immediately, before the pointer moves. */
+.stage[data-borrow="pages"] .page:hover::after {
+  opacity: 1;
+}
