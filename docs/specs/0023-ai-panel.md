@@ -265,6 +265,24 @@ Three state bugs found by reading the combined flows:
 - The deferred clear is armed only when `send_text` really started streaming; an early return
   (missing configuration, empty question) cannot leave a stale clear waiting for the next request.
 
+## 7k. Progress — rich files
+
+The paperclip now accepts what mainstream assistants accept, extracted in the renderer:
+
+| Kind | How | Notes |
+|---|---|---|
+| Images | data URL | 25 MB limit |
+| PDF | PDF.js text per page | page markers `[附件第 n 页]`; scans produce an explicit error |
+| DOCX | ZIP + `word/document.xml` | paragraphs from `w:p` / `w:t` |
+| PPTX | ZIP + `ppt/slides/*.xml` | one section per slide |
+| XLSX | ZIP + shared strings + sheets | `A1: value` rows |
+| Text / code | UTF-8 | 40+ extensions, 25 MB |
+
+Office files are read with a small ZIP reader (central directory, stored and raw-deflate via
+`DecompressionStream("deflate-raw")`) and `DOMParser`; no new dependency. Extraction is capped at
+200 000 characters, and each file is folded into the request with a 20 000-character
+`[附件文件 …]` block. Unsupported kinds and unreadable files produce a specific message.
+
 ## 8. Gaps beyond the first inventory
 
 A second pass over mature assistants adds these, which the program should cover rather than
@@ -336,8 +354,10 @@ Run these against the desktop build with a configured model and (for §6) a Tavi
 16. 导出 copies the active conversation as Markdown.
 
 ### Files and images
-17. Attach two images and a `.md`: three rows appear, each removable; the token hint grows.
-18. Send: images arrive as pictures and the file text is labelled `[附件文件 …]` in the prompt.
+17. Attach two images, a `.md`, a PDF, a DOCX, a PPTX and an XLSX: each appears as its own row and is
+    removable; the token hint grows. Scanned PDFs and unsupported kinds give a specific error.
+18. Send: images arrive as pictures; document and text text is labelled `[附件文件 …]` with page or
+    slide markers where they apply.
 
 ### Web search
 19. Without a key, the globe search ends the turn with a message and keeps the draft and references.

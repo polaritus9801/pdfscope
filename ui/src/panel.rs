@@ -341,7 +341,7 @@ pub fn AiPanel(
             characters += answer.quote.chars().count();
         }
         for file in files.get() {
-            characters += file.text.chars().count().min(8000);
+            characters += file.text.chars().count().min(20_000);
         }
         estimate_tokens(
             characters,
@@ -1055,7 +1055,7 @@ pub fn AiPanel(
             }
         }
         for file in files.get() {
-            text.push_str(&pdfscope_core::file_block(&file.name, &file.text, 8000));
+            text.push_str(&pdfscope_core::file_block(&file.name, &file.text, 20_000));
             text.push('\n');
         }
         if text.trim().is_empty() {
@@ -2748,7 +2748,7 @@ pub fn AiPanel(
                             <path d="M3.5 12h17M12 3.5c2.4 2.3 3.6 5.1 3.6 8.5s-1.2 6.2-3.6 8.5c-2.4-2.3-3.6-5.1-3.6-8.5S9.6 5.8 12 3.5z" />
                         </svg>
                     </button>
-                    <label class="icon-button attach-button" title="附加图片或文本文件">
+                    <label class="icon-button attach-button" title="附加图片、PDF、Office 或文本/代码文件">
                         <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M20 11.5l-7.8 7.8a5 5 0 0 1-7.1-7.1l8.2-8.2a3.4 3.4 0 0 1 4.8 4.8l-8.2 8.2a1.8 1.8 0 0 1-2.5-2.5l7.4-7.4" />
                         </svg>
@@ -2756,7 +2756,7 @@ pub fn AiPanel(
                             id="attach-input"
                             class="file-input"
                             type="file"
-                            accept="image/*,.txt,.md,.markdown,.csv,.json,.log,.yaml,.yml"
+                            accept="image/*,.pdf,.docx,.pptx,.xlsx,.txt,.md,.markdown,.csv,.tsv,.json,.jsonl,.log,.yaml,.yml,.html,.htm,.xml,.toml,.ini,.rs,.ts,.tsx,.js,.jsx,.py,.java,.kt,.c,.h,.cpp,.hpp,.cs,.go,.rb,.php,.swift,.sh,.sql,.css,.scss,.vue,.svelte,.lua"
                             multiple
                             on:change=move |_| {
                                 let Some(promise) = crate::call(

@@ -122,6 +122,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Attach PDF, DOCX, PPTX, XLSX, text and code files; the renderer extracts their text (PDF.js and a
+  dependency-free ZIP/XML reader) and folds it into the request with size and length limits.
+
+
 - Each answer keeps its own web sources and shows numbered citation cards; the live 来源 shelf row is
   only for the turn in flight.
 

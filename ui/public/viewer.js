@@ -1791,6 +1791,237 @@ window.addEventListener("keydown", (event) => {
 
 // ── Public boundary ────────────────────────────────────────────────────────────────────────────
 
+
+const ATTACHMENT_TEXT_LIMIT = 200_000;
+const ATTACHMENT_FILE_LIMIT = 25 * 1024 * 1024;
+const TEXT_EXTENSIONS = new Set([
+  "txt", "md", "markdown", "csv", "tsv", "json", "jsonl", "log", "yaml", "yml",
+  "html", "htm", "xml", "toml", "ini", "cfg", "conf", "rs", "ts", "tsx", "js",
+  "jsx", "mjs", "cjs", "py", "java", "kt", "c", "h", "cc", "cpp", "hpp", "cs",
+  "go", "rb", "php", "swift", "scala", "sh", "bash", "zsh", "fish", "sql",
+  "css", "scss", "less", "vue", "svelte", "lua", "pl", "r", "m", "gitignore",
+]);
+
+function extensionOf(name) {
+  const dot = name.lastIndexOf(".");
+  return dot < 0 ? "" : name.slice(dot + 1).toLowerCase();
+}
+
+async function readOneAttachment(file) {
+  const extension = extensionOf(file.name);
+
+  if (file.type.startsWith("image/")) {
+    if (file.size > ATTACHMENT_FILE_LIMIT) {
+      throw new Error("图片太大，请换一张小于 25MB 的");
+    }
+    const data = await readAsDataUrl(file);
+    return { kind: "image", name: file.name, data };
+  }
+
+  if (file.size > ATTACHMENT_FILE_LIMIT) {
+    throw new Error("文件太大，请换一个小于 25MB 的");
+  }
+
+  if (extension === "pdf") {
+    return { kind: "text", name: file.name, data: await readPdfText(file) };
+  }
+  if (extension === "docx") {
+    return { kind: "text", name: file.name, data: await readOfficeText(file, "docx") };
+  }
+  if (extension === "pptx") {
+    return { kind: "text", name: file.name, data: await readOfficeText(file, "pptx") };
+  }
+  if (extension === "xlsx") {
+    return { kind: "text", name: file.name, data: await readOfficeText(file, "xlsx") };
+  }
+  if (file.type.startsWith("text/") || TEXT_EXTENSIONS.has(extension)) {
+    if (file.size > ATTACHMENT_FILE_LIMIT) {
+      throw new Error("文本文件太大，请换一个小于 25MB 的");
+    }
+    const data = await file.text();
+    return { kind: "text", name: file.name, data: clampText(data) };
+  }
+
+  throw new Error(`暂不支持 .${extension || "未知"} 文件`);
+}
+
+function readAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function clampText(text) {
+  const characters = [...text];
+  if (characters.length <= ATTACHMENT_TEXT_LIMIT) return text;
+  return `${characters.slice(0, ATTACHMENT_TEXT_LIMIT).join("")}\n…（已截断）`;
+}
+
+/// Extracts the text of an attached PDF; page markers keep the model honest about where it read.
+async function readPdfText(file) {
+  const data = new Uint8Array(await file.arrayBuffer());
+  const pdf = await pdfjsLib.getDocument({ data }).promise;
+  const parts = [];
+  let length = 0;
+
+  for (let number = 1; number <= pdf.numPages; number += 1) {
+    const page = await pdf.getPage(number);
+    const content = await page.getTextContent();
+    const text = content.items.map((item) => item.str ?? "").join(" ").replace(/\s+/g, " ").trim();
+    if (!text) continue;
+    const block = `[附件第 ${number} 页]\n${text}`;
+    parts.push(block);
+    length += block.length;
+    if (length >= ATTACHMENT_TEXT_LIMIT) break;
+  }
+
+  if (parts.length === 0) throw new Error("这个 PDF 没有可提取的文字（可能是扫描件）");
+  return clampText(parts.join("\n\n"));
+}
+
+/// Minimal ZIP reader: central directory, stored or raw-deflated entries.
+async function readZip(file) {
+  const buffer = await file.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+  const view = new DataView(buffer);
+  let eocd = -1;
+  const earliest = Math.max(0, bytes.length - 65557);
+  for (let index = bytes.length - 22; index >= earliest; index -= 1) {
+    if (view.getUint32(index, true) === 0x06054b50) {
+      eocd = index;
+      break;
+    }
+  }
+  if (eocd < 0) throw new Error("这个 Office 文件的压缩结构无法识别");
+
+  const count = view.getUint16(eocd + 10, true);
+  let cursor = view.getUint32(eocd + 16, true);
+  const entries = new Map();
+
+  for (let index = 0; index < count; index += 1) {
+    if (view.getUint32(cursor, true) !== 0x02014b50) break;
+    const method = view.getUint16(cursor + 10, true);
+    const compressedSize = view.getUint32(cursor + 20, true);
+    const nameLength = view.getUint16(cursor + 28, true);
+    const extraLength = view.getUint16(cursor + 30, true);
+    const commentLength = view.getUint16(cursor + 32, true);
+    const localOffset = view.getUint32(cursor + 42, true);
+    const name = new TextDecoder().decode(bytes.subarray(cursor + 46, cursor + 46 + nameLength));
+    entries.set(name, { method, compressedSize, localOffset });
+    cursor += 46 + nameLength + extraLength + commentLength;
+  }
+
+  const names = [...entries.keys()];
+  const read = async (name) => {
+    const entry = entries.get(name);
+    if (!entry) return null;
+    const local = entry.localOffset;
+    if (view.getUint32(local, true) !== 0x04034b50) return null;
+    const nameLength = view.getUint16(local + 26, true);
+    const extraLength = view.getUint16(local + 28, true);
+    const start = local + 30 + nameLength + extraLength;
+    const data = bytes.subarray(start, start + entry.compressedSize);
+
+    if (entry.method === 0) return new TextDecoder().decode(data);
+    if (entry.method === 8) {
+      if (typeof DecompressionStream !== "function") {
+        throw new Error("当前 webview 不支持解压 Office 文件");
+      }
+      const stream = new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+      return new TextDecoder().decode(await new Response(stream).arrayBuffer());
+    }
+    throw new Error("这个 Office 文件使用了不支持的压缩方式");
+  };
+
+  return { names, read };
+}
+
+function parseXml(text) {
+  const document = new DOMParser().parseFromString(text, "application/xml");
+  if (document.querySelector("parsererror")) throw new Error("这个 Office 文件的内容无法解析");
+  return document;
+}
+
+function textsOf(root, tag) {
+  return [...root.getElementsByTagNameNS("*", tag)].map((node) => node.textContent ?? "");
+}
+
+async function readOfficeText(file, kind) {
+  const zip = await readZip(file);
+  const extension = extensionOf(file.name);
+
+  if (kind === "docx") {
+    const xml = await zip.read("word/document.xml");
+    if (!xml) throw new Error(`${extension} 缺少正文，无法读取`);
+    const document = parseXml(xml);
+    const paragraphs = [...document.getElementsByTagNameNS("*", "p")]
+      .map((paragraph) => textsOf(paragraph, "t").join(""))
+      .filter((line) => line.trim());
+    return clampText(paragraphs.join("\n"));
+  }
+
+  if (kind === "pptx") {
+    const slides = zip.names
+      .filter((name) => /^ppt\/slides\/slide\d+\.xml$/.test(name))
+      .sort((left, right) => slideNumber(left) - slideNumber(right));
+    const parts = [];
+    for (const [index, name] of slides.entries()) {
+      const xml = await zip.read(name);
+      if (!xml) continue;
+      const document = parseXml(xml);
+      const lines = [...document.getElementsByTagNameNS("*", "p")]
+        .map((paragraph) => textsOf(paragraph, "t").join(""))
+        .filter((line) => line.trim());
+      if (lines.length) parts.push(`[附件第 ${index + 1} 张幻灯片]\n${lines.join("\n")}`);
+    }
+    if (parts.length === 0) throw new Error("这个演示文稿没有可提取的文字");
+    return clampText(parts.join("\n\n"));
+  }
+
+  // xlsx
+  const shared = [];
+  const sharedXml = await zip.read("xl/sharedStrings.xml");
+  if (sharedXml) {
+    const document = parseXml(sharedXml);
+    for (const item of document.getElementsByTagNameNS("*", "si")) {
+      shared.push(textsOf(item, "t").join(""));
+    }
+  }
+
+  const sheets = zip.names
+    .filter((name) => /^xl\/worksheets\/sheet\d+\.xml$/.test(name))
+    .sort();
+  const parts = [];
+  for (const [index, name] of sheets.entries()) {
+    const xml = await zip.read(name);
+    if (!xml) continue;
+    const document = parseXml(xml);
+    const rows = [];
+    for (const row of document.getElementsByTagNameNS("*", "row")) {
+      const cells = [];
+      for (const cell of row.getElementsByTagNameNS("*", "c")) {
+        const reference = cell.getAttribute("r") ?? "";
+        const type = cell.getAttribute("t") ?? "";
+        const value = textsOf(cell, "v")[0] ?? textsOf(cell, "t")[0] ?? "";
+        const text = type === "s" ? shared[Number(value)] ?? "" : value;
+        if (text.trim()) cells.push(`${reference}: ${text.trim()}`);
+      }
+      if (cells.length) rows.push(cells.join(" | "));
+    }
+    if (rows.length) parts.push(`[附件工作表 ${index + 1}]\n${rows.join("\n")}`);
+  }
+  if (parts.length === 0) throw new Error("这个表格没有可提取的文字");
+  return clampText(parts.join("\n\n"));
+}
+
+function slideNumber(name) {
+  const match = name.match(/slide(\d+)\.xml$/);
+  return match ? Number(match[1]) : 0;
+}
+
 window.PDFScope = {
   /** @param {Uint8Array} bytes */
   async load(bytes, name = "") {
@@ -1932,39 +2163,29 @@ window.PDFScope = {
     window.open(url, "_blank", "noopener");
   },
 
-  /// Reads the attachments chosen in a file input: images as data URLs, text files as text.
+  /// Reads the attachments chosen in a file input: images, documents and text.
   async readAttachments(inputId) {
     const input = document.getElementById(inputId);
     const files = [...(input?.files ?? [])];
     const out = [];
-    const textish = /\.(txt|md|markdown|csv|json|log|ya?ml)$/i;
-    const LIMIT = 200_000;
+    if (input) input.value = "";
 
     for (const file of files) {
-      if (file.type.startsWith("image/")) {
-        const dataUrl = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result);
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
+      try {
+        const attachment = await readOneAttachment(file);
+        if (attachment) out.push(attachment);
+      } catch (error) {
+        out.push({
+          kind: "error",
+          name: file.name,
+          message: error instanceof Error ? error.message : "这个文件读不出来",
         });
-        out.push({ kind: "image", name: file.name, data: String(dataUrl) });
-      } else if (file.type.startsWith("text/") || textish.test(file.name)) {
-        if (file.size > LIMIT) {
-          out.push({ kind: "error", name: file.name, message: "文件太大，请换一个小于 200KB 的" });
-          continue;
-        }
-        const text = await file.text();
-        out.push({ kind: "text", name: file.name, data: text });
-      } else {
-        out.push({ kind: "error", name: file.name, message: "目前只支持图片和文本文件" });
       }
     }
-    if (input) input.value = "";
     return out;
   },
 
-  /// The conversation library of one document.
+  /// The conversation library of one document.  /// The conversation library of one document.
   loadConversations(key) {
     try {
       return window.localStorage.getItem(`pdfscope.conversations.${key}`);
