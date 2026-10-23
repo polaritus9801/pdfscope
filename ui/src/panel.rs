@@ -13,6 +13,18 @@ use crate::scope_ui::PageManager;
 use crate::settings::SettingsSheet;
 use crate::{Passage, Region, truncate};
 
+/// Consecutive page numbers collapsed into inclusive ranges.
+fn page_ranges(pages: &[u32]) -> Vec<(u32, u32)> {
+    let mut ranges: Vec<(u32, u32)> = Vec::new();
+    for &page in pages {
+        match ranges.last_mut() {
+            Some((_, end)) if *end + 1 == page => *end = page,
+            _ => ranges.push((page, page)),
+        }
+    }
+    ranges
+}
+
 /// A compact icon action with a tooltip and an accessible name.
 fn icon_action(
     name: &'static str,
@@ -1464,16 +1476,6 @@ pub fn AiPanel(
             regions.update(|list| list.retain(|entry| entry.id != id));
         }
     };
-    let remove_page = move |page_number: u32| {
-        let key = format!("page:{page_number}");
-        let removed = composer("removeToken", &[JsValue::from_str(&key)])
-            .and_then(|value| value.as_bool())
-            .unwrap_or(false);
-        if !removed {
-            undo_push.run(());
-            page_set.update(|set| set.retain(|entry| *entry != page_number));
-        }
-    };
     let remove_file = move |id: u64| {
         let key = format!("file:{id}");
         let removed = composer("removeToken", &[JsValue::from_str(&key)])
@@ -1885,7 +1887,7 @@ pub fn AiPanel(
                             title="关闭"
                             on:click=move |_| history_open.set(false)
                         >
-                            "✕"
+                            {icon("close", 16)}
                         </button>
                     </header>
                     <div class="history-tools">
@@ -2020,10 +2022,11 @@ pub fn AiPanel(
                                         <div class="history-row" class:active=is_active>
                                             <button
                                                 class="history-pin"
+                                                class:active=pinned
                                                 title=if pinned { "取消置顶" } else { "置顶" }
                                                 on:click=move |_| toggle_pin(id_for_pin.clone())
                                             >
-                                                {if pinned { "★" } else { "☆" }}
+                                                {icon("pin", 14)}
                                             </button>
                                             {if is_renaming {
                                                 view! {
@@ -2085,7 +2088,7 @@ pub fn AiPanel(
                                                     )));
                                                 }
                                             >
-                                                "✎"
+                                                {icon("edit", 14)}
                                             </button>
                                             <button
                                                 class="history-act danger"
@@ -2099,7 +2102,11 @@ pub fn AiPanel(
                                                     }
                                                 }
                                             >
-                                                {if deleting { "确认" } else { "✕" }}
+                                                {if deleting {
+                                                    view! { "确认" }.into_any()
+                                                } else {
+                                                    icon("close", 14).into_any()
+                                                }}
                                             </button>
                                         </div>
                                     }
@@ -2630,10 +2637,18 @@ pub fn AiPanel(
                         return ().into_any();
                     }
 
+                    let total = quotes.len()
+                        + shots.len()
+                        + pictures.len()
+                        + documents.len()
+                        + citations.len()
+                        + pages_selected.len()
+                        + cited.len();
+
                     let quote_row = (!quotes.is_empty()).then(|| {
                         view! {
                             <div class="shelf-row">
-                                <span class="shelf-label">"文字"</span>
+                                <span class="shelf-label">{icon("quote", 12)}<span>文字</span></span>
                                 <div class="shelf-track">
                                     {quotes
                                         .into_iter()
@@ -2667,7 +2682,7 @@ pub fn AiPanel(
                                                             remove_passage(id);
                                                         }
                                                     >
-                                                        "✕"
+                                                        {icon("close", 12)}
                                                     </span>
                                                 </div>
                                             }
@@ -2681,7 +2696,7 @@ pub fn AiPanel(
                     let shot_row = (!shots.is_empty()).then(|| {
                         view! {
                             <div class="shelf-row">
-                                <span class="shelf-label">"截图"</span>
+                                <span class="shelf-label">{icon("image", 12)}<span>截图</span></span>
                                 <div class="shelf-track">
                                     {shots
                                         .into_iter()
@@ -2713,7 +2728,7 @@ pub fn AiPanel(
                                                             remove_region(id);
                                                         }
                                                     >
-                                                        "✕"
+                                                        {icon("close", 12)}
                                                     </span>
                                                 </div>
                                             }
@@ -2727,7 +2742,7 @@ pub fn AiPanel(
                     let image_row = (!pictures.is_empty()).then(|| {
                         view! {
                             <div class="shelf-row">
-                                <span class="shelf-label">"图片"</span>
+                                <span class="shelf-label">{icon("image", 12)}<span>图片</span></span>
                                 <div class="shelf-track">
                                     {pictures
                                         .into_iter()
@@ -2744,7 +2759,7 @@ pub fn AiPanel(
                                                             remove_image(id);
                                                         }
                                                     >
-                                                        "✕"
+                                                        {icon("close", 12)}
                                                     </span>
                                                 </div>
                                             }
@@ -2758,7 +2773,7 @@ pub fn AiPanel(
                     let file_row = (!documents.is_empty()).then(|| {
                         view! {
                             <div class="shelf-row">
-                                <span class="shelf-label">"文件"</span>
+                                <span class="shelf-label">{icon("file", 12)}<span>文件</span></span>
                                 <div class="shelf-track">
                                     {documents
                                         .into_iter()
@@ -2779,7 +2794,7 @@ pub fn AiPanel(
                                                             remove_file(id);
                                                         }
                                                     >
-                                                        "✕"
+                                                        {icon("close", 12)}
                                                     </span>
                                                 </div>
                                             }
@@ -2790,40 +2805,51 @@ pub fn AiPanel(
                         }
                     });
 
-                    let page_row = (!pages_selected.is_empty()).then(|| {
+                    let ranges = page_ranges(&pages_selected);
+                    let page_row = (!ranges.is_empty()).then(|| {
                         view! {
                             <div class="shelf-row">
-                                <span class="shelf-label">"页面"</span>
+                                <span class="shelf-label">{icon("pages", 12)}<span>"页面"</span></span>
                                 <div class="shelf-track">
-                                    {pages_selected
+                                    {ranges
                                         .into_iter()
-                                        .map(|page_number| {
+                                        .map(|(start, end)| {
+                                            let label = if start == end {
+                                                format!("p.{start}")
+                                            } else {
+                                                format!("p.{start}–{end}")
+                                            };
+                                            let drag_key = format!("page:{start}\np.{start}");
                                             view! {
                                                 <div
                                                     class="attach-chip"
                                                     draggable="true"
-                                                    on:click=move |_| jump(page_number)
+                                                    on:click=move |_| jump(start)
                                                     on:dragstart=move |event: web_sys::DragEvent| {
                                                         if let Some(data) = event.data_transfer() {
-                                                            let _ = data.set_data(
-                                                                "text/plain",
-                                                                &format!("page:{}\np.{}", page_number, page_number),
-                                                            );
+                                                            let _ = data.set_data("text/plain", &drag_key);
                                                             data.set_effect_allowed("copy");
                                                         }
                                                     }
                                                 >
-                                                    <span class="chip-kind">"页"</span>
-                                                    <span class="chip-page">{format!("p.{page_number}")}</span>
+                                                    <span class="chip-kind">{icon("page", 12)}</span>
+                                                    <span class="chip-page">{label}</span>
                                                     <span
                                                         class="chip-x"
                                                         title="移除"
                                                         on:click=move |event: web_sys::MouseEvent| {
                                                             event.stop_propagation();
-                                                            remove_page(page_number);
+                                                            undo_push.run(());
+                                                            for page in start..=end {
+                                                                let _ = composer(
+                                                                    "removeToken",
+                                                                    &[JsValue::from_str(&format!("page:{page}"))],
+                                                                );
+                                                            }
+                                                            page_set.update(|set| set.retain(|page| *page < start || *page > end));
                                                         }
                                                     >
-                                                        "✕"
+                                                        {icon("close", 11)}
                                                     </span>
                                                 </div>
                                             }
@@ -2837,7 +2863,7 @@ pub fn AiPanel(
                     let source_row = (!citations.is_empty()).then(|| {
                         view! {
                             <div class="shelf-row">
-                                <span class="shelf-label">"来源"</span>
+                                <span class="shelf-label">{icon("link", 12)}<span>来源</span></span>
                                 <div class="shelf-track">
                                     {citations
                                         .into_iter()
@@ -2869,7 +2895,7 @@ pub fn AiPanel(
                     let answer_row = (!cited.is_empty()).then(|| {
                         view! {
                             <div class="shelf-row">
-                                <span class="shelf-label">"回答"</span>
+                                <span class="shelf-label">{icon("sparkle", 12)}<span>回答</span></span>
                                 <div class="shelf-track">
                                     {cited
                                         .into_iter()
@@ -2890,7 +2916,7 @@ pub fn AiPanel(
                                                         }
                                                     }
                                                 >
-                                                    <span class="chip-kind">"✦"</span>
+                                                    <span class="chip-kind">{icon("sparkle", 12)}</span>
                                                     <span class="chip-text">{truncate(&answer.quote, 32)}</span>
                                                     <span
                                                         class="chip-x"
@@ -2900,7 +2926,7 @@ pub fn AiPanel(
                                                             remove_answer(id);
                                                         }
                                                     >
-                                                        "✕"
+                                                        {icon("close", 12)}
                                                     </span>
                                                 </div>
                                             }
@@ -2913,6 +2939,25 @@ pub fn AiPanel(
 
                     view! {
                         <div class="context-shelf">
+                            <div class="shelf-head">
+                                <span class="shelf-title">{format!("上下文 · {total} 项")}</span>
+                                <button
+                                    class="shelf-clear"
+                                    on:click=move |_| {
+                                        undo_push.run(());
+                                        passages.set(Vec::new());
+                                        regions.set(Vec::new());
+                                        images.set(Vec::new());
+                                        files.set(Vec::new());
+                                        sources.set(Vec::new());
+                                        answers.set(Vec::new());
+                                        page_set.update(|set| set.clear());
+                                        notify.run("已清空上下文".to_owned());
+                                    }
+                                >
+                                    "清空"
+                                </button>
+                            </div>
                             {quote_row}
                             {shot_row}
                             {image_row}
@@ -3064,7 +3109,7 @@ pub fn AiPanel(
                                     mention_open.set(false);
                                 }
                             >
-                                <span class="mention-kind">"✦"</span>
+                                <span class="mention-kind">{icon("sparkle", 12)}</span>
                                 <span class="mention-label">{format!("{} · {}", answer.label, truncate(&answer.quote, 28))}</span>
                             </button>
                         }.into_any());

@@ -3452,3 +3452,57 @@ body.selection-quiet .textLayer :is(span, br)::selection {
     animation: none;
   }
 }
+
+/* P2 context shelf: header, counts, type icons and collapsed page ranges. */
+.shelf-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2px var(--space-1);
+}
+
+.shelf-title {
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+
+.shelf-clear {
+  padding: 2px 4px;  /* size */
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  background: transparent;
+  border: 0;
+  border-radius: 4px;  /* size */
+  cursor: pointer;
+}
+
+.shelf-clear:hover {
+  color: var(--ink);
+  background: var(--surface-sunken);
+}
+
+.shelf-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;  /* size */
+}
+
+.shelf-label svg {
+  opacity: 0.7;  /* size */
+}
+
+.chip-kind svg,
+.chip-x svg {
+  display: block;
+}
+
+.chip-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.history-pin.active {
+  color: var(--accent);
+}

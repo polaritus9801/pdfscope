@@ -130,6 +130,9 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- The context shelf gains a count header, clear-all, type icons and collapsed page ranges.
+
+
 - Message identity rails, question bubbles, reasoning pills, icon-only answer actions and a designed
   empty state in the AI panel.
 

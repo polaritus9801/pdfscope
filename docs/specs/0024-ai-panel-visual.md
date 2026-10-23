@@ -37,4 +37,7 @@ one icon language, designed states. Behaviour, request logic and the reader stay
   tooltips and accessible names; the empty state has a mark, copy and three suggestion cards.
   `Turn.model` records the model that produced each answer (serde-defaulted for old data), and the
   streaming answer gets a caret.
-- Next: P2 context shelf.
+- P2 landed: the shelf has a `上下文 · N 项` header and 清空, rows use type icons, page chips collapse
+  into inclusive ranges (`p.12–14`) that remove the whole range, and the remaining text glyphs (✕ ✎ ★)
+  are icons.
+- Next: P3 states.
