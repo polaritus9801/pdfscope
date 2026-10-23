@@ -10,6 +10,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Changed
 
+- The four tool buttons float over the stage without a capsule behind them, and the page slider moved
+  from the bottom strip to a hairline on the header's bottom edge with a hover-only handle.
+
+
 - The 120-second request timeout and the bridge's silence watchdog are one setting
   (接口 → 响应超时), default unlimited.
 

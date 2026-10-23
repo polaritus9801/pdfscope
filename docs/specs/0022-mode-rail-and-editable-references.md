@@ -432,6 +432,15 @@ Now there are only three scopes. The page bars, page drags and the manager all s
 that scope sends the selected pages **and** the quote/region references. With no pages and no
 references, the composer says so before asking. The hidden fourth state is gone from the interface.
 
+## Field fixes: a floating rail and the progress line
+
+- The rail sat in the layout with a capsule behind it, so a visible panel covered the left edge of the
+  page. It is now absolutely positioned over the stage and each of the four controls is its own round
+  floating button — no panel, and the stage gets its width back.
+- The page slider left the bottom strip (which is gone) and became a hairline on the bottom edge of
+  the header: page 1 at the far left, the last page at the far right, with the accent fill showing
+  progress. The handle appears only when the pointer is on the line or it has keyboard focus.
+
 ## Deviations
 
 - The reference undo stack is cleared when a question is sent: references become part of that turn's

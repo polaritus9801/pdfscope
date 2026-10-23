@@ -855,6 +855,23 @@ fn App() -> impl IntoView {
                         </svg>
                     </button>
                 </div>
+                <div class="page-seek" class:hidden=move || !ready.get()>
+                    <input
+                        class="seek-range"
+                        type="range"
+                        min="1"
+                        max=move || pages.get().max(1).to_string()
+                        prop:value=move || page.get().to_string()
+                        aria-label="阅读进度"
+                        style=move || {
+                            let total = f64::from(pages.get().max(1));
+                            let position = (f64::from(page.get()) - 1.0).clamp(0.0, total - 1.0);
+                            let percent = position / (total - 1.0).max(1.0) * 100.0;
+                            format!("--progress: {percent:.2}%")
+                        }
+                        on:input=jump
+                    />
+                </div>
             </header>
 
 
@@ -1197,20 +1214,6 @@ fn App() -> impl IntoView {
                         })
                 }}
 
-                <div class="progress-strip" class:hidden=move || !ready.get()>
-                    <input
-                        class="progress-range"
-                        type="range"
-                        min="1"
-                        max=move || pages.get().max(1).to_string()
-                        prop:value=move || page.get().to_string()
-                        aria-label="阅读进度"
-                        on:input=jump
-                    />
-                    <span class="progress-count">
-                        {move || format!("{} / {}", page.get(), pages.get().max(1))}
-                    </span>
-                </div>
             </main>
 
             <Show when=move || reading.get()>

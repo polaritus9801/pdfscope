@@ -123,6 +123,7 @@ body {
 }
 
 .bar {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -853,16 +854,21 @@ body {
   min-height: 0;
 }
 
-/* #6: floating tool rail */
+/* The rail floats over the stage: no panel behind it, no space taken from the page. */
 .tool-rail {
-  flex: none;
-  align-self: flex-start;
-  margin: var(--space-4) 0 var(--space-4) var(--space-4);
-  z-index: 8;
+  position: absolute;
+  top: var(--space-4);
+  left: var(--space-4);
+  z-index: 9;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: var(--space-2);
+  pointer-events: none;
+}
+
+.tool-rail > * {
+  pointer-events: auto;
 }
 
 .rail-pointer,
@@ -887,20 +893,17 @@ body {
 .rail-capsule {
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-full);
-  box-shadow: var(--shadow-2);
+  gap: var(--space-2);
+  overflow: visible;
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 .rail-capsule .rail-tool {
-  border: none;
-  border-radius: 0;
-}
-
-.rail-capsule .rail-tool + .rail-tool {
-  border-top: 1px solid var(--border);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  box-shadow: var(--shadow-2);
 }
 
 .rail-pointer:hover:not(:disabled),
@@ -1542,50 +1545,79 @@ body {
 }
 
 /* Reading progress: a real range input, so dragging and arrow keys both work. */
-.progress-strip {
-  position: sticky;
+/* Reading progress: a hairline on the header's bottom edge; the handle only appears nearby. */
+.page-seek {
+  position: absolute;
+  left: 0;
+  right: 0;
   bottom: 0;
-  z-index: 5;
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-5);
-  background: color-mix(in srgb, var(--surface) 86%, transparent);
-  border-top: 1px solid var(--border);
-  backdrop-filter: blur(6px);  /* size */
+  height: 14px;  /* size */
+  z-index: 6;
 }
 
-.progress-range {
-  flex: 1;
-  height: 4px;  /* size */
+.seek-range {
+  width: 100%;
+  height: 100%;
+  margin: 0;
   appearance: none;
-  background: var(--surface-sunken);
-  border-radius: var(--radius-full);
+  background: transparent;
   cursor: pointer;
 }
 
-.progress-range::-webkit-slider-thumb {
+.seek-range::-webkit-slider-runnable-track {
+  height: 2px;  /* size */
+  background: linear-gradient(
+    to right,
+    var(--accent) var(--progress, 0%),
+    var(--border) var(--progress, 0%)
+  );
+}
+
+.seek-range::-moz-range-track {
+  height: 2px;  /* size */
+  background: linear-gradient(
+    to right,
+    var(--accent) var(--progress, 0%),
+    var(--border) var(--progress, 0%)
+  );
+}
+
+.seek-range::-webkit-slider-thumb {
   appearance: none;
-  width: 12px;  /* size */
-  height: 12px;  /* size */
+  width: 10px;  /* size */
+  height: 10px;  /* size */
+  margin-top: -4px;  /* size */
   background: var(--accent);
+  border: 2px solid var(--surface);  /* size */
   border-radius: 50%;
-  border: none;
+  box-shadow: var(--shadow-1);
+  opacity: 0;
+  transition: opacity var(--duration) var(--ease);
 }
 
-.progress-range::-moz-range-thumb {
-  width: 12px;  /* size */
-  height: 12px;  /* size */
-  background: var(--accent);
-  border: none;
-  border-radius: 50%;
+.seek-range:hover::-webkit-slider-thumb,
+.seek-range:focus-visible::-webkit-slider-thumb,
+.page-seek:hover .seek-range::-webkit-slider-thumb {
+  opacity: 1;
 }
 
-.progress-count {
-  flex: none;
-  font-size: var(--text-xs);
-  color: var(--ink-muted);
-  font-variant-numeric: tabular-nums;
+.seek-range::-moz-range-thumb {
+  width: 10px;  /* size */
+  height: 10px;  /* size */
+  background: var(--accent);
+  border: 2px solid var(--surface);  /* size */
+  border-radius: 50%;
+  box-shadow: var(--shadow-1);
+  opacity: 0;
+}
+
+.seek-range:hover::-moz-range-thumb,
+.seek-range:focus-visible::-moz-range-thumb {
+  opacity: 1;
+}
+
+.seek-range:focus-visible {
+  outline: none;
 }
 
 /* Outline: an overlay beside the tool rail, so the column never narrows. */
