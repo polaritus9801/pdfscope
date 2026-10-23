@@ -1003,11 +1003,9 @@ body {
   position: relative;
 }
 
+.panel.collapsed .panel-head,
 .panel.collapsed .panel-body,
 .panel.collapsed .composer,
-.panel.collapsed .panel-title,
-.panel.collapsed .panel-model,
-.panel.collapsed .panel-head .button,
 .panel.collapsed .panel-resize {
   display: none;
 }
@@ -1044,18 +1042,27 @@ body {
   background: var(--accent);
 }
 
-.panel-resize:hover {
-  background: var(--accent-strong);
-}
 
 .panel-expand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
   width: 100%;
   height: 100%;
-  border: none;
-  background: transparent;
+  padding: 0;
   color: var(--ink-muted);
+  background: transparent;
+  border: none;
   font: inherit;
   cursor: pointer;
+}
+
+.panel-expand-label {
+  font-size: var(--text-xs);
+  letter-spacing: 0.14em;
+  writing-mode: vertical-rl;
 }
 
 .panel-expand:hover {
@@ -3127,14 +3134,19 @@ body.selection-quiet .textLayer :is(span, br)::selection {
   display: flex;
   flex-direction: column;
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1.5px solid var(--border-strong);  /* size */
   border-radius: 14px;  /* size */
   transition: border-color 120ms ease, box-shadow 120ms ease;
 }
 
 .composer-card:focus-within {
-  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  border-color: var(--accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.composer-card .ask:focus {
+  outline: none;
+  background: transparent;
 }
 
 .composer-card .ask {
@@ -3608,8 +3620,7 @@ body.selection-quiet .textLayer :is(span, br)::selection {
 
 .panel button:focus-visible,
 .panel input:focus-visible,
-.panel select:focus-visible,
-.panel .editor:focus-visible {
+.panel select:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;  /* size */
 }
@@ -3714,4 +3725,65 @@ body.selection-quiet .textLayer :is(span, br)::selection {
 .model-option svg {
   flex: none;
   color: var(--accent);
+}
+
+/* Borrowed modes: the cursor and the page wash match the mode being borrowed. */
+.stage[data-borrow="pages"] .page {
+  cursor: pointer;
+}
+
+.stage[data-borrow="pages"] .textLayer {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.stage[data-borrow="box"] .page {
+  cursor: crosshair;
+}
+
+.stage[data-borrow="text"] .page {
+  cursor: text;
+}
+
+/* JS marks the page under the pointer, which also holds while dragging or borrowing. */
+.stage[data-tool="pages"] .page.pointer-page::after,
+.stage[data-borrow="pages"] .page.pointer-page::after {
+  opacity: 1;
+}
+
+/* The optional model list is a row of chips, each with its provider mark. */
+.model-choice-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;  /* size */
+  margin: 0 0 var(--space-2);
+}
+
+.model-choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;  /* size */
+  padding: 3px 8px 3px 4px;  /* size */
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  background: var(--surface-sunken);
+  border-radius: 999px;  /* size */
+}
+
+.model-option-icon {
+  display: inline-flex;
+  flex: none;
+}
+
+/* Panel drag: one frame per pointer move, no stage interaction, no hover repaint. */
+body.panel-dragging {
+  cursor: col-resize;
+}
+
+body.panel-dragging .stage {
+  pointer-events: none;
+}
+
+body.panel-dragging .panel-resize::after {
+  background: var(--accent);
 }

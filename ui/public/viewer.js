@@ -100,6 +100,41 @@ function pageShellOf(node) {
   return element?.closest?.(".page[data-page]") ?? null;
 }
 
+let pointerPage = null;
+
+/// The page immediately under the pointer. Unlike CSS :hover this also survives a drag or a
+/// borrowed page mode, so exactly one page is lit at all times.
+function markPointerPage(clientX, clientY) {
+  const page = pageShellOf(document.elementFromPoint(clientX, clientY));
+  if (pointerPage === page) return;
+  pointerPage?.classList.remove("pointer-page");
+  pointerPage = page;
+  pointerPage?.classList.add("pointer-page");
+}
+
+function clearPointerPage() {
+  pointerPage?.classList.remove("pointer-page");
+  pointerPage = null;
+}
+
+/// Holding a modifier borrows a mode's cursor and page affordance without changing the tool.
+function syncBorrow(event) {
+  const stage = stageElement();
+  if (!stage) return;
+  if (event.target?.closest?.("input, textarea, select, [contenteditable='true']")) return;
+  let mode = "";
+  if (toolMode === "pointer") {
+    if (event.shiftKey) mode = "text";
+    else if (event.metaKey || event.ctrlKey) mode = "pages";
+    else if (event.altKey) mode = "box";
+  }
+  if (mode) {
+    stage.dataset.borrow = mode;
+  } else {
+    delete stage.dataset.borrow;
+  }
+}
+
 function nextFrame() {
   return new Promise((resolve) => requestAnimationFrame(resolve));
 }
@@ -1103,7 +1138,11 @@ function bindStage() {
   stage.addEventListener("gestureend", onGestureEnd, { passive: false });
   stage.addEventListener("pointermove", (event) => {
     lastPointer = { x: event.clientX, y: event.clientY };
+    if (toolMode === "pages" || stage.dataset.borrow === "pages") {
+      markPointerPage(event.clientX, event.clientY);
+    }
   });
+  stage.addEventListener("pointerleave", clearPointerPage);
 
   if (typeof ResizeObserver === "undefined" || resizeObserver) return;
   resizeObserver = new ResizeObserver(scheduleResizeCheck);
@@ -1112,6 +1151,7 @@ function bindStage() {
 
 function scheduleResizeCheck() {
   if (!document_ || !initialized) return;
+  if (document.body.classList.contains("panel-dragging")) return;
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(runResizeCheck, 120);
 }
@@ -1553,6 +1593,7 @@ function autoScrollPages() {
 
 function onPageMove(event) {
   updatePagePreview(event.clientX, event.clientY);
+  markPointerPage(event.clientX, event.clientY);
 }
 
 function onPageUp(event) {
@@ -1612,12 +1653,17 @@ document.addEventListener("keyup", reportSelection);
 
 window.addEventListener("keydown", (event) => {
   if (event.key === "Control") ctrlKeyDown = true;
+  syncBorrow(event);
 });
 window.addEventListener("keyup", (event) => {
   if (event.key === "Control") ctrlKeyDown = false;
+  syncBorrow(event);
 });
 window.addEventListener("blur", () => {
   ctrlKeyDown = false;
+  const stage = stageElement();
+  if (stage) delete stage.dataset.borrow;
+  clearPointerPage();
 });
 
 // ── Region capture ─────────────────────────────────────────────────────────────────────────────
@@ -2022,6 +2068,70 @@ function slideNumber(name) {
   return match ? Number(match[1]) : 0;
 }
 
+function panelElement() {
+  return document.querySelector(".panel");
+}
+
+let panelDrag = null;
+let panelDragFrame = 0;
+
+/// Starts a smooth divider drag: the panel width is written directly once per frame and the stage
+/// keeps the same content point in its centre, without a Leptos re-render per pointer event.
+function beginPanelResize() {
+  const panel = panelElement();
+  const stage = stageElement();
+  if (!panel || !stage || panelDrag) return;
+  panelDrag = {
+    panel,
+    stage,
+    anchorX: stage.scrollLeft + stage.clientWidth / 2,
+    anchorY: stage.scrollTop + stage.clientHeight / 2,
+    clientX: 0,
+    width: panel.getBoundingClientRect().width,
+  };
+  document.body.classList.add("panel-dragging");
+  window.addEventListener("pointermove", onPanelResizeMove, true);
+  window.addEventListener("pointerup", finishPanelResize, true);
+  window.addEventListener("blur", finishPanelResize, true);
+}
+
+function onPanelResizeMove(event) {
+  if (!panelDrag) return;
+  event.preventDefault();
+  panelDrag.clientX = event.clientX;
+  if (panelDragFrame) return;
+  panelDragFrame = requestAnimationFrame(applyPanelResize);
+}
+
+function applyPanelResize() {
+  panelDragFrame = 0;
+  if (!panelDrag) return;
+  const width = Math.min(720, Math.max(320, window.innerWidth - panelDrag.clientX));
+  panelDrag.width = width;
+  panelDrag.panel.style.width = `${width}px`;
+  const stage = panelDrag.stage;
+  stage.scrollLeft = Math.max(0, panelDrag.anchorX - stage.clientWidth / 2);
+}
+
+function finishPanelResize() {
+  if (!panelDrag) return 0;
+  if (panelDragFrame) {
+    cancelAnimationFrame(panelDragFrame);
+    panelDragFrame = 0;
+  }
+  if (panelDrag.clientX > 0) applyPanelResize();
+  const width = Math.round(panelDrag.width);
+  panelDrag.panel.style.width = `${width}px`;
+  window.removeEventListener("pointermove", onPanelResizeMove, true);
+  window.removeEventListener("pointerup", finishPanelResize, true);
+  window.removeEventListener("blur", finishPanelResize, true);
+  document.body.classList.remove("panel-dragging");
+  panelDrag = null;
+  window.__pdfscopePanelResized?.(width);
+  scheduleResizeCheck();
+  return width;
+}
+
 window.PDFScope = {
   /** @param {Uint8Array} bytes */
   async load(bytes, name = "") {
@@ -2093,7 +2203,9 @@ window.PDFScope = {
     toolMode = ["text", "box", "pages"].includes(name) ? name : "pointer";
     if (stageElement()) {
       stageElement().dataset.tool = toolMode;
+      delete stageElement().dataset.borrow;
     }
+    clearPointerPage();
     if (toolMode === "box") {
       armCapture();
     } else {
@@ -2156,6 +2268,12 @@ window.PDFScope = {
     } catch {
       // Preference lost, layout still works.
     }
+  },
+
+  beginPanelResize,
+  finishPanelResize,
+  panelWidth() {
+    return Math.round(panelElement()?.getBoundingClientRect().width ?? 0);
   },
 
   /// Opens a citation in the system browser.

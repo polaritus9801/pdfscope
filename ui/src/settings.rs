@@ -680,6 +680,21 @@ pub(crate) fn SettingsSheet(
                                         <p class="settings-hint">
                                             "填写后每个对话可以在顶栏切换模型；留空则固定使用上面的模型。"
                                         </p>
+                                        <div class="model-choice-list">
+                                            {move || {
+                                                parse_choices(&form_model_choices.get())
+                                                    .into_iter()
+                                                    .map(|name| {
+                                                        view! {
+                                                            <span class="model-choice">
+                                                                {provider_tile(provider_preset.get(), 16)}
+                                                                <span>{name}</span>
+                                                            </span>
+                                                        }
+                                                    })
+                                                    .collect_view()
+                                            }}
+                                        </div>
 
                                         <label class="settings-row">
                                             <span>"响应超时（秒）"</span>

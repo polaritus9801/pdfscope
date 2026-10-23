@@ -347,6 +347,16 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Fixed
 
+- Tool shortcuts no longer fire while typing in the composer; held modifiers show the borrowed
+  mode's cursor and page wash; the page under the pointer stays lit during a page drag.
+- The composer's inner focus rectangle is gone, its card border is stronger, the divider no longer
+  paints a purple bar, the collapsed rail is one full-height 展开 button, and dragging the panel is
+  frame-coalesced with a stable document anchor.
+- MiMo uses Xiaomi's mark; model rows and settings chips carry provider tiles.
+
+Spec: docs/specs/0025-panel-interaction-fixes.md
+
+
 - Opening a PDF could pin the webview at 100% CPU. The document-load effect read signals it also
   wrote (`next_conversation`, `known_mentions`) and re-subscribed itself; those reads are untracked,
   draft/attachment reads are untracked, and no-op removals no longer notify.

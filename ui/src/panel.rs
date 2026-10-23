@@ -353,9 +353,7 @@ pub fn AiPanel(
     let show_all = RwSignal::new(false);
     let notice = RwSignal::new(Option::<String>::None);
     let collapsed = RwSignal::new(false);
-    let dragging = RwSignal::new(false);
     let width = RwSignal::new(380_u32);
-    let stage_anchor = RwSignal::new(Option::<(f64, f64)>::None);
 
     // Restore the last width; the divider remembers it per machine.
     Effect::new(move |_| {
@@ -366,6 +364,25 @@ pub fn AiPanel(
             }
         }
     });
+    // JS can finish the drag even when pointerup lands outside the divider.
+    Effect::new(move |_| {
+        let callback = Closure::<dyn Fn(f64)>::new(move |reported: f64| {
+            if reported.is_finite() {
+                let reported = reported as u32;
+                width.set(reported);
+                let _ = crate::call("savePanelWidth", &[JsValue::from_f64(f64::from(reported))]);
+            }
+        });
+        if let Some(window) = web_sys::window() {
+            let _ = js_sys::Reflect::set(
+                &window,
+                &JsValue::from_str("__pdfscopePanelResized"),
+                callback.as_ref(),
+            );
+        }
+        callback.forget();
+    });
+
     let pending = RwSignal::new(String::new());
     let scheduled = RwSignal::new(false);
 
@@ -1733,45 +1750,22 @@ pub fn AiPanel(
                         let _ = root.class_list().add_1("resizing");
                     }
                     let _ = crate::call("clearSelection", &[]);
-                    if let Some(anchor) = crate::call("captureStageAnchor", &[]) {
-                        let x = js_sys::Reflect::get(&anchor, &JsValue::from_str("x"))
-                            .ok()
-                            .and_then(|value| value.as_f64());
-                        let y = js_sys::Reflect::get(&anchor, &JsValue::from_str("y"))
-                            .ok()
-                            .and_then(|value| value.as_f64());
-                        stage_anchor.set(x.zip(y));
-                    }
-                    dragging.set(true);
-                }
-                on:pointermove=move |event: web_sys::PointerEvent| {
-                    if !dragging.get() {
-                        return;
-                    }
-                    event.prevent_default();
-                    let viewport = web_sys::window()
-                        .and_then(|window| window.inner_width().ok())
-                        .and_then(|value| value.as_f64())
-                        .unwrap_or(1280.0);
-                    let next = (viewport - f64::from(event.client_x())).clamp(320.0, 720.0);
-                    width.set(next as u32);
-                    if let Some((x, y)) = stage_anchor.get() {
-                        let _ = crate::call(
-                            "restoreStageAnchor",
-                            &[JsValue::from_f64(x), JsValue::from_f64(y)],
-                        );
-                    }
+                    let _ = crate::call("beginPanelResize", &[]);
                 }
                 on:dblclick=move |_| {
                     width.set(380);
                     let _ = crate::call("savePanelWidth", &[JsValue::from_f64(380.0)]);
                 }
                 on:pointerup=move |_| {
-                    dragging.set(false);
-                    stage_anchor.set(None);
+                    let _ = crate::call("finishPanelResize", &[]);
+                    let final_width = crate::call("panelWidth", &[])
+                        .and_then(|value| value.as_f64())
+                        .map(|value| value as u32)
+                        .unwrap_or_else(|| width.get());
+                    width.set(final_width);
                     let _ = crate::call(
                         "savePanelWidth",
-                        &[JsValue::from_f64(f64::from(width.get()))],
+                        &[JsValue::from_f64(f64::from(final_width))],
                     );
                     if let Some(root) = web_sys::window()
                         .and_then(|window| window.document())
@@ -1834,6 +1828,9 @@ pub fn AiPanel(
                                         model_menu.set(false);
                                     }
                                 >
+                                    <span class="model-option-icon">
+                                        {provider_tile(provider_preset.get(), 18)}
+                                    </span>
                                     <span class="model-option-label">
                                         {format!("默认 · {}", model.get())}
                                     </span>
@@ -1868,6 +1865,9 @@ pub fn AiPanel(
                                                         model_menu.set(false);
                                                     }
                                                 >
+                                                    <span class="model-option-icon">
+                                                        {provider_tile(provider_preset.get(), 18)}
+                                                    </span>
                                                     <span class="model-option-label">{choice}</span>
                                                     <Show when=move || selected>
                                                         {icon("check", 14)}
@@ -2155,12 +2155,11 @@ pub fn AiPanel(
 
             <button
                 class="panel-expand"
-                title="展开"
+                title="展开 AI 面板"
                 on:click=move |_| collapsed.set(false)
             >
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M15 6l-6 6 6 6" />
-                </svg>
+                <span class="panel-expand-label">"展开"</span>
+                {icon("chevron-left", 16)}
             </button>
 
             <div class="panel-body">

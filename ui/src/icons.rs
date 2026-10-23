@@ -134,7 +134,18 @@ pub(crate) fn provider_mark(preset: &str, size: u32) -> AnyView {
             </svg>
         }
         .into_any()
-    } else if lowered.contains("mimo") || lowered.contains("moonshot") {
+    } else if lowered.contains("mimo") {
+        // Xiaomi's mark: an orange square with the white "mi".
+        view! {
+            <svg viewBox="0 0 24 24" width=size height=size aria-hidden="true">
+                <rect x="1.5" y="1.5" width="21" height="21" rx="5" fill="#FF6900"/>
+                <path d="M6.2 15.6V9h1.7l1.9 3.2L11.7 9h1.7v6.6M15.5 9v6.6M15.5 7.3h.01"
+                    fill="none" stroke="#ffffff" stroke-width="1.4"
+                    stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        }
+        .into_any()
+    } else if lowered.contains("moonshot") {
         view! {
             <svg viewBox="0 0 24 24" width=size height=size fill=colour aria-hidden="true">
                 <path d="M15.5 3.2a8.8 8.8 0 1 0 6 15.1 7.2 7.2 0 0 1-6-15.1z"/>

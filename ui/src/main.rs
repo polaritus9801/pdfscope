@@ -388,8 +388,14 @@ fn App() -> impl IntoView {
     let on_key = move |event: web_sys::KeyboardEvent| {
         let typing = event
             .target()
-            .and_then(|target| target.dyn_into::<web_sys::HtmlElement>().ok())
-            .map(|element| matches!(element.tag_name().as_str(), "INPUT" | "TEXTAREA" | "SELECT"))
+            .and_then(|target| target.dyn_into::<web_sys::Element>().ok())
+            .map(|element| {
+                element
+                    .closest("input, textarea, select, [contenteditable='true'], [role='textbox']")
+                    .ok()
+                    .flatten()
+                    .is_some()
+            })
             .unwrap_or(false);
         if typing || settings_open.get() {
             return;
