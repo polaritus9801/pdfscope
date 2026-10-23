@@ -347,9 +347,9 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Fixed
 
-- Opening a PDF could pin a webview at 100% CPU: restoring a draft with image/file pills fed the
-  document-load effect through attachment writes. Draft reads are now untracked and no-op removals no
-  longer notify.
+- Opening a PDF could pin the webview at 100% CPU. The document-load effect read signals it also
+  wrote (`next_conversation`, `known_mentions`) and re-subscribed itself; those reads are untracked,
+  draft/attachment reads are untracked, and no-op removals no longer notify.
 
 
 - A failed web search no longer consumes references or clears the draft; rename blur cannot reset a

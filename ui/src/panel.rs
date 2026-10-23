@@ -676,7 +676,7 @@ pub fn AiPanel(
                     .map(|list| list.iter().filter_map(|value| value.as_string()).collect())
                     .unwrap_or_default();
 
-                let previous = known_mentions.get();
+                let previous = known_mentions.get_untracked();
                 for key in previous.iter().filter(|key| !current.contains(key)) {
                     // Remove only what still exists. `update` notifies even when the list is
                     // unchanged, and a restore that re-emits the same keys used to turn that
@@ -792,7 +792,9 @@ pub fn AiPanel(
     });
 
     let new_conversation_id = move || {
-        let serial = next_conversation.get() + 1;
+        // The document-load Effect calls this when a library is empty. A tracked read here would
+        // subscribe that Effect to the counter it is about to write, and it would re-run forever.
+        let serial = next_conversation.get_untracked() + 1;
         next_conversation.set(serial);
         format!("{}-{serial}", js_sys::Date::now() as u64)
     };

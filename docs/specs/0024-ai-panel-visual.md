@@ -61,12 +61,20 @@ when nothing changed; that notification re-ran the load effect, which restored t
 again. A draft containing an image/file pill whose attachment no longer existed (images and files are
 session-only) therefore looped forever.
 
+A second sample after the draft fix showed the same chain, which exposed two more self-triggers inside
+the same load effect:
+
+- an empty library called `new_conversation_id`, which **read and wrote** `next_conversation`; the
+  read subscribed the effect to the counter it was about to change;
+- restoring a draft calls `Composer.setRich`, which synchronously runs the input callback; that
+  callback **read and wrote** `known_mentions`.
+
 Fixes:
 
-- every signal read used to label or restore a draft is untracked, so the load effect depends only on
-  the document key;
+- `new_conversation_id` reads the counter untracked;
+- the input callback reads `known_mentions` untracked;
+- every signal read used to label or restore a draft is untracked;
 - attachment removal checks that the entry still exists and never calls `update` for a no-op;
-- file pills are now removed like image pills (they were previously ignored);
-- a restored draft is written back immediately in its cleaned form.
+- file pills are removed like image pills and a restored draft is written back cleaned.
 
-Verified with `just check`; the running app must be rebuilt/restarted to pick it up.
+Verified with `just check` and a desktop build; the running app must be restarted.
