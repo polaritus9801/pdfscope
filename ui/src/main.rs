@@ -1374,7 +1374,33 @@ fn App() -> impl IntoView {
                 }}
             </div>
 
-            <div class="rail">
+            <div
+                class="rail"
+                on:pointerdown=move |event: web_sys::PointerEvent| {
+                    if event.button() != 0 {
+                        return;
+                    }
+                    event.prevent_default();
+                    // No pointer capture: WebKit keeps :hover on a capturing rail after the drag,
+                    // which would leave a purple band behind the pointer.
+                    if let Some(root) = web_sys::window()
+                        .and_then(|window| window.document())
+                        .and_then(|document| document.document_element())
+                    {
+                        let _ = root.class_list().add_1("resizing");
+                    }
+                    let _ = crate::call("beginPanelResize", &[]);
+                }
+                on:pointerup=move |_| {
+                    let _ = crate::call("finishPanelResize", &[]);
+                    if let Some(root) = web_sys::window()
+                        .and_then(|window| window.document())
+                        .and_then(|document| document.document_element())
+                    {
+                        let _ = root.class_list().remove_1("resizing");
+                    }
+                }
+            >
                 {move || {
                     hovered
                         .get()

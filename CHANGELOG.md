@@ -130,6 +130,14 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- The six-pixel purple band was the page-position rail; it is now a 4 px divider that darkens to
+  `#7F5CBF` on hover and stays dark for the whole drag through `.resizing`, then returns to native
+  `:hover`. It has an invisible 12 px drag hit area and is disabled while collapsed. The stage
+  scrollbar is back, and the composer is clipped with `clip-path`/`contain: paint` with no outer halo,
+  targeting the caret-repaint white tips. The token/status row is gone; empty conversations are never
+  written to history.
+
+
 - Search-provider cards with marks and a configured badge, a provider mark in the model popover, and
   an icon-bearing 厂商 menu in settings.
 

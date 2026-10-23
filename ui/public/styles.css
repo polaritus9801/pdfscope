@@ -258,6 +258,7 @@ body {
   /* We own scroll anchoring during zoom; the browser must not adjust it as the scaler resizes. */
   overflow-anchor: none;
   padding: var(--space-5);
+  padding-right: 0;
 }
 
 /* The column is laid out once at the base width. Zoom transforms the whole column; the scaler
@@ -826,15 +827,43 @@ body {
 
 .rail {
   position: relative;
-  width: 6px;  /* size */
-  background: var(--surface-sunken);
-  border-left: 1px solid var(--border);
+  z-index: 6;
+  width: 4px;  /* size */
+  background: var(--border);
+  transition: background 120ms ease;
+}
+
+/* The visible rail stays four pixels; a wider transparent overlay only enlarges the drag target. */
+.rail::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -4px;  /* size */
+  width: 12px;  /* size */
+  height: 100%;
+  background: transparent;
+  cursor: col-resize;
+}
+
+.rail:hover,
+.resizing .rail {
+  background: var(--lilac-700);
+}
+
+/* A collapsed panel has no divider affordance. */
+.workspace:has(.panel.collapsed) .rail {
+  pointer-events: none;
+  background: var(--border);
+}
+
+.workspace:has(.panel.collapsed) .rail::before {
+  cursor: default;
 }
 
 .rail-marker {
   position: absolute;
-  left: 0;
-  width: 100%;
+  left: -1px;  /* size */
+  width: 6px;  /* size */
   height: 8px;  /* size */
   margin-top: -var(--space-1);
   background: var(--accent-strong);
@@ -1016,14 +1045,7 @@ body {
 
 /* The divider is the affordance: no separate bar, just a wider invisible strip on the border. */
 .panel-resize {
-  display: block;
-  position: absolute;
-  top: 0;
-  left: -4px;  /* size */
-  width: 9px;  /* size */
-  height: 100%;
-  cursor: col-resize;
-  z-index: 6;
+  display: none;
 }
 
 .panel-resize::after {
@@ -1031,9 +1053,10 @@ body {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: 4px;  /* size */
-  width: 1px;  /* size */
+  left: 3px;  /* size */
+  width: 2px;  /* size */
   background: transparent;
+  border-radius: 1px;  /* size */
   transition: background var(--duration) var(--ease);
 }
 
@@ -2792,14 +2815,6 @@ body.selection-quiet .textLayer :is(span, br)::selection {
 }
 
 /* A rough budget hint, not a promise: the provider decides the real count. */
-.token-meter {
-  flex: none;
-  font-size: var(--text-xs);
-  color: var(--ink-muted);
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-
 /* The attach control is a labelled hidden file input, styled like the other small buttons. */
 .attach-button {
   display: flex;
@@ -3123,22 +3138,33 @@ body.selection-quiet .textLayer :is(span, br)::selection {
 
 /* P0 composer: one card, a toolbar inside it, a round send. */
 .composer {
-  padding: var(--space-2) var(--space-3) var(--space-3);
+  padding: var(--space-2) var(--space-3) var(--space-2);
   gap: var(--space-2);
 }
 
 .composer-card {
   display: flex;
   flex-direction: column;
-  background: var(--surface);
-  border: 1.5px solid var(--border-strong);  /* size */
+  overflow: hidden;
+  overflow: clip;
+  contain: paint;
+  isolation: isolate;
+  /* Deliberately transparent: the panel behind is already the surface. With no white rectangle of
+     its own, a composited contenteditable layer has no white corner to leak during caret repaint. */
+  background: transparent;
+  border: 0;
   border-radius: 14px;  /* size */
-  transition: border-color 120ms ease, box-shadow 120ms ease;
+  /* contenteditable can composite its white surface on its own layer in WebKit. During caret
+     repaint that layer may escape overflow:hidden at the rounded corners; clip-path forces the
+     rounded clip, and there is no outer lilac ring left for a white tip to show against. */
+  -webkit-clip-path: inset(0 round 14px);  /* size */  /* size */
+  clip-path: inset(0 round 14px);  /* size */
+  box-shadow: inset 0 0 0 2px var(--border-strong);
+  transition: box-shadow 120ms ease;
 }
 
 .composer-card:focus-within {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
+  box-shadow: inset 0 0 0 2px var(--accent);
 }
 
 .composer-card .ask:focus {
@@ -3215,24 +3241,6 @@ body.selection-quiet .textLayer :is(span, br)::selection {
 
 .send-button.is-stop {
   background: var(--ink);
-}
-
-.composer-status {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-2);
-  min-height: 16px;  /* size */
-  padding: 0 2px;  /* size */
-}
-
-.composer-status .status {
-  flex: 1;
-  min-width: 0;
-}
-
-.composer-status .token-meter {
-  flex: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

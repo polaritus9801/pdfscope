@@ -2148,6 +2148,7 @@ function beginPanelResize() {
     baseWidth,
   };
   document.body.classList.add("panel-dragging");
+  document.documentElement.classList.add("resizing");
   window.addEventListener("pointermove", onPanelResizeMove, true);
   window.addEventListener("pointerup", finishPanelResize, true);
   window.addEventListener("blur", finishPanelResize, true);
@@ -2201,6 +2202,7 @@ function finishPanelResize() {
   window.removeEventListener("pointerup", finishPanelResize, true);
   window.removeEventListener("blur", finishPanelResize, true);
   document.body.classList.remove("panel-dragging");
+  document.documentElement.classList.remove("resizing");
   panelDrag = null;
 
   // The continuous visual scale is replaced by the new base layout at the same visual size.

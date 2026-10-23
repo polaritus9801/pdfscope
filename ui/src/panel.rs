@@ -398,23 +398,6 @@ pub fn AiPanel(
     };
 
     let manager_open = RwSignal::new(false);
-    let token_estimate = move || {
-        let mut characters = question.get().chars().count();
-        for passage in passages.get() {
-            characters += passage.quote.chars().count();
-        }
-        for answer in answers.get() {
-            characters += answer.quote.chars().count();
-        }
-        for file in files.get() {
-            characters += file.text.chars().count().min(20_000);
-        }
-        estimate_tokens(
-            characters,
-            regions.get().len() + images.get().len(),
-            page_set.get().len(),
-        )
-    };
     let reference_count = move || {
         passages.get().len()
             + regions.get().len()
@@ -821,7 +804,14 @@ pub fn AiPanel(
         if key.trim().is_empty() {
             return;
         }
-        if let Ok(json) = serde_json::to_string(&conversations.get_untracked()) {
+        // An empty conversation is a scratch pad, not history; only conversations that produced a
+        // turn are persisted.
+        let stored: Vec<Conversation> = conversations
+            .get_untracked()
+            .into_iter()
+            .filter(|conversation| !conversation.turns.is_empty())
+            .collect();
+        if let Ok(json) = serde_json::to_string(&stored) {
             let _ = crate::call(
                 "saveConversations",
                 &[JsValue::from_str(&key), JsValue::from_str(&json)],
@@ -863,6 +853,20 @@ pub fn AiPanel(
                 pinned: false,
                 model: None,
                 turns: legacy,
+            });
+        }
+
+        // Older builds stored empty conversations; they are not history.
+        list.retain(|conversation| !conversation.turns.is_empty());
+        if list.is_empty() {
+            let id = new_conversation_id();
+            list.push(Conversation {
+                title: "新对话".to_owned(),
+                id,
+                updated: js_sys::Date::now(),
+                pinned: false,
+                model: None,
+                turns: Vec::new(),
             });
         }
 
@@ -1577,6 +1581,7 @@ pub fn AiPanel(
         else {
             return;
         };
+        conversations.update(|list| list.retain(|entry| !entry.turns.is_empty() || entry.id == id));
         active.set(id.clone());
         session_model.set(conversation.model.clone());
         turns.set(conversation.turns);
@@ -1594,6 +1599,7 @@ pub fn AiPanel(
         }
         let id = new_conversation_id();
         conversations.update(|list| {
+            list.retain(|entry| !entry.turns.is_empty());
             list.push(Conversation {
                 id: id.clone(),
                 title: "新对话".to_owned(),
@@ -1623,7 +1629,9 @@ pub fn AiPanel(
             let key = draft_key_for(&id);
             let _ = composer("clearPartial", &[JsValue::from_str(&key)]);
         }
-        conversations.update(|list| list.retain(|entry| entry.id != id));
+        conversations.update(|list| {
+            list.retain(|entry| entry.id != id && !entry.turns.is_empty());
+        });
         confirm_delete.set(None);
         if active.get() == id {
             let mut remaining = conversations.get();
@@ -2000,6 +2008,7 @@ pub fn AiPanel(
                         {move || {
                             let query = history_query.get().to_lowercase();
                             let mut list = conversations.get();
+                            list.retain(|conversation| !conversation.turns.is_empty());
                             list.sort_by(|left, right| {
                                 right
                                     .pinned
@@ -3512,12 +3521,6 @@ pub fn AiPanel(
                         }}
                     </button>
                 </div>
-                </div>
-                <div class="composer-status">
-                    <span class="status">{move || status.get()}</span>
-                    <span class="token-meter" title="粗略估算，真实用量由模型决定">
-                        {move || format!("约 {} tokens", token_estimate())}
-                    </span>
                 </div>
             </div>
 
