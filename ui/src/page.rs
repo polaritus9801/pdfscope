@@ -4,7 +4,7 @@ use leptos::prelude::*;
 use leptos::task::spawn_local;
 use wasm_bindgen::{JsCast, JsValue};
 
-use crate::model::{Passage, Region, Selection, rect_style, truncate};
+use crate::model::{Passage, Region, Selection, read_string, rect_style, truncate};
 use crate::{call, settle};
 
 #[component]
@@ -19,10 +19,11 @@ pub(crate) fn PageView(
     next_ref: RwSignal<u64>,
     undo_push: Callback<()>,
     active_ref: RwSignal<Option<(u8, u64)>>,
-    pinned_ref: RwSignal<Option<(u8, u64)>>,
+    focused_ref: RwSignal<Option<(u8, u64)>>,
     edit_epoch: RwSignal<u64>,
     page_set: RwSignal<Vec<u32>>,
     scope_mode: RwSignal<u8>,
+    tool: RwSignal<u8>,
     anchor: RwSignal<Option<(u8, u32)>>,
     hover_page: RwSignal<Option<u32>>,
 ) -> impl IntoView {
@@ -99,14 +100,17 @@ pub(crate) fn PageView(
                     if edit_epoch.get() != epoch {
                         return;
                     }
-                    if let Some(text) = value.as_string() {
-                        if !text.trim().is_empty() {
-                            passages.update(|list| {
-                                if let Some(entry) = list.iter_mut().find(|entry| entry.id == id) {
-                                    entry.quote = text;
+                    let text = read_string(&value, "text").unwrap_or_default();
+                    let rects = crate::model::parse_rects(&value);
+                    if !text.trim().is_empty() {
+                        passages.update(|list| {
+                            if let Some(entry) = list.iter_mut().find(|entry| entry.id == id) {
+                                entry.quote = text;
+                                if !rects.is_empty() {
+                                    entry.rects = rects;
                                 }
-                            });
-                        }
+                            }
+                        });
                     }
                 }
             });
@@ -239,6 +243,7 @@ pub(crate) fn PageView(
                     page: current.page,
                     quote: current.text.clone(),
                     rect: current.rect,
+                    rects: current.rects.clone(),
                 });
             });
             selection.set(None);
@@ -298,6 +303,37 @@ pub(crate) fn PageView(
     let style = format!("aspect-ratio: {width} / {height};");
     let page_attribute = number.to_string();
 
+    let tap_start = RwSignal::new(Option::<(f64, f64)>::None);
+
+    // Which reference, if any, lies under a point, when the pointer tools are not the active one.
+    let reference_at = move |client_x: f64, client_y: f64, page: &web_sys::Element| {
+        let box_rect = page.get_bounding_client_rect();
+        if box_rect.width() <= 0.0 || box_rect.height() <= 0.0 {
+            return None;
+        }
+        let x = (client_x - box_rect.left()) / box_rect.width();
+        let y = (client_y - box_rect.top()) / box_rect.height();
+
+        let inside = |rect: (f64, f64, f64, f64)| {
+            x >= rect.0 && x <= rect.0 + rect.2 && y >= rect.1 && y <= rect.1 + rect.3
+        };
+
+        if let Some(region) = regions
+            .get()
+            .iter()
+            .rev()
+            .find(|region| region.page == number && inside(region.rect))
+        {
+            return Some((1_u8, region.id));
+        }
+        passages
+            .get()
+            .iter()
+            .rev()
+            .find(|passage| passage.page == number && inside(passage.rect))
+            .map(|passage| (0_u8, passage.id))
+    };
+
     view! {
         <div
             class="page"
@@ -306,8 +342,82 @@ pub(crate) fn PageView(
             id=id
             data-page=page_attribute
             style=style
+            on:pointerdown=move |event: web_sys::PointerEvent| {
+                tap_start.set(Some((event.client_x() as f64, event.client_y() as f64)));
+            }
+            on:pointermove=move |event: web_sys::PointerEvent| {
+                if !matches!(tool.get(), 1 | 2) {
+                    return;
+                }
+                let Some(page) = event
+                    .current_target()
+                    .and_then(|target| target.dyn_into::<web_sys::Element>().ok())
+                else {
+                    return;
+                };
+                active_ref.set(reference_at(
+                    event.client_x() as f64,
+                    event.client_y() as f64,
+                    &page,
+                ));
+            }
+            on:pointerleave=move |_| {
+                if focused_ref.get().is_none() {
+                    active_ref.set(None);
+                }
+            }
+            on:click=move |event: web_sys::MouseEvent| {
+                if !matches!(tool.get(), 1 | 2) {
+                    return;
+                }
+                let Some((start_x, start_y)) = tap_start.get() else {
+                    return;
+                };
+                let moved = (event.client_x() as f64 - start_x).abs()
+                    + (event.client_y() as f64 - start_y).abs();
+                if moved > 4.0 {
+                    return;
+                }
+                if event
+                    .target()
+                    .and_then(|target| target.dyn_into::<web_sys::Element>().ok())
+                    .and_then(|element| element.closest(".page-bar-actions, .page-bar").ok().flatten())
+                    .is_some()
+                {
+                    return;
+                }
+                let Some(page) = event
+                    .current_target()
+                    .and_then(|target| target.dyn_into::<web_sys::Element>().ok())
+                else {
+                    return;
+                };
+                focused_ref.set(reference_at(
+                    event.client_x() as f64,
+                    event.client_y() as f64,
+                    &page,
+                ));
+            }
         >
             <div class="page-layer"></div>
+
+            {move || {
+                let mut marks = Vec::new();
+                for passage in passages.get() {
+                    if passage.page != number {
+                        continue;
+                    }
+                    let boxes = if passage.rects.is_empty() {
+                        vec![passage.rect]
+                    } else {
+                        passage.rects.clone()
+                    };
+                    for rect in boxes {
+                        marks.push(view! { <div class="passage-mark" style=rect_style(rect)></div> });
+                    }
+                }
+                marks.collect_view()
+            }}
 
             <div class="page-bar" aria-hidden="true"></div>
             <div
@@ -336,43 +446,61 @@ pub(crate) fn PageView(
                 let mut frames = Vec::new();
                 for passage in passages.get() {
                     if passage.page == number {
-                        frames.push((0_u8, passage.id, passage.rect));
+                        frames.push((0_u8, passage.id, passage.rect, passage.rects));
                     }
                 }
                 for region in regions.get() {
                     if region.page == number {
-                        frames.push((1_u8, region.id, region.rect));
+                        frames.push((1_u8, region.id, region.rect, Vec::new()));
                     }
                 }
                 frames
                     .into_iter()
-                    .map(|(kind, id, rect)| {
+                    .map(|(kind, id, rect, tight)| {
+                        let first = tight.first().copied().unwrap_or(rect);
+                        let last = tight.last().copied().unwrap_or(rect);
+                        let unit = |value: f64, origin: f64, span: f64| {
+                            if span <= 0.0 {
+                                0.0
+                            } else {
+                                (value - origin) / span * 100.0
+                            }
+                        };
+                        let start_position = format!(
+                            "left:{:.2}%; top:{:.2}%;",
+                            unit(first.0, rect.0, rect.2),
+                            unit(first.1 + first.3, rect.1, rect.3),
+                        );
+                        let end_position = format!(
+                            "left:{:.2}%; top:{:.2}%;",
+                            unit(last.0 + last.2, rect.0, rect.2),
+                            unit(last.1 + last.3, rect.1, rect.3),
+                        );
                         let is_active = move || {
                             active_ref.get() == Some((kind, id))
-                                || pinned_ref.get() == Some((kind, id))
+                                || focused_ref.get() == Some((kind, id))
                         };
-                        let move_handle = (kind == 1).then(|| {
-                            view! {
-                                <div class="ref-handle ref-handle-move" title="移动">
-                                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                                        <path d="M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3" />
-                                    </svg>
-                                </div>
-                            }
-                        });
+                        let is_focused = move || focused_ref.get() == Some((kind, id));
+                        // Only the pointer tool manipulates directly; elsewhere a click focuses first.
+                        let editable = move || tool.get() == 0 || is_focused();
                         view! {
                             <div
                                 class="ref-frame"
                                 data-kind=if kind == 0 { "passage" } else { "region" }
                                 class:active=is_active
+                                class:focused=is_focused
+                                class:editable=editable
                                 style=rect_style(rect)
                                 on:mouseenter=move |_| active_ref.set(Some((kind, id)))
                                 on:mouseleave=move |_| {
-                                    if pinned_ref.get() != Some((kind, id)) {
+                                    if focused_ref.get() != Some((kind, id)) {
                                         active_ref.set(None);
                                     }
                                 }
                                 on:pointerdown=move |event: web_sys::PointerEvent| {
+                                    if !editable() {
+                                        return;
+                                    }
                                     let Some(target) = event
                                         .current_target()
                                         .and_then(|target| target.dyn_into::<web_sys::HtmlElement>().ok())
@@ -386,14 +514,17 @@ pub(crate) fn PageView(
                                 on:pointerup=move |_| finish_drag(kind, id)
                                 on:pointercancel=move |_| finish_drag(kind, id)
                                 on:click=move |_| {
+                                    if !editable() {
+                                        return;
+                                    }
                                     if suppress_click.get() {
                                         suppress_click.set(false);
                                         return;
                                     }
-                                    if pinned_ref.get() == Some((kind, id)) {
-                                        pinned_ref.set(None);
+                                    if focused_ref.get() == Some((kind, id)) {
+                                        focused_ref.set(None);
                                     } else {
-                                        pinned_ref.set(Some((kind, id)));
+                                        focused_ref.set(Some((kind, id)));
                                     }
                                 }
                             >
@@ -409,7 +540,7 @@ pub(crate) fn PageView(
                                         } else {
                                             regions.update(|list| list.retain(|entry| entry.id != id));
                                         }
-                                        pinned_ref.set(None);
+                                        focused_ref.set(None);
                                         active_ref.set(None);
                                     }
                                 >
@@ -418,27 +549,25 @@ pub(crate) fn PageView(
                                 {if kind == 0 {
                                     view! {
                                         <div
-                                            class="ref-handle ref-handle-open ref-handle-left"
+                                            class="text-grip"
+                                            style=start_position
                                             title="调整起点"
                                             on:pointerdown=move |event: web_sys::PointerEvent| {
                                                 event.stop_propagation();
                                                 begin_drag(event, kind, id, rect, 1);
                                             }
                                             on:click=move |event: web_sys::MouseEvent| event.stop_propagation()
-                                        >
-                                            "["
-                                        </div>
+                                        ></div>
                                         <div
-                                            class="ref-handle ref-handle-open ref-handle-right"
+                                            class="text-grip"
+                                            style=end_position
                                             title="调整终点"
                                             on:pointerdown=move |event: web_sys::PointerEvent| {
                                                 event.stop_propagation();
                                                 begin_drag(event, kind, id, rect, 2);
                                             }
                                             on:click=move |event: web_sys::MouseEvent| event.stop_propagation()
-                                        >
-                                            "]"
-                                        </div>
+                                        ></div>
                                     }
                                         .into_any()
                                 } else {
@@ -454,7 +583,6 @@ pub(crate) fn PageView(
                                     }
                                         .into_any()
                                 }}
-                                {move_handle}
                             </div>
                         }
                     })

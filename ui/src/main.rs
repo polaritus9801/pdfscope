@@ -66,9 +66,11 @@ fn App() -> impl IntoView {
     let anchor = RwSignal::new(Option::<(u8, u32)>::None);
     let hover_page = RwSignal::new(Option::<u32>::None);
     let active_ref = RwSignal::new(Option::<(u8, u64)>::None);
-    let pinned_ref = RwSignal::new(Option::<(u8, u64)>::None);
+    let focused_ref = RwSignal::new(Option::<(u8, u64)>::None);
 
     let choose_tool = move |next: u8| {
+        focused_ref.set(None);
+        active_ref.set(None);
         tool.set(next);
         let name = match next {
             1 => "text",
@@ -176,41 +178,6 @@ fn App() -> impl IntoView {
     let passages = RwSignal::new(Vec::<Passage>::new());
     let regions = RwSignal::new(Vec::<Region>::new());
 
-    Effect::new(move |_| {
-        let list = js_sys::Array::new();
-        for passage in passages.get() {
-            let item = js_sys::Object::new();
-            let rect = js_sys::Object::new();
-            let _ = js_sys::Reflect::set(
-                &rect,
-                &JsValue::from_str("x"),
-                &JsValue::from_f64(passage.rect.0),
-            );
-            let _ = js_sys::Reflect::set(
-                &rect,
-                &JsValue::from_str("y"),
-                &JsValue::from_f64(passage.rect.1),
-            );
-            let _ = js_sys::Reflect::set(
-                &rect,
-                &JsValue::from_str("width"),
-                &JsValue::from_f64(passage.rect.2),
-            );
-            let _ = js_sys::Reflect::set(
-                &rect,
-                &JsValue::from_str("height"),
-                &JsValue::from_f64(passage.rect.3),
-            );
-            let _ = js_sys::Reflect::set(
-                &item,
-                &JsValue::from_str("page"),
-                &JsValue::from_f64(f64::from(passage.page)),
-            );
-            let _ = js_sys::Reflect::set(&item, &JsValue::from_str("rect"), &rect);
-            list.push(&item);
-        }
-        let _ = call("highlightPassages", &[list.into()]);
-    });
     let next_ref = RwSignal::new(0_u64);
     type Snapshot = (Vec<Passage>, Vec<Region>, Vec<u32>, u8);
     let history = RwSignal::new(pdfscope_core::history::History::<Snapshot>::new(50));
@@ -319,7 +286,7 @@ fn App() -> impl IntoView {
         anchor.set(None);
         hover_page.set(None);
         active_ref.set(None);
-        pinned_ref.set(None);
+        focused_ref.set(None);
 
         spawn_local(async move {
             let Ok(buffer) = JsFuture::from(file.array_buffer()).await else {
@@ -554,6 +521,7 @@ fn App() -> impl IntoView {
                         page: parsed.page,
                         quote: parsed.text.clone(),
                         rect: parsed.rect,
+                        rects: parsed.rects.clone(),
                     })
                 });
                 selection.set(None);
@@ -619,6 +587,26 @@ fn App() -> impl IntoView {
             );
         }
         callback.forget();
+    });
+
+    Effect::new(move |_| {
+        let handler =
+            Closure::<dyn Fn(web_sys::PointerEvent)>::new(move |event: web_sys::PointerEvent| {
+                let inside = event
+                    .target()
+                    .and_then(|target| target.dyn_into::<web_sys::Element>().ok())
+                    .and_then(|element| element.closest(".ref-frame").ok().flatten())
+                    .is_some();
+                if !inside {
+                    focused_ref.set(None);
+                    active_ref.set(None);
+                }
+            });
+        if let Some(window) = web_sys::window() {
+            let _ = window
+                .add_event_listener_with_callback("pointerdown", handler.as_ref().unchecked_ref());
+        }
+        handler.forget();
     });
 
     // The renderer reports a captured region the same way it reports a selection.
@@ -1144,10 +1132,11 @@ fn App() -> impl IntoView {
                                         next_ref=next_ref
                                         undo_push=undo_push
                                         active_ref=active_ref
-                                        pinned_ref=pinned_ref
+                                        focused_ref=focused_ref
                                         edit_epoch=edit_epoch
                                         page_set=page_set
                                         scope_mode=scope_mode
+                                        tool=tool
                                         anchor=anchor
                                         hover_page=hover_page
                                     />

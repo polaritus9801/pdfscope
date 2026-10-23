@@ -265,30 +265,6 @@ function markCurrentPage() {
   }
 }
 
-function applyPassageHighlights() {
-  for (const span of document.querySelectorAll(".textLayer span.ref-highlight")) {
-    span.classList.remove("ref-highlight");
-  }
-  if (!Array.isArray(passageHighlights)) return;
-
-  for (const entry of passageHighlights) {
-    const page = pageElement(entry.page);
-    if (!page || !entry.rect) continue;
-    const box = page.getBoundingClientRect();
-    const left = box.left + entry.rect.x * box.width;
-    const top = box.top + entry.rect.y * box.height;
-    const right = left + entry.rect.width * box.width;
-    const bottom = top + entry.rect.height * box.height;
-
-    for (const span of page.querySelectorAll(".textLayer span")) {
-      const r = span.getBoundingClientRect();
-      if (r.right < left || r.left > right) continue;
-      if (r.bottom < top || r.top > bottom) continue;
-      span.classList.add("ref-highlight");
-    }
-  }
-}
-
 function storageKey() {
   return documentName ? `pdfscope:pos:${documentName}` : "";
 }
@@ -319,7 +295,6 @@ function rememberPage(page) {
 
 // ── Find in document ────────────────────────────────────────────────────────────────────────────
 let findQuery = "";
-let passageHighlights = [];
 
 function clearHighlights(root) {
   for (const mark of root.querySelectorAll("mark.find-hit")) {
@@ -974,7 +949,6 @@ async function mountPage(number, state) {
   layer.replaceChildren(prepared.canvas, textLayer);
   if (pageMode !== "continuous") pagedLayout();
   if (findQuery) highlightSpans(layer, findQuery);
-  applyPassageHighlights();
   state.mounted = true;
   state.baseEpoch = epoch;
   state.canvasScale = canvasScale;
@@ -1232,6 +1206,27 @@ function onGestureEnd(event) {
 
 /// Union of the selection's client rects, normalised to the page that contains the selection. The
 /// page and its text layer are transformed together, so the normalisation cancels the zoom.
+/// A collapsed range at a point, but only when that point lands inside the page's text layer.
+function caretInside(layer, clientX, clientY) {
+  const document = layer.ownerDocument;
+  let range = null;
+
+  if (typeof document.caretRangeFromPoint === "function") {
+    range = document.caretRangeFromPoint(clientX, clientY);
+  } else if (typeof document.caretPositionFromPoint === "function") {
+    const position = document.caretPositionFromPoint(clientX, clientY);
+    if (position) {
+      range = document.createRange();
+      range.setStart(position.offsetNode, position.offset);
+      range.collapse(true);
+    }
+  }
+
+  if (!range) return null;
+  if (!layer.contains(range.startContainer)) return null;
+  return range;
+}
+
 function normalisedSelectionRect() {
   const selection = window.getSelection();
   if (!selection || selection.isCollapsed || selection.rangeCount === 0) return null;
@@ -1251,12 +1246,19 @@ function normalisedSelectionRect() {
   let top = Infinity;
   let right = -Infinity;
   let bottom = -Infinity;
+  const rects = [];
   for (const rect of range.getClientRects()) {
     if (rect.width === 0 || rect.height === 0) continue;
     left = Math.min(left, rect.left);
     top = Math.min(top, rect.top);
     right = Math.max(right, rect.right);
     bottom = Math.max(bottom, rect.bottom);
+    rects.push({
+      x: unit((rect.left - box.left) / box.width),
+      y: unit((rect.top - box.top) / box.height),
+      width: unit(rect.width / box.width),
+      height: unit(rect.height / box.height),
+    });
   }
   if (!Number.isFinite(left)) return null;
 
@@ -1273,7 +1275,7 @@ function normalisedSelectionRect() {
   const number = Number(startPage.dataset.page);
   if (!number) return null;
 
-  return { page: number, x, y, width, height, text };
+  return { page: number, x, y, width, height, text, rects };
 }
 
 let settleSelectionTimer = null;
@@ -1306,35 +1308,94 @@ function reportSelection() {
 
 let pageGesture = null;
 
+/// Paints the live preview for a page gesture: a marquee between the two points and an outline on
+/// every page it covers. A click is the same code with a zero-sized box, so there is one path.
+function updatePagePreview(clientX, clientY) {
+  if (!pageGesture) return;
+  const stage = stageElement();
+  if (!stage) return;
+
+  const stageBox = stage.getBoundingClientRect();
+  const left = Math.min(pageGesture.startX, clientX) - stageBox.left + stage.scrollLeft;
+  const top = Math.min(pageGesture.startY, clientY) - stageBox.top + stage.scrollTop;
+  const width = Math.abs(clientX - pageGesture.startX);
+  const height = Math.abs(clientY - pageGesture.startY);
+
+  let marquee = stage.querySelector(".page-marquee");
+  if (!marquee) {
+    marquee = document.createElement("div");
+    marquee.className = "page-marquee";
+    stage.appendChild(marquee);
+  }
+  marquee.style.left = `${left}px`;
+  marquee.style.top = `${top}px`;
+  marquee.style.width = `${width}px`;
+  marquee.style.height = `${height}px`;
+
+  const leftmost = Math.min(pageGesture.startX, clientX);
+  const rightmost = Math.max(pageGesture.startX, clientX);
+  const topmost = Math.min(pageGesture.startY, clientY);
+  const bottommost = Math.max(pageGesture.startY, clientY);
+
+  for (const page of document.querySelectorAll(".page[data-page]")) {
+    const box = page.getBoundingClientRect();
+    const covers =
+      box.right >= leftmost && box.left <= rightmost && box.bottom >= topmost && box.top <= bottommost;
+    page.classList.toggle("range-preview", covers);
+  }
+}
+
+function finishPageGesture(clientX, clientY, subtract) {
+  if (!pageGesture) return;
+  const { page: from, startX, startY } = pageGesture;
+  pageGesture = null;
+
+  for (const page of document.querySelectorAll(".page.range-preview")) {
+    page.classList.remove("range-preview");
+  }
+  document.querySelector(".page-marquee")?.remove();
+  document.removeEventListener("pointermove", onPageMove, true);
+  document.removeEventListener("pointerup", onPageUp, true);
+
+  const moved = Math.hypot(clientX - startX, clientY - startY) >= 4;
+  const hit = pageShellOf(document.elementFromPoint(clientX, clientY));
+  const to = hit ? Number(hit.dataset.page) : from;
+
+  if (!moved && to === from) {
+    window.__pdfscopeTogglePage?.(from);
+  } else if (to !== from) {
+    window.__pdfscopePageRange?.(from, to, subtract ? 1 : 0);
+  } else {
+    window.__pdfscopeTogglePage?.(from);
+  }
+}
+
+function onPageMove(event) {
+  updatePagePreview(event.clientX, event.clientY);
+}
+
+function onPageUp(event) {
+  finishPageGesture(event.clientX, event.clientY, event.altKey);
+}
+
 document.addEventListener(
   "pointerdown",
   (event) => {
+    if (event.button !== 0) return;
     if (toolMode !== "pages" && !event.metaKey && !event.ctrlKey) return;
     if (event.target.closest(".page-bar-actions, .page-bar, .ref-frame, .ref-handle")) return;
     const page = pageShellOf(event.target);
     if (!page) return;
-    pageGesture = { page: Number(page.dataset.page) };
-  },
-  true,
-);
 
-document.addEventListener(
-  "pointerup",
-  (event) => {
-    if (!pageGesture) return;
-    const { page: from } = pageGesture;
-    pageGesture = null;
-    const subtract = event.altKey;
-
-    const hit = document.elementFromPoint(event.clientX, event.clientY);
-    const target = pageShellOf(hit);
-    const to = target ? Number(target.dataset.page) : from;
-
-    if (to === from) {
-      window.__pdfscopeTogglePage?.(from);
-    } else {
-      window.__pdfscopePageRange?.(from, to, subtract ? 1 : 0);
-    }
+    event.preventDefault();
+    pageGesture = {
+      page: Number(page.dataset.page),
+      startX: event.clientX,
+      startY: event.clientY,
+    };
+    updatePagePreview(event.clientX, event.clientY);
+    document.addEventListener("pointermove", onPageMove, true);
+    document.addEventListener("pointerup", onPageUp, true);
   },
   true,
 );
@@ -1480,6 +1541,8 @@ document.addEventListener(
 
 document.addEventListener("pointerdown", (event) => {
   if (!captureArmed) return;
+  // A focused reference owns the pointer; the tool must not start a marquee on top of it.
+  if (event.target.closest(".ref-frame")) return;
   const page = pageShellOf(event.target);
   if (!page) return;
   const point = normaliseIn(page, event.clientX, event.clientY);
@@ -1660,36 +1723,52 @@ window.PDFScope = {
     target?.scrollIntoView({ block: "center", inline: "nearest" });
   },
 
-  /// Marks the text under each passage rectangle, so a reference shows as highlighted words.
-  highlightPassages(list) {
-    for (const span of document.querySelectorAll(".textLayer span.ref-highlight")) {
-      span.classList.remove("ref-highlight");
-    }
-    passageHighlights = Array.isArray(list) ? list : [];
-    applyPassageHighlights();
-  },
-
   /// Text covered by a normalised rectangle, read from the rendered text layer.
   async textInRect(pageNumber, rect) {
     const page = pageElement(pageNumber);
-    if (!page || !rect) return "";
+    if (!page || !rect) return { text: "", rects: [] };
 
+    const layer = page.querySelector(".textLayer");
     const box = page.getBoundingClientRect();
+    if (!layer || box.width === 0 || box.height === 0) return { text: "", rects: [] };
+
     const left = box.left + rect.x * box.width;
     const top = box.top + rect.y * box.height;
     const right = left + rect.width * box.width;
     const bottom = top + rect.height * box.height;
 
-    const parts = [];
-    for (const span of page.querySelectorAll(".textLayer span")) {
-      const spanRect = span.getBoundingClientRect();
-      if (spanRect.right < left || spanRect.left > right) continue;
-      if (spanRect.bottom < top || spanRect.top > bottom) continue;
-      const text = (span.textContent ?? "").trim();
-      if (text) parts.push(text);
+    // Character boundaries, not span boxes: a caret sits between two characters, so the range
+    // between the two corners is exactly the text the rectangle covers.
+    const start = caretInside(layer, left + 1, top + 2);
+    const end = caretInside(layer, right - 1, bottom - 2);
+
+    if (start && end) {
+      const range = document.createRange();
+      const ordered =
+        start.compareBoundaryPoints(Range.START_TO_START, end) <= 0
+          ? [start, end]
+          : [end, start];
+      range.setStart(ordered[0].startContainer, ordered[0].startOffset);
+      range.setEnd(ordered[1].startContainer, ordered[1].startOffset);
+
+      const text = range.toString().replace(/\s+/g, " ").trim();
+      if (text) {
+        const unit = (value) => Math.min(Math.max(value, 0), 1);
+        const rects = [];
+        for (const line of range.getClientRects()) {
+          if (line.width === 0 || line.height === 0) continue;
+          rects.push({
+            x: unit((line.left - box.left) / box.width),
+            y: unit((line.top - box.top) / box.height),
+            width: unit(line.width / box.width),
+            height: unit(line.height / box.height),
+          });
+        }
+        return { text, rects };
+      }
     }
 
-    return parts.join(" ").replace(/\s+/g, " ").trim();
+    return { text: "", rects: [] };
   },
 
   /// Re-crops a region after its rectangle changed.

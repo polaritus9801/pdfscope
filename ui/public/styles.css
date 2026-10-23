@@ -1938,6 +1938,13 @@ mark.find-hit {
 
 /* A reference frame sits exactly on the reference; a transparent ::after extends the hit area by
    12 px, which is the bridge that makes the outside controls reachable from the selection. */
+.stage[data-tool="text"] .ref-frame:not(.focused),
+.stage[data-tool="box"] .ref-frame:not(.focused),
+.stage[data-tool="pages"] .ref-frame {
+  /* Inert background: the reader must be able to select text or draw a box across it. */
+  pointer-events: none;
+}
+
 .ref-frame {
   position: absolute;
   z-index: 4;
@@ -1952,11 +1959,31 @@ mark.find-hit {
   inset: -12px;  /* size */
 }
 
-.ref-frame:hover {
+.ref-frame.active {
   outline-color: color-mix(in srgb, var(--accent) 40%, transparent);
 }
 
-/* A passage is shown by the highlighted words themselves; only a region needs a filled box. */
+.ref-frame.focused {
+  outline: 1px solid var(--accent);
+}
+
+/* An inert reference only warms up on hover: a hint that clicking it edits, nothing more. */
+.ref-frame.active:not(.editable) {
+  background: rgb(203 184 236 / 12%);
+  outline: 1px dashed color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+/* A passage is drawn from the selection's own line boxes, so selecting one word highlights one word
+   and not the whole line. */
+.passage-mark {
+  position: absolute;
+  z-index: 2;
+  background: rgb(203 184 236 / 45%);
+  border-radius: 2px;  /* size */
+  pointer-events: none;
+}
+
+/* A passage is shown by those marks; only a region needs a filled box. */
 .ref-frame[data-kind="passage"] {
   outline: none;
   background: transparent;
@@ -1970,10 +1997,7 @@ mark.find-hit {
   background: rgb(203 184 236 / 22%);
 }
 
-.textLayer span.ref-highlight {
-  background: rgb(203 184 236 / 45%);
-  border-radius: 2px;  /* size */
-}
+
 
 .ref-frame.active {
   outline: 1px solid var(--accent);
@@ -1998,13 +2022,16 @@ mark.find-hit {
   z-index: 5;
 }
 
-.ref-frame.active .ref-handle {
+.ref-frame.editable.active .ref-handle,
+.ref-frame.focused .ref-handle {
   display: flex;
 }
 
 .ref-handle-x {
   top: 0;
-  right: 0;
+  left: 100%;
+  right: auto;
+  margin-left: 3px;  /* size */
   color: var(--ink);
 }
 
@@ -2013,42 +2040,31 @@ mark.find-hit {
   border-color: var(--danger);
 }
 
-.ref-handle-move {
-  top: 22px;  /* size */
-  right: 0;
-  cursor: move;
-}
 
-.ref-handle-move:hover {
-  color: var(--accent);
-  border-color: var(--accent);
-}
+
+
 
 .ref-frame.active {
   cursor: grab;
 }
 
-/* Resize affordances: brackets for a quote, dots for a region. */
-.ref-handle-open {
-  width: 16px;  /* size */
-  height: 22px;  /* size */
-  border-radius: var(--radius-sm);
-  font-size: var(--text-sm);
-  line-height: 1;
+/* Resize affordances: two tabs at the ends of a passage, dots around a region. */
+.text-grip {
+  position: absolute;
+  display: none;
+  width: 8px;  /* size */
+  height: 20px;  /* size */
+  background: var(--accent);
+  border-radius: var(--radius-full);
+  transform: translate(-50%, -50%);
+  box-shadow: var(--shadow-1);
+  cursor: ew-resize;
+  z-index: 6;
 }
 
-.ref-handle-left {
-  top: 50%;
-  left: -8px;  /* size */
-  transform: translateY(-50%);
-  cursor: ew-resize;
-}
-
-.ref-handle-right {
-  top: 50%;
-  right: -8px;  /* size */
-  transform: translateY(-50%);
-  cursor: ew-resize;
+.ref-frame.editable.active .text-grip,
+.ref-frame.focused .text-grip {
+  display: block;
 }
 
 .ref-dot {
@@ -2062,7 +2078,8 @@ mark.find-hit {
   z-index: 5;
 }
 
-.ref-frame.active .ref-dot {
+.ref-frame.editable.active .ref-dot,
+.ref-frame.focused .ref-dot {
   display: block;
 }
 
@@ -2236,4 +2253,44 @@ mark.find-hit {
 /* An icon-only header button: the same height, less horizontal padding. */
 .button.icon-only {
   padding-inline: var(--space-2);
+}
+
+/* Page scope mode: the page is the target, not its text. */
+.stage[data-tool="pages"] .page,
+.stage[data-tool="pages"] .textLayer {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.stage[data-tool="pages"] .page {
+  cursor: pointer;
+}
+
+/* The page under the pointer, lighter than a committed selection. */
+.stage[data-tool="pages"] .page:hover:not(.in-scope):not(.range-preview) {
+  outline: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+/* Pages the live gesture covers: the same outline the committed set gets, before the commit. */
+.page.range-preview {
+  outline: 2px solid var(--accent);  /* size */
+}
+
+/* A thin solid box that follows the gesture; it disappears on release and commits nothing itself. */
+.page-marquee {
+  position: absolute;
+  z-index: 5;
+  border: 1px solid var(--accent);  /* size */
+  border-radius: 2px;  /* size */
+  background: rgb(203 184 236 / 16%);
+  pointer-events: none;
+}
+
+/* Inert references warm up a little on hover, and nothing more. */
+.ref-frame[data-kind="passage"].active:not(.editable) {
+  background: rgb(203 184 236 / 10%);
+}
+
+.ref-frame[data-kind="region"].active:not(.editable) {
+  background: rgb(203 184 236 / 30%);
 }

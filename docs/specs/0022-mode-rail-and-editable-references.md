@@ -447,6 +447,30 @@ references, the composer says so before asking. The hidden fourth state is gone 
   the header: page 1 at the far left, the last page at the far right, with the accent fill showing
   progress. The handle appears only when the pointer is on the line or it has keyboard focus.
 
+## Field fixes: precision, focus and page gestures
+
+**Passages are the selection, not its bounding box.** The renderer now reports the selection Range's
+tight line boxes (`getClientRects`), stored on the passage and painted one box per line. Selecting one
+word highlights one word. Re-reading after a handle drag goes through `caretRangeFromPoint` at the two
+corners, so the quote and its boxes follow character boundaries instead of whole text-layer spans. The
+old `[` / `]` are replaced by mobile-style purple tabs at the bottom-left of the first line and the
+bottom-right of the last.
+
+The ✕ sits outside the frame (left: 100%, top-aligned), and the region's separate move button is gone;
+the frame itself moves a region.
+
+**Focus before editing.** In text, box and page modes a reference is inert background: it does not take
+the pointer, so text selection and box capture pass straight through it. A click (under 4 px of
+movement) focuses the reference under the pointer; only then do the frame, its handles and its ✕
+become interactive. Hover shows a faint tint and a dashed outline, nothing else. Switching tools,
+pressing outside any frame, or right-clicking clears the focus immediately. The pointer tool keeps
+direct manipulation: hover reveals the controls and drags edit without a preliminary click.
+
+**Page gestures.** Page mode disables text selection, tints the page under the pointer, and runs click
+and drag through one path: a thin solid purple box follows the pointer from press to release, and every
+page it covers gets the same outline while the gesture is live. The purple page bar still appears only
+after release, when the set is committed.
+
 ## Deviations
 
 - The reference undo stack is cleared when a question is sent: references become part of that turn's

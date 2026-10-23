@@ -243,6 +243,11 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Fixed
 
+- Passages highlight the exact lines selected instead of whole text-layer spans; endpoints are
+  character-accurate, the ✕ sits outside the frame, references are focus-to-edit outside the pointer
+  tool, and page drags show a live preview box with per-page outlines.
+
+
 - 仅引用 now sends the pages marked with the purple bars as well as the quote/region references; the
   hidden fourth scope state is gone.
 
