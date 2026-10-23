@@ -1,6 +1,8 @@
 # The AI panel, visual refresh
 
-**Status:** proposal. No product code is changed by this document.
+**Status:** accepted. Decisions: provider marks are official-style logos with a coloured-monogram
+fallback; questions are right-aligned bubbles with flat answers carrying an identity rail; the model
+picker is a custom popover.
 **Scope:** the AI panel only; the reader and the palette are untouched.
 
 ## 1. Why it feels behind
@@ -131,9 +133,16 @@ Provider marks are 24 grid filled shapes and are the only coloured icons. Implem
 Each phase is its own commit, `just check` green, no behaviour change outside the panel. A manual
 checklist covers light/dark at 320/420/720 px widths.
 
-## 11. Decisions to take
+## 11. Decisions
 
-1. **Provider marks:** official-style logos, or monogram tiles in brand colours?
-2. **Message layout:** right-aligned question bubble + flat answer (recommended), or both flat with
-   role labels?
-3. **Header menu:** custom popover for model/provider (recommended), or keep the native `<select>`?
+1. **Provider marks:** official-style logos for DeepSeek, OpenAI, Anthropic, MiMo and Google, with a
+   coloured monogram tile for anything unknown.
+2. **Message layout:** right-aligned question bubble, full-width answers with an identity rail.
+3. **Header menu:** a custom popover grouping providers and models, with a check and 管理模型; the
+   native `<select>` is removed.
+
+## 12. First slice
+
+P0: an `Icon` component with one stroke language, provider marks, the 52 px header (tile, title,
+model chip, history/new/collapse), and the contained composer card with its toolbar and circular
+send/stop. Behaviour is unchanged; only markup and CSS move.
