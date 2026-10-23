@@ -8,6 +8,7 @@ use wasm_bindgen_futures::JsFuture;
 
 use pdfscope_core::{Segment, estimate_tokens, link_source_markers, segments, transcript_markdown};
 
+use crate::icons::{icon, provider_tile};
 use crate::scope_ui::PageManager;
 use crate::settings::SettingsSheet;
 use crate::{Passage, Region, truncate};
@@ -275,6 +276,7 @@ pub fn AiPanel(
     page_limit: RwSignal<u32>,
     context_limit: RwSignal<u32>,
     model_choices: RwSignal<Vec<String>>,
+    provider_preset: RwSignal<String>,
     answers: RwSignal<Vec<crate::AnswerRef>>,
     next_answer: RwSignal<u64>,
     document_key: RwSignal<String>,
@@ -314,6 +316,7 @@ pub fn AiPanel(
     let history_cursor = RwSignal::new(Option::<usize>::None);
     let last_asked = RwSignal::new(String::new());
     let session_model = RwSignal::new(Option::<String>::None);
+    let model_menu = RwSignal::new(false);
     let request_started = RwSignal::new(0_u64);
     let next_file = RwSignal::new(0_u64);
     let editor_ref = NodeRef::<leptos::html::Div>::new();
@@ -1728,85 +1731,131 @@ pub fn AiPanel(
             ></div>
             <div class="panel-head">
                 <button
-                    class="panel-toggle"
+                    class="icon-button panel-toggle"
                     title="收起"
                     on:click=move |_| collapsed.set(true)
                 >
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M9 6l6 6-6 6" />
-                    </svg>
+                    {icon("chevron-right", 18)}
                 </button>
-                <span class="panel-title">"AI"</span>
-                {move || {
-                    let choices = model_choices.get();
-                    if choices.is_empty() {
-                        return view! { <span class="panel-model">{model.get()}</span> }.into_any();
-                    }
-                    let current = session_model.get().unwrap_or_default();
-                    let options = choices
-                        .into_iter()
-                        .map(|choice| {
-                            let selected = choice == current;
-                            let value = choice.clone();
-                            let label = choice.clone();
-                            view! {
-                                <option value=value selected=selected>
-                                    {label}
-                                </option>
-                            }
-                        })
-                        .collect_view();
-                    view! {
-                        <select
-                            class="panel-model-select"
-                            title="本对话使用的模型"
-                            on:change=move |event| {
-                                let value = event_target_value(&event);
-                                let next = if value.is_empty() { None } else { Some(value) };
-                                session_model.set(next.clone());
-                                let id = active.get();
-                                conversations.update(|list| {
-                                    if let Some(conversation) =
-                                        list.iter_mut().find(|entry| entry.id == id)
-                                    {
-                                        conversation.model = next;
-                                        conversation.updated = js_sys::Date::now();
-                                    }
-                                });
-                                save_conversations();
-                            }
+                <span class="provider-slot">
+                    {move || provider_tile(provider_preset.get(), 28)}
+                </span>
+                <div class="panel-identity">
+                    <span class="panel-title">"AI 助手"</span>
+                    <div class="model-anchor">
+                        <button
+                            class="model-chip"
+                            title="选择模型"
+                            on:click=move |_| model_menu.update(|open| *open = !*open)
                         >
-                            <option value="" selected=current.is_empty()>
-                                {format!("默认 · {}", model.get())}
-                            </option>
-                            {options}
-                        </select>
-                    }
-                        .into_any()
-                }}
+                            <span class="model-chip-label">
+                                {move || {
+                                    session_model.get().unwrap_or_else(|| model.get())
+                                }}
+                            </span>
+                            {icon("chevron-down", 12)}
+                        </button>
+                        <Show when=move || model_menu.get()>
+                            <div
+                                class="model-backdrop"
+                                on:pointerdown=move |_| model_menu.set(false)
+                            ></div>
+                            <div class="model-menu">
+                                <div class="model-menu-head">"选择模型"</div>
+                                <button
+                                    class="model-option"
+                                    on:click=move |_| {
+                                        session_model.set(None);
+                                        let id = active.get();
+                                        conversations.update(|list| {
+                                            if let Some(conversation) =
+                                                list.iter_mut().find(|entry| entry.id == id)
+                                            {
+                                                conversation.model = None;
+                                                conversation.updated = js_sys::Date::now();
+                                            }
+                                        });
+                                        save_conversations();
+                                        model_menu.set(false);
+                                    }
+                                >
+                                    <span class="model-option-label">
+                                        {format!("默认 · {}", model.get())}
+                                    </span>
+                                    <Show when=move || session_model.get().is_none()>
+                                        {icon("check", 14)}
+                                    </Show>
+                                </button>
+                                {move || {
+                                    let current = session_model.get();
+                                    model_choices
+                                        .get()
+                                        .into_iter()
+                                        .map(|choice| {
+                                            let selected = current.as_deref() == Some(choice.as_str());
+                                            let next = choice.clone();
+                                            view! {
+                                                <button
+                                                    class="model-option"
+                                                    on:click=move |_| {
+                                                        let next = Some(next.clone());
+                                                        session_model.set(next.clone());
+                                                        let id = active.get();
+                                                        conversations.update(|list| {
+                                                            if let Some(conversation) =
+                                                                list.iter_mut().find(|entry| entry.id == id)
+                                                            {
+                                                                conversation.model = next;
+                                                                conversation.updated = js_sys::Date::now();
+                                                            }
+                                                        });
+                                                        save_conversations();
+                                                        model_menu.set(false);
+                                                    }
+                                                >
+                                                    <span class="model-option-label">{choice}</span>
+                                                    <Show when=move || selected>
+                                                        {icon("check", 14)}
+                                                    </Show>
+                                                </button>
+                                            }
+                                        })
+                                        .collect_view()
+                                }}
+                                <div class="model-menu-sep"></div>
+                                <button
+                                    class="model-menu-foot"
+                                    on:click=move |_| {
+                                        model_menu.set(false);
+                                        open.set(true);
+                                    }
+                                >
+                                    {icon("settings", 14)}
+                                    "管理模型"
+                                </button>
+                            </div>
+                        </Show>
+                    </div>
+                </div>
                 <Show when=move || temporary.get().is_some()>
                     <span class="temp-badge" title="这个对话不会被保存">"临时"</span>
                 </Show>
-                <button
-                    class="panel-new"
-                    title="历史对话"
-                    on:click=move |_| history_open.set(true)
-                >
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M3 12a9 9 0 1 0 3-6.7" />
-                        <path d="M3 4v5h5" />
-                        <path d="M12 8v4l3 2" />
-                    </svg>
-                </button>
-                <button
-                    class="panel-new"
-                    title="新对话"
-                    on:click=move |_| create_conversation()
-                >
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
-                        <path d="M12 5v14M5 12h14" />
-                    </svg>
-                </button>
+                <div class="panel-head-actions">
+                    <button
+                        class="icon-button"
+                        title="历史对话"
+                        on:click=move |_| history_open.set(true)
+                    >
+                        {icon("history", 17)}
+                    </button>
+                    <button
+                        class="icon-button"
+                        title="新对话"
+                        on:click=move |_| create_conversation()
+                    >
+                        {icon("plus", 17)}
+                    </button>
+                </div>
             </div>
 
             <Show when=move || history_open.get()>
@@ -2798,68 +2847,6 @@ pub fn AiPanel(
                     }
                         .into_any()
                 }}
-                <div class="scope-row">
-                    <div class="scope-icons" role="group" aria-label="提问范围">
-                        <button
-                            class="scope-icon"
-                            class:active=move || scope_mode.get() == 0
-                            title=move || format!("整份文档 · {} 页", pages.get())
-                            aria-label="整份文档"
-                            aria-pressed=move || (scope_mode.get() == 0).to_string()
-                            on:click=move |_| {
-                                undo_push.run(());
-                                scope_mode.set(0);
-                            }
-                        >
-                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                                <rect x="7" y="3.5" width="10" height="14" rx="1.6" />
-                                <path d="M10 20.5h7a2 2 0 0 0 2-2V8" />
-                            </svg>
-                        </button>
-                        <button
-                            class="scope-icon"
-                            class:active=move || scope_mode.get() == 1
-                            title=move || format!("仅当前页 · p.{}", page.get())
-                            aria-label="仅当前页"
-                            aria-pressed=move || (scope_mode.get() == 1).to_string()
-                            on:click=move |_| {
-                                undo_push.run(());
-                                scope_mode.set(1);
-                            }
-                        >
-                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M7 3.5h6l4 4v13H7z" />
-                                <path d="M13 3.5v4h4" />
-                            </svg>
-                        </button>
-                        <button
-                            class="scope-icon"
-                            class:active=move || scope_mode.get() == 2
-                            title=move || format!("仅引用 · {} 项", reference_count())
-                            aria-label="仅引用"
-                            aria-pressed=move || (scope_mode.get() == 2).to_string()
-                            on:click=move |_| {
-                                undo_push.run(());
-                                scope_mode.set(2);
-                            }
-                        >
-                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M4 20.5h16" />
-                                <path d="M7.5 16.5l8-9 3 3-8 9h-3z" />
-                                <path d="M12.5 6.5l3 3" />
-                            </svg>
-                            <span class="scope-badge">
-                                {move || {
-                                    let count = reference_count();
-                                    if count == 0 { String::new() } else { count.to_string() }
-                                }}
-                            </span>
-                        </button>
-                    </div>
-                    <button class="button scope-manage" on:click=move |_| manager_open.set(true)>
-                        "管理页面引用"
-                    </button>
-                </div>
                 {move || {
                     notice
                         .get()
@@ -3042,6 +3029,7 @@ pub fn AiPanel(
                     }
                         .into_any()
                 }}
+                <div class="composer-card">
                 <div
                     node_ref=editor_ref
                     id="ask-editor"
@@ -3170,7 +3158,17 @@ pub fn AiPanel(
                         }
                     }
                 ></div>
-                <div class="composer-row">
+                <div class="composer-toolbar">
+                    <button
+                        class="icon-button"
+                        title="插入引用（输入 @）"
+                        on:click=move |_| {
+                            mention_open.set(true);
+                            let _ = composer("focus", &[]);
+                        }
+                    >
+                        {icon("at", 17)}
+                    </button>
                     <button
                         class="icon-button attach-button"
                         class:active=move || web.get()
@@ -3244,12 +3242,68 @@ pub fn AiPanel(
                             }
                         />
                     </label>
-                    <span class="status">{move || status.get()}</span>
-                    <span class="token-meter" title="粗略估算，真实用量由模型决定">
-                        {move || format!("约 {} tokens", token_estimate())}
-                    </span>
+                    <div class="scope-icons toolbar-scope" role="group" aria-label="提问范围">
+                        <button
+                            class="scope-icon"
+                            class:active=move || scope_mode.get() == 0
+                            title=move || format!("整份文档 · {} 页", pages.get())
+                            aria-label="整份文档"
+                            aria-pressed=move || (scope_mode.get() == 0).to_string()
+                            on:click=move |_| {
+                                undo_push.run(());
+                                scope_mode.set(0);
+                            }
+                        >
+                            {icon("pages", 17)}
+                        </button>
+                        <button
+                            class="scope-icon"
+                            class:active=move || scope_mode.get() == 1
+                            title=move || format!("仅当前页 · p.{}", page.get())
+                            aria-label="仅当前页"
+                            aria-pressed=move || (scope_mode.get() == 1).to_string()
+                            on:click=move |_| {
+                                undo_push.run(());
+                                scope_mode.set(1);
+                            }
+                        >
+                            {icon("page", 17)}
+                        </button>
+                        <button
+                            class="scope-icon"
+                            class:active=move || scope_mode.get() == 2
+                            title=move || format!("仅引用 · {} 项", reference_count())
+                            aria-label="仅引用"
+                            aria-pressed=move || (scope_mode.get() == 2).to_string()
+                            on:click=move |_| {
+                                undo_push.run(());
+                                scope_mode.set(2);
+                            }
+                        >
+                            {icon("highlight", 17)}
+                            <span class="scope-badge">
+                                {move || {
+                                    let count = reference_count();
+                                    if count == 0 { String::new() } else { count.to_string() }
+                                }}
+                            </span>
+                        </button>
+                    </div>
                     <button
-                        class="button button-primary"
+                        class="icon-button"
+                        title="管理页面引用"
+                        on:click=move |_| manager_open.set(true)
+                    >
+                        {icon("book", 17)}
+                    </button>
+                    <span class="toolbar-grow"></span>
+                    <button
+                        class="send-button"
+                        class:is-stop=move || streaming.get()
+                        title=move || {
+                            if streaming.get() { "停止" } else if failed.get() { "重试" } else { "发送" }
+                        }
+                        disabled=move || !streaming.get() && question.get().trim().is_empty()
                         on:click=move |_| {
                             if streaming.get() {
                                 let _ = bridge("stop", &[]);
@@ -3260,14 +3314,21 @@ pub fn AiPanel(
                     >
                         {move || {
                             if streaming.get() {
-                                "停止"
+                                icon("stop", 17)
                             } else if failed.get() {
-                                "重试"
+                                icon("retry", 17)
                             } else {
-                                "发送"
+                                icon("send", 17)
                             }
                         }}
                     </button>
+                </div>
+                </div>
+                <div class="composer-status">
+                    <span class="status">{move || status.get()}</span>
+                    <span class="token-meter" title="粗略估算，真实用量由模型决定">
+                        {move || format!("约 {} tokens", token_estimate())}
+                    </span>
                 </div>
             </div>
 
@@ -3288,6 +3349,7 @@ pub fn AiPanel(
                 page_limit=page_limit
                 context_limit=context_limit
                 model_choices=model_choices
+                provider_preset=provider_preset
             />
 
         </aside>

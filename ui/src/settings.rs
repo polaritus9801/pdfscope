@@ -44,6 +44,7 @@ pub(crate) fn SettingsSheet(
     page_limit: RwSignal<u32>,
     context_limit: RwSignal<u32>,
     model_choices: RwSignal<Vec<String>>,
+    provider_preset: RwSignal<String>,
 ) -> impl IntoView {
     let testing = RwSignal::new(false);
 
@@ -104,7 +105,8 @@ pub(crate) fn SettingsSheet(
                 model_choices.set(parse_choices(&choices));
                 form_model_choices.set(choices);
                 if let Some(stored) = text_of(&value, "preset") {
-                    form_preset.set(stored);
+                    form_preset.set(stored.clone());
+                    provider_preset.set(stored);
                 }
                 if let Some(stored) = text_of(&value, "protocol") {
                     form_protocol.set(stored);

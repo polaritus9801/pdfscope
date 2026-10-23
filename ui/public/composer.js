@@ -209,6 +209,10 @@ window.Composer = {
 
   insertToken,
 
+  focus() {
+    root?.focus();
+  },
+
   /// Whether the caret sits at the very start of the field.
   isAtStart() {
     const range = caretInRoot();

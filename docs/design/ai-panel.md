@@ -141,8 +141,13 @@ checklist covers light/dark at 320/420/720 px widths.
 3. **Header menu:** a custom popover grouping providers and models, with a check and 管理模型; the
    native `<select>` is removed.
 
-## 12. First slice
+## 12. Progress
 
-P0: an `Icon` component with one stroke language, provider marks, the 52 px header (tile, title,
-model chip, history/new/collapse), and the contained composer card with its toolbar and circular
-send/stop. Behaviour is unchanged; only markup and CSS move.
+**P0 done.** `ui/src/icons.rs` holds one 24-grid/1.6-stroke icon family and provider marks (DeepSeek,
+OpenAI, Anthropic, MiMo/Moonshot, Gemini, monogram fallback). The header is a 52 px column of
+provider tile, `AI 助手`, a model chip and its custom popover (default, models, 管理模型), with
+history/new/collapse as icon buttons. The composer is one card: editor, toolbar (`@`, attach, web,
+three scope icons with badge, page manager), a growing spacer and a circular send that becomes a stop.
+The token meter and status moved below the card.
+
+**Next: P1** — message identity rail, question bubble, reasoning pill, icon action row, empty state.

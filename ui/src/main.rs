@@ -13,6 +13,7 @@ use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::HtmlInputElement;
 
+mod icons;
 mod model;
 mod page;
 mod panel;
@@ -63,6 +64,7 @@ fn App() -> impl IntoView {
     let scope_mode = RwSignal::new(0_u8);
     let page_limit = RwSignal::new(0_u32);
     let model_choices = RwSignal::new(Vec::<String>::new());
+    let provider_preset = RwSignal::new("MiMo".to_owned());
     let context_limit = RwSignal::new(128_000_u32);
     // kind 0 = start anchor, 1 = end anchor; the hovered page completes the preview.
     let anchor = RwSignal::new(Option::<(u8, u32)>::None);
@@ -1373,6 +1375,7 @@ fn App() -> impl IntoView {
                 page_limit=page_limit
                 context_limit=context_limit
                 model_choices=model_choices
+                provider_preset=provider_preset
                 answers=answers
                 next_answer=next_answer
                 document_key=file_name
