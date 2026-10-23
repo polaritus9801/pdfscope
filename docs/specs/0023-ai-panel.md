@@ -203,6 +203,14 @@ before sending).
 - Images live only in the session (they are not written into persisted conversations), and adding an
   image is not part of the reference undo snapshot. Both are deliberate for now.
 
+## 7f. Progress — temporary chat and branching
+
+- `临时` in the history drawer starts a conversation that is never written to storage: it has no
+  record in the library, the sync effect ignores it, and switching away discards it. The header shows
+  a 临时 badge so the state is never implicit.
+- `分支` on any answer creates a new stored conversation containing that turn and everything before
+  it, titled after its parent with a `· 分支` suffix, and switches to it.
+
 ## 8. Gaps beyond the first inventory
 
 A second pass over mature assistants adds these, which the program should cover rather than

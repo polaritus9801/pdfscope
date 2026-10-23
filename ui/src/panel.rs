@@ -270,6 +270,7 @@ pub fn AiPanel(
     let renaming = RwSignal::new(Option::<(String, String)>::None);
     let confirm_delete = RwSignal::new(Option::<String>::None);
     let sync_ready = RwSignal::new(false);
+    let temporary = RwSignal::new(Option::<String>::None);
     let next_conversation = RwSignal::new(0_u64);
     let images = RwSignal::new(Vec::<UserImage>::new());
     let next_image = RwSignal::new(0_u64);
@@ -492,6 +493,7 @@ pub fn AiPanel(
             active.set(String::new());
             turns.set(Vec::new());
             images.set(Vec::new());
+            temporary.set(None);
             sync_ready.set(true);
             return;
         }
@@ -544,7 +546,7 @@ pub fn AiPanel(
         }
         let current_turns = turns.get();
         let id = active.get();
-        if id.is_empty() {
+        if id.is_empty() || temporary.get().is_some() {
             return;
         }
         conversations.update(|list| {
@@ -1075,6 +1077,7 @@ pub fn AiPanel(
         };
         active.set(id);
         turns.set(conversation.turns);
+        temporary.set(None);
         reset_transient();
         history_open.set(false);
         sync_ready.set(true);
@@ -1096,6 +1099,7 @@ pub fn AiPanel(
         });
         active.set(id);
         turns.set(Vec::new());
+        temporary.set(None);
         reset_transient();
         history_open.set(false);
         save_conversations();
@@ -1126,6 +1130,47 @@ pub fn AiPanel(
             }
         }
         save_conversations();
+    };
+
+    let start_temporary = move || {
+        if streaming.get() {
+            return;
+        }
+        let id = format!("temp-{}", js_sys::Date::now() as u64);
+        temporary.set(Some(id.clone()));
+        active.set(id);
+        turns.set(Vec::new());
+        reset_transient();
+        history_open.set(false);
+    };
+
+    let branch_conversation = move |index: usize| {
+        let prefix: Vec<Turn> = turns.get().into_iter().take(index + 1).collect();
+        if prefix.is_empty() {
+            return;
+        }
+        let parent_title = conversations
+            .get()
+            .into_iter()
+            .find(|conversation| conversation.id == active.get())
+            .map(|conversation| conversation.title)
+            .unwrap_or_else(|| "对话".to_owned());
+        let id = new_conversation_id();
+        conversations.update(|list| {
+            list.push(Conversation {
+                title: format!("{parent_title} · 分支"),
+                id: id.clone(),
+                updated: js_sys::Date::now(),
+                pinned: false,
+                turns: prefix.clone(),
+            });
+        });
+        temporary.set(None);
+        active.set(id);
+        turns.set(prefix);
+        reset_transient();
+        save_conversations();
+        notify.run("已从这条回答分支".to_owned());
     };
 
     let toggle_pin = move |id: String| {
@@ -1235,6 +1280,9 @@ pub fn AiPanel(
                 </button>
                 <span class="panel-title">"AI"</span>
                 <span class="panel-model">{move || model.get()}</span>
+                <Show when=move || temporary.get().is_some()>
+                    <span class="temp-badge" title="这个对话不会被保存">"临时"</span>
+                </Show>
                 <button
                     class="panel-new"
                     title="历史对话"
@@ -1279,6 +1327,13 @@ pub fn AiPanel(
                         />
                         <button class="button button-primary" on:click=move |_| create_conversation()>
                             "新对话"
+                        </button>
+                        <button
+                            class="button"
+                            title="临时对话：关闭后不保留"
+                            on:click=move |_| start_temporary()
+                        >
+                            "临时"
                         </button>
                         <button
                             class="button"
@@ -1616,6 +1671,15 @@ pub fn AiPanel(
                                                     "编辑"
                                                 </button>
                                             };
+                                            let branch = view! {
+                                                <button
+                                                    class="action"
+                                                    title="从这里开始一条新对话"
+                                                    on:click=move |_| branch_conversation(index)
+                                                >
+                                                    "分支"
+                                                </button>
+                                            };
 
                                             let answer_for_copy_cite = turn.answer.clone();
                                             let copy_with_citations = view! {
@@ -1684,6 +1748,7 @@ pub fn AiPanel(
                                                     <div class="turn-actions">
                                                         {located}
                                                         {edit}
+                                                        {branch}
                                                         {cite}
                                                         <button
                                                             class="action"

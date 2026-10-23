@@ -2815,3 +2815,14 @@ body.selection-quiet .textLayer :is(span, br)::selection {
   color: var(--accent);
   border-color: var(--accent);
 }
+
+/* A conversation that is deliberately not written to storage. */
+.temp-badge {
+  flex: none;
+  padding: 0 var(--space-2);
+  font-size: var(--text-xs);
+  line-height: 18px;  /* size */
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: var(--radius-full);
+}

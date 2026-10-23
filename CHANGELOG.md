@@ -118,6 +118,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Temporary conversations that are never persisted, and 分支 to continue from any answer in a new
+  stored conversation.
+
+
 - Attach images to a question from the composer; they show as thumbnails, become inline pills, count
   toward the token hint, and are labelled as attachments by the request builder.
 
