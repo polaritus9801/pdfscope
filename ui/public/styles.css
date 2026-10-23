@@ -2664,6 +2664,7 @@ body.selection-quiet .textLayer :is(span, br)::selection {
 
 .history-tools {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
 }
@@ -2784,4 +2785,13 @@ body.selection-quiet .textLayer :is(span, br)::selection {
   font-size: var(--text-sm);
   color: var(--ink-muted);
   text-align: center;
+}
+
+/* A rough budget hint, not a promise: the provider decides the real count. */
+.token-meter {
+  flex: none;
+  font-size: var(--text-xs);
+  color: var(--ink-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }

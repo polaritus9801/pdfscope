@@ -184,6 +184,14 @@ before sending).
 - Remaining in P2: branching from an answer (edit-and-resend covers the common case), pinning a whole
   document, and exporting a conversation.
 
+## 7d. Progress — export, budget and citations
+
+- `导出` in the history drawer copies the active conversation as Markdown (`transcript_markdown` in
+  core).
+- A quiet token estimate sits beside the composer status; `estimate_tokens` in core charges three
+  characters per token plus a flat allowance per image and page. It is a budget hint, not a promise.
+- Every turn gains `复制引用`: the answer plus a deduplicated list of its cited pages.
+
 ## 8. Gaps beyond the first inventory
 
 A second pass over mature assistants adds these, which the program should cover rather than

@@ -118,6 +118,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Export the current conversation as Markdown, a rough token estimate beside the composer, and
+  复制引用 (answer plus its cited pages).
+
+
 - A conversation library per document: search, rename, pin, delete, new conversation, with the old
   single transcript migrated into it.
 

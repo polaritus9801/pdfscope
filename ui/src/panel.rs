@@ -6,7 +6,7 @@ use wasm_bindgen::closure::Closure;
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 
-use pdfscope_core::{Segment, segments};
+use pdfscope_core::{Segment, estimate_tokens, segments, transcript_markdown};
 
 use crate::scope_ui::PageManager;
 use crate::settings::SettingsSheet;
@@ -287,6 +287,16 @@ pub fn AiPanel(
     };
 
     let manager_open = RwSignal::new(false);
+    let token_estimate = move || {
+        let mut characters = question.get().chars().count();
+        for passage in passages.get() {
+            characters += passage.quote.chars().count();
+        }
+        for answer in answers.get() {
+            characters += answer.quote.chars().count();
+        }
+        estimate_tokens(characters, regions.get().len(), page_set.get().len())
+    };
     let reference_count = move || passages.get().len() + regions.get().len() + page_set.get().len();
 
     let redeem = move |index: usize| {
@@ -1227,6 +1237,33 @@ pub fn AiPanel(
                         <button class="button button-primary" on:click=move |_| create_conversation()>
                             "新对话"
                         </button>
+                        <button
+                            class="button"
+                            title="把当前对话复制为 Markdown"
+                            on:click=move |_| {
+                                let pairs: Vec<(String, String)> = conversations
+                                    .get()
+                                    .into_iter()
+                                    .find(|conversation| conversation.id == active.get())
+                                    .map(|conversation| {
+                                        conversation
+                                            .turns
+                                            .iter()
+                                            .map(|turn| (turn.question.clone(), turn.answer.clone()))
+                                            .collect()
+                                    })
+                                    .unwrap_or_default();
+                                let markdown = transcript_markdown(&pairs);
+                                if markdown.is_empty() {
+                                    notify.run("当前对话还没有内容".to_owned());
+                                    return;
+                                }
+                                copy_to_clipboard(&markdown);
+                                notify.run("已复制 Markdown".to_owned());
+                            }
+                        >
+                            "导出"
+                        </button>
                     </div>
                     <div class="history-list">
                         {move || {
@@ -1537,6 +1574,40 @@ pub fn AiPanel(
                                                 </button>
                                             };
 
+                                            let answer_for_copy_cite = turn.answer.clone();
+                                            let copy_with_citations = view! {
+                                                <button
+                                                    class="action"
+                                                    title="复制回答并附上引用页码"
+                                                    on:click=move |_| {
+                                                        let mut pages: Vec<u32> = segments(&answer_for_copy_cite)
+                                                            .into_iter()
+                                                            .filter_map(|segment| match segment {
+                                                                Segment::Citation(page) => Some(page),
+                                                                Segment::Text(_) => None,
+                                                            })
+                                                            .collect();
+                                                        pages.sort_unstable();
+                                                        pages.dedup();
+                                                        let mut text = answer_for_copy_cite.clone();
+                                                        if !pages.is_empty() {
+                                                            text.push_str("\n\n参考：");
+                                                            text.push_str(
+                                                                &pages
+                                                                    .iter()
+                                                                    .map(|page| format!("p.{page}"))
+                                                                    .collect::<Vec<_>>()
+                                                                    .join("、"),
+                                                            );
+                                                        }
+                                                        copy_to_clipboard(&text);
+                                                        notify.run("已复制（含页码）".to_owned());
+                                                    }
+                                                >
+                                                    "复制引用"
+                                                </button>
+                                            };
+
                                             let answer_for_cite = turn.answer.clone();
                                             let cite = view! {
                                                 <button
@@ -1580,6 +1651,7 @@ pub fn AiPanel(
                                                         >
                                                             "复制"
                                                         </button>
+                                                        {copy_with_citations}
                                                         {regenerate}
                                                         {continued}
                                                     </div>
@@ -2224,6 +2296,9 @@ pub fn AiPanel(
                 ></div>
                 <div class="composer-row">
                     <span class="status">{move || status.get()}</span>
+                    <span class="token-meter" title="粗略估算，真实用量由模型决定">
+                        {move || format!("约 {} tokens", token_estimate())}
+                    </span>
                     <button
                         class="button button-primary"
                         on:click=move |_| {

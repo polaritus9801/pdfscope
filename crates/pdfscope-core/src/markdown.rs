@@ -256,6 +256,53 @@ fn is_safe_url(url: &str) -> bool {
     lower.starts_with("http://") || lower.starts_with("https://") || lower.starts_with("mailto:")
 }
 
+/// Exports a conversation as Markdown: one numbered section per question and answer.
+pub fn transcript_markdown(turns: &[(String, String)]) -> String {
+    let mut out = String::new();
+    for (index, (question, answer)) in turns.iter().enumerate() {
+        out.push_str(&format!(
+            "## {}. {}\n\n{}\n\n",
+            index + 1,
+            question.trim(),
+            answer.trim()
+        ));
+    }
+    let trimmed = out.trim_end();
+    if trimmed.is_empty() {
+        String::new()
+    } else {
+        format!("{trimmed}\n")
+    }
+}
+
+#[cfg(test)]
+mod transcript_tests {
+    use super::*;
+
+    #[test]
+    fn an_empty_conversation_exports_nothing() {
+        assert_eq!(transcript_markdown(&[]), "");
+    }
+
+    #[test]
+    fn each_turn_becomes_a_numbered_section() {
+        let md = transcript_markdown(&[
+            ("问题一".to_owned(), "回答一".to_owned()),
+            ("问题二".to_owned(), "回答二".to_owned()),
+        ]);
+        assert!(md.starts_with("## 1. 问题一"));
+        assert!(md.contains("回答一"));
+        assert!(md.contains("## 2. 问题二"));
+        assert!(md.ends_with('\n'));
+    }
+
+    #[test]
+    fn surrounding_whitespace_is_trimmed() {
+        let md = transcript_markdown(&[("  q  ".to_owned(), "  a  ".to_owned())]);
+        assert_eq!(md, "## 1. q\n\na\n");
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
