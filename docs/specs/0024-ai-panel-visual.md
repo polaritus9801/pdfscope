@@ -45,5 +45,5 @@ one icon language, designed states. Behaviour, request logic and the reader stay
   all disabled under `prefers-reduced-motion`.
 - P4 landed: the search provider is a two-column card list with marks, a hint and a selected check;
   the key row carries an 已配置 badge; the model popover gains the provider mark in its header.
-- All phases landed. Behaviour is unchanged; only presentation, icons and the per-answer `model`
-  display field were added.
+- All phases landed. Behaviour is unchanged apart from the per-answer `model` display field and the
+  clear-all path, which now also removes the corresponding pills while keeping the typed text.

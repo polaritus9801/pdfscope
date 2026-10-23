@@ -2986,6 +2986,9 @@ pub fn AiPanel(
                                         sources.set(Vec::new());
                                         answers.set(Vec::new());
                                         page_set.update(|set| set.clear());
+                                        // The shelf is the source of truth; the editor must not keep
+                                        // pills whose attachment no longer exists.
+                                        let _ = composer("clearTokens", &[]);
                                         notify.run("已清空上下文".to_owned());
                                     }
                                 >

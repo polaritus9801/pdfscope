@@ -306,6 +306,13 @@ window.Composer = {
     }
   },
 
+  /// Removes every pill while keeping the typed text, for a context clear-all.
+  clearTokens() {
+    if (!root) return;
+    for (const token of root.querySelectorAll(".mention")) token.remove();
+    emit();
+  },
+
   loadPromptHistory() {
     try {
       return window.localStorage.getItem("pdfscope.prompts");
