@@ -118,6 +118,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Answers can be quoted as context (`引用此回答`), and references now sit in a horizontally scrolling
+  context shelf with one row per kind.
+
+
 - The question field is a contenteditable editor with inline attachment pills: type `@` to insert a
   passage, region or page, delete a pill to remove its attachment (undoable), and send with Enter.
 

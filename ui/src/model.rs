@@ -39,6 +39,14 @@ pub(crate) struct Passage {
     pub(crate) end: usize,
 }
 
+/// A previous assistant answer, quoted as context.
+#[derive(Clone, PartialEq)]
+pub(crate) struct AnswerRef {
+    pub(crate) id: u64,
+    pub(crate) label: String,
+    pub(crate) quote: String,
+}
+
 /// One page's size at scale 1, as the renderer measured it.
 #[derive(Clone, Copy, PartialEq)]
 pub(crate) struct PageSize {

@@ -19,7 +19,7 @@ mod panel;
 mod scope_ui;
 mod settings;
 
-pub(crate) use model::{PageSize, Passage, Region, Selection, truncate};
+pub(crate) use model::{AnswerRef, PageSize, Passage, Region, Selection, truncate};
 pub(crate) use page::PageView;
 
 use model::{parse_page_sizes, parse_rects, parse_selection, read_flag, read_number, read_string};
@@ -177,9 +177,11 @@ fn App() -> impl IntoView {
     let selection = RwSignal::new(Option::<Selection>::None);
     let passages = RwSignal::new(Vec::<Passage>::new());
     let regions = RwSignal::new(Vec::<Region>::new());
+    let answers = RwSignal::new(Vec::<AnswerRef>::new());
+    let next_answer = RwSignal::new(0_u64);
 
     let next_ref = RwSignal::new(0_u64);
-    type Snapshot = (Vec<Passage>, Vec<Region>, Vec<u32>, u8);
+    type Snapshot = (Vec<Passage>, Vec<Region>, Vec<u32>, u8, Vec<AnswerRef>);
     let history = RwSignal::new(pdfscope_core::history::History::<Snapshot>::new(50));
 
     let current_state = move || {
@@ -188,6 +190,7 @@ fn App() -> impl IntoView {
             regions.get(),
             page_set.get(),
             scope_mode.get(),
+            answers.get(),
         )
     };
 
@@ -196,6 +199,7 @@ fn App() -> impl IntoView {
         regions.set(state.1);
         page_set.set(state.2);
         scope_mode.set(state.3);
+        answers.set(state.4);
         selection.set(None);
     };
 
@@ -277,6 +281,8 @@ fn App() -> impl IntoView {
         ready.set(false);
         passages.set(Vec::new());
         regions.set(Vec::new());
+        answers.set(Vec::new());
+        next_answer.set(0);
         selection.set(None);
         // A new document owns a new history and scope; nothing from the old one may be undone into it.
         history.set(pdfscope_core::history::History::new(50));
@@ -1353,6 +1359,8 @@ fn App() -> impl IntoView {
                 scope_mode=scope_mode
                 page_set=page_set
                 page_limit=page_limit
+                answers=answers
+                next_answer=next_answer
             />
             </div>
         </div>

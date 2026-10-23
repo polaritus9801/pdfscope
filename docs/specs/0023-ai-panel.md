@@ -158,7 +158,13 @@ before sending).
   caret, Backspace removes a pill and its attachment (one undo step), paste is reduced to text, and
   Enter sends. Pills serialise as `@{kind:id}`; the interface turns them into `[引用 n]` in the order
   passages → regions → pages, and an orphaned marker becomes `[引用已移除]`.
-- Still to come in P1: the horizontal context shelf, answers as references, drag-to-insert.
+- **Context shelf and answers** — landed. One horizontally scrolling row per kind (文字 / 截图 /
+  页面 / 回答) instead of stacked rows; each chip jumps to its page and removes its attachment; a
+  region shows as a thumbnail. Every answer now offers `引用此回答`, which adds a `✦` answer chip,
+  is undoable through the same snapshot, appears in the `@` picker, and is appended to the request as
+  `[引用的先前回答]` with numbered quotes.
+- Still to come in P1: drag-to-insert, quoting a selection inside an answer, keyboard navigation in
+  the picker.
 
 ## 8. Gaps beyond the first inventory
 

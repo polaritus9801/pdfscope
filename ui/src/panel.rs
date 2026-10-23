@@ -208,6 +208,8 @@ pub fn AiPanel(
     scope_mode: RwSignal<u8>,
     page_set: RwSignal<Vec<u32>>,
     page_limit: RwSignal<u32>,
+    answers: RwSignal<Vec<crate::AnswerRef>>,
+    next_answer: RwSignal<u64>,
 ) -> impl IntoView {
     let model = RwSignal::new("未配置".to_owned());
     let answer = RwSignal::new(String::new());
@@ -323,6 +325,17 @@ pub fn AiPanel(
                     {
                         undo_push.run(());
                         regions.update(|list| list.retain(|entry| entry.id != id));
+                    } else if let Some(page) = key
+                        .strip_prefix("page:")
+                        .and_then(|page| page.parse::<u32>().ok())
+                    {
+                        undo_push.run(());
+                        page_set.update(|set| set.retain(|entry| *entry != page));
+                    } else if let Some(id) =
+                        key.strip_prefix("a:").and_then(|id| id.parse::<u64>().ok())
+                    {
+                        undo_push.run(());
+                        answers.update(|list| list.retain(|entry| entry.id != id));
                     }
                 }
 
@@ -710,6 +723,10 @@ pub fn AiPanel(
     };
 
     let send = move |_| {
+        // While an answer streams the button is "stop"; Enter must not wipe the draft either.
+        if streaming.get() {
+            return;
+        }
         let mut order = Vec::new();
         for passage in passages.get() {
             order.push(format!("p:{}", passage.id));
@@ -720,12 +737,26 @@ pub fn AiPanel(
         for page in page_set.get() {
             order.push(format!("page:{page}"));
         }
+        for answer in answers.get() {
+            order.push(format!("a:{}", answer.id));
+        }
 
-        let text = inline_question(&question.get(), &order);
+        let mut text = inline_question(&question.get(), &order);
+        if !answers.get().is_empty() {
+            text.push_str("\n\n[引用的先前回答]\n");
+            for (index, answer) in answers.get().iter().enumerate() {
+                text.push_str(&format!(
+                    "回答 {}：{}\n",
+                    index + 1,
+                    truncate(&answer.quote, 4000)
+                ));
+            }
+        }
         if text.trim().is_empty() {
             return;
         }
         send_text(text);
+        answers.set(Vec::new());
         composer_clear();
     };
 
@@ -787,6 +818,47 @@ pub fn AiPanel(
             window.add_event_listener_with_callback("keydown", handler.as_ref().unchecked_ref());
         handler.forget();
     });
+
+    let remove_passage = move |id: u64| {
+        let key = format!("p:{id}");
+        let removed = composer("removeToken", &[JsValue::from_str(&key)])
+            .and_then(|value| value.as_bool())
+            .unwrap_or(false);
+        if !removed {
+            undo_push.run(());
+            passages.update(|list| list.retain(|entry| entry.id != id));
+        }
+    };
+    let remove_region = move |id: u64| {
+        let key = format!("r:{id}");
+        let removed = composer("removeToken", &[JsValue::from_str(&key)])
+            .and_then(|value| value.as_bool())
+            .unwrap_or(false);
+        if !removed {
+            undo_push.run(());
+            regions.update(|list| list.retain(|entry| entry.id != id));
+        }
+    };
+    let remove_page = move |page_number: u32| {
+        let key = format!("page:{page_number}");
+        let removed = composer("removeToken", &[JsValue::from_str(&key)])
+            .and_then(|value| value.as_bool())
+            .unwrap_or(false);
+        if !removed {
+            undo_push.run(());
+            page_set.update(|set| set.retain(|entry| *entry != page_number));
+        }
+    };
+    let remove_answer = move |id: u64| {
+        let key = format!("a:{id}");
+        let removed = composer("removeToken", &[JsValue::from_str(&key)])
+            .and_then(|value| value.as_bool())
+            .unwrap_or(false);
+        if !removed {
+            undo_push.run(());
+            answers.update(|list| list.retain(|entry| entry.id != id));
+        }
+    };
 
     view! {
         <aside
@@ -1012,6 +1084,31 @@ pub fn AiPanel(
                                                     }
                                                 });
 
+                                            let answer_for_cite = turn.answer.clone();
+                                            let cite = view! {
+                                                <button
+                                                    class="action"
+                                                    on:click=move |_| {
+                                                        if answer_for_cite.trim().is_empty() {
+                                                            return;
+                                                        }
+                                                        undo_push.run(());
+                                                        let id = next_answer.get() + 1;
+                                                        next_answer.set(id);
+                                                        answers.update(|list| {
+                                                            list.push(crate::AnswerRef {
+                                                                id,
+                                                                label: format!("回答 {id}"),
+                                                                quote: answer_for_cite.clone(),
+                                                            });
+                                                        });
+                                                        notify.run("已引用这条回答".to_owned());
+                                                    }
+                                                >
+                                                    "引用此回答"
+                                                </button>
+                                            };
+
                                             view! {
                                                 <div class="turn">
                                                     <p class="turn-question">{turn.question.clone()}</p>
@@ -1019,6 +1116,7 @@ pub fn AiPanel(
                                                     {body}
                                                     <div class="turn-actions">
                                                         {located}
+                                                        {cite}
                                                         <button
                                                             class="action"
                                                             on:click=move |_| {
@@ -1175,79 +1273,167 @@ pub fn AiPanel(
                         .into_any()
                 }}
                 {move || {
-                    passages
-                        .get()
-                        .into_iter()
-                        .map(|passage| {
-                            view! {
-                                <div class="ref-row">
-                                    <span class="ref-kind">"文"</span>
-                                    <span class="ref-text">{passage.quote.clone()}</span>
-                                    <span class="ref-page">{format!("p.{}", passage.page)}</span>
-                                    <button
-                                        class="ref-remove"
-                                        title="移除"
-                                        on:click=move |_| {
+                    let quotes = passages.get();
+                    let shots = regions.get();
+                    let pages_selected = page_set.get();
+                    let cited = answers.get();
+                    if quotes.is_empty()
+                        && shots.is_empty()
+                        && pages_selected.is_empty()
+                        && cited.is_empty()
+                    {
+                        return ().into_any();
+                    }
+
+                    let quote_row = (!quotes.is_empty()).then(|| {
+                        view! {
+                            <div class="shelf-row">
+                                <span class="shelf-label">"文字"</span>
+                                <div class="shelf-track">
+                                    {quotes
+                                        .into_iter()
+                                        .map(|passage| {
+                                            let page_number = passage.page;
                                             let id = passage.id;
-                                            let key = format!("p:{id}");
-                                            let removed = composer(
-                                                "removeToken",
-                                                &[JsValue::from_str(&key)],
-                                            )
-                                            .and_then(|value| value.as_bool())
-                                            .unwrap_or(false);
-                                            // Removing a pill already removes the attachment, once.
-                                            if !removed {
-                                                undo_push.run(());
-                                                passages.update(|list| {
-                                                    list.retain(|entry| entry.id != id)
-                                                });
+                                            view! {
+                                                <div
+                                                    class="attach-chip"
+                                                    title=passage.quote.clone()
+                                                    on:click=move |_| jump(page_number)
+                                                >
+                                                    <span class="chip-kind">"文"</span>
+                                                    <span class="chip-text">{truncate(&passage.quote, 36)}</span>
+                                                    <span class="chip-page">{format!("p.{page_number}")}</span>
+                                                    <span
+                                                        class="chip-x"
+                                                        title="移除"
+                                                        on:click=move |event: web_sys::MouseEvent| {
+                                                            event.stop_propagation();
+                                                            remove_passage(id);
+                                                        }
+                                                    >
+                                                        "✕"
+                                                    </span>
+                                                </div>
                                             }
-                                        }
-                                    >
-                                        "✕"
-                                    </button>
+                                        })
+                                        .collect_view()}
                                 </div>
-                            }
-                        })
-                        .collect_view()
-                }}
-                {move || {
-                    regions
-                        .get()
-                        .into_iter()
-                        .map(|region| {
-                            view! {
-                                <div class="ref-row">
-                                    <img class="ref-thumb" src=region.image alt="" />
-                                    <span class="ref-text">"截图"</span>
-                                    <span class="ref-page">{format!("p.{}", region.page)}</span>
-                                    <button
-                                        class="ref-remove"
-                                        title="移除"
-                                        on:click=move |_| {
+                            </div>
+                        }
+                    });
+
+                    let shot_row = (!shots.is_empty()).then(|| {
+                        view! {
+                            <div class="shelf-row">
+                                <span class="shelf-label">"截图"</span>
+                                <div class="shelf-track">
+                                    {shots
+                                        .into_iter()
+                                        .map(|region| {
+                                            let page_number = region.page;
                                             let id = region.id;
-                                            let key = format!("r:{id}");
-                                            let removed = composer(
-                                                "removeToken",
-                                                &[JsValue::from_str(&key)],
-                                            )
-                                            .and_then(|value| value.as_bool())
-                                            .unwrap_or(false);
-                                            if !removed {
-                                                undo_push.run(());
-                                                regions.update(|list| {
-                                                    list.retain(|entry| entry.id != id)
-                                                });
+                                            view! {
+                                                <div
+                                                    class="attach-thumb"
+                                                    title=format!("p.{} · 截图", region.page)
+                                                    on:click=move |_| jump(page_number)
+                                                >
+                                                    <img src=region.image.clone() alt="" />
+                                                    <span
+                                                        class="chip-x thumb-x"
+                                                        title="移除"
+                                                        on:click=move |event: web_sys::MouseEvent| {
+                                                            event.stop_propagation();
+                                                            remove_region(id);
+                                                        }
+                                                    >
+                                                        "✕"
+                                                    </span>
+                                                </div>
                                             }
-                                        }
-                                    >
-                                        "✕"
-                                    </button>
+                                        })
+                                        .collect_view()}
                                 </div>
-                            }
-                        })
-                        .collect_view()
+                            </div>
+                        }
+                    });
+
+                    let page_row = (!pages_selected.is_empty()).then(|| {
+                        view! {
+                            <div class="shelf-row">
+                                <span class="shelf-label">"页面"</span>
+                                <div class="shelf-track">
+                                    {pages_selected
+                                        .into_iter()
+                                        .map(|page_number| {
+                                            view! {
+                                                <div
+                                                    class="attach-chip"
+                                                    on:click=move |_| jump(page_number)
+                                                >
+                                                    <span class="chip-kind">"页"</span>
+                                                    <span class="chip-page">{format!("p.{page_number}")}</span>
+                                                    <span
+                                                        class="chip-x"
+                                                        title="移除"
+                                                        on:click=move |event: web_sys::MouseEvent| {
+                                                            event.stop_propagation();
+                                                            remove_page(page_number);
+                                                        }
+                                                    >
+                                                        "✕"
+                                                    </span>
+                                                </div>
+                                            }
+                                        })
+                                        .collect_view()}
+                                </div>
+                            </div>
+                        }
+                    });
+
+                    let answer_row = (!cited.is_empty()).then(|| {
+                        view! {
+                            <div class="shelf-row">
+                                <span class="shelf-label">"回答"</span>
+                                <div class="shelf-track">
+                                    {cited
+                                        .into_iter()
+                                        .map(|answer| {
+                                            let id = answer.id;
+                                            view! {
+                                                <div class="attach-chip" title=answer.quote.clone()>
+                                                    <span class="chip-kind">"✦"</span>
+                                                    <span class="chip-text">{truncate(&answer.quote, 32)}</span>
+                                                    <span
+                                                        class="chip-x"
+                                                        title="移除"
+                                                        on:click=move |event: web_sys::MouseEvent| {
+                                                            event.stop_propagation();
+                                                            remove_answer(id);
+                                                        }
+                                                    >
+                                                        "✕"
+                                                    </span>
+                                                </div>
+                                            }
+                                        })
+                                        .collect_view()}
+                                </div>
+                            </div>
+                        }
+                    });
+
+                    view! {
+                        <div class="context-shelf">
+                            {quote_row}
+                            {shot_row}
+                            {page_row}
+                            {answer_row}
+                        </div>
+                    }
+                        .into_any()
                 }}
                 <div class="scope-row">
                     <div class="scope-icons" role="group" aria-label="提问范围">
@@ -1375,6 +1561,25 @@ pub fn AiPanel(
                             >
                                 <span class="mention-kind">"页"</span>
                                 <span class="mention-label">{format!("p.{page}")}</span>
+                            </button>
+                        }.into_any());
+                    }
+                    for answer in answers.get() {
+                        let key = format!("a:{}", answer.id);
+                        let label = answer.label.clone();
+                        items.push(view! {
+                            <button
+                                class="mention-item"
+                                on:click=move |_| {
+                                    let _ = composer(
+                                        "insertToken",
+                                        &[JsValue::from_str(&key), JsValue::from_str(&label)],
+                                    );
+                                    mention_open.set(false);
+                                }
+                            >
+                                <span class="mention-kind">"✦"</span>
+                                <span class="mention-label">{format!("{} · {}", answer.label, truncate(&answer.quote, 28))}</span>
                             </button>
                         }.into_any());
                     }
