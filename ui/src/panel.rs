@@ -190,6 +190,13 @@ async fn fetch_page_text(number: u32) -> String {
     }
 }
 
+/// One web result kept for the citation row.
+#[derive(Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+struct Source {
+    title: String,
+    url: String,
+}
+
 /// One finished exchange.
 #[derive(Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub(crate) struct Turn {
@@ -199,6 +206,9 @@ pub(crate) struct Turn {
     seconds: f64,
     /// The stream was cut off, so the answer can be continued.
     interrupted: bool,
+    /// Web results this answer was allowed to cite.
+    #[serde(default)]
+    sources: Vec<Source>,
 }
 
 /// One conversation stored against a document.
@@ -210,13 +220,6 @@ struct Conversation {
     #[serde(default)]
     pinned: bool,
     turns: Vec<Turn>,
-}
-
-/// One web result kept for the citation row.
-#[derive(Clone, PartialEq)]
-struct Source {
-    title: String,
-    url: String,
 }
 
 /// A text file the reader attached to a question.
@@ -389,8 +392,11 @@ pub fn AiPanel(
             reasoning: reasoning.get(),
             seconds: think_seconds.get().max(0.1),
             interrupted: interrupted.get(),
+            sources: sources.get(),
         };
         turns.update(|list| list.push(finished));
+        // The answer keeps its own copy now; the shelf row is only for the live turn.
+        sources.set(Vec::new());
         current_question.set(String::new());
         answer.set(String::new());
         reasoning.set(String::new());
@@ -1779,6 +1785,36 @@ pub fn AiPanel(
                                                 </button>
                                             };
 
+                                            let answer_sources = (!turn.sources.is_empty()).then(|| {
+                                                let sources = turn.sources.clone();
+                                                view! {
+                                                    <div class="answer-sources">
+                                                        {sources
+                                                            .into_iter()
+                                                            .enumerate()
+                                                            .map(|(index, source)| {
+                                                                let url = source.url.clone();
+                                                                view! {
+                                                                    <button
+                                                                        class="source-chip"
+                                                                        title=source.url.clone()
+                                                                        on:click=move |_| {
+                                                                            let _ = crate::call(
+                                                                                "openUrl",
+                                                                                &[JsValue::from_str(&url)],
+                                                                            );
+                                                                        }
+                                                                    >
+                                                                        <span class="source-index">{index + 1}</span>
+                                                                        <span class="source-title">{source.title.clone()}</span>
+                                                                    </button>
+                                                                }
+                                                            })
+                                                            .collect_view()}
+                                                    </div>
+                                                }
+                                            });
+
                                             let answer_for_copy_cite = turn.answer.clone();
                                             let copy_with_citations = view! {
                                                 <button
@@ -1843,6 +1879,7 @@ pub fn AiPanel(
                                                     <p class="turn-question">{turn.question.clone()}</p>
                                                     {detail}
                                                     {body}
+                                                    {answer_sources}
                                                     <div class="turn-actions">
                                                         {located}
                                                         {edit}

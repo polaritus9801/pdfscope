@@ -118,6 +118,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Each answer keeps its own web sources and shows numbered citation cards; the live 来源 shelf row is
+  only for the turn in flight.
+
+
 - Web search through Tavily: a search key in settings, a globe toggle in the composer, numbered
   results appended to the request and a 来源 shelf row that opens citations.
 

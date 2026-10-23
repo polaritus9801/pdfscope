@@ -234,6 +234,16 @@ before sending).
   does not fall back silently. An empty result set is reported and the question proceeds locally.
 - The 来源 chips are the citation cards; inline hover cards inside an answer are not built.
 
+## 7i. Progress — per-answer citations
+
+- `Turn` now carries the `sources` it was allowed to cite (`#[serde(default)]`, so old stored
+  conversations still load). The archive step copies the live source list into the turn and clears
+  the shelf row.
+- Every answer renders its own numbered citation chips under the body; clicking one opens the URL in
+  the system browser. The 来源 shelf row remains only for the turn in flight.
+- Because sources live in the turn, switching conversations, branching, retrying and reloading keep
+  the cards attached to the answer that used them.
+
 ## 8. Gaps beyond the first inventory
 
 A second pass over mature assistants adds these, which the program should cover rather than
