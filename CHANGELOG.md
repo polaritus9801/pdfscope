@@ -10,6 +10,11 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Changed
 
+- The AI panel is a flush column: its left border is the divider and the drag affordance, resizing
+  keeps the document's centre in place, and the three scope icons are a refined segmented control
+  with a reference count badge.
+
+
 - The progress line now covers the header's bottom border, so it is flush at the edge, and the header
   paints above the page so the dot is no longer cut in half.
 

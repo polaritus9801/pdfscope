@@ -545,13 +545,15 @@ body {
   position: relative;
   display: flex;
   flex-direction: column;
-  width: 340px;  /* size */
-  margin: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
+  width: 380px;  /* size */
+  margin: 0;
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-2);
+  border: none;
+  border-left: 1px solid var(--border);
+  border-radius: 0;
+  box-shadow: none;
   overflow: hidden;
+  height: 100%;
 }
 
 .panel-head {
@@ -691,7 +693,7 @@ body {
 
 .citation:focus-visible {
   outline: 2px solid var(--accent);
-  outline-offset: 1px;  /* size */
+  outline-offset: 1px;  /* size */  /* size */
 }
 
 .page.flash {
@@ -1014,15 +1016,32 @@ body {
   display: none;
 }
 
+/* The divider is the affordance: no separate bar, just a wider invisible strip on the border. */
 .panel-resize {
   display: block;
   position: absolute;
   top: 0;
-  left: -3px;  /* size */
-  width: 6px;  /* size */
+  left: -4px;  /* size */
+  width: 9px;  /* size */
   height: 100%;
   cursor: col-resize;
   z-index: 6;
+}
+
+.panel-resize::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 4px;  /* size */
+  width: 1px;  /* size */
+  background: transparent;
+  transition: background var(--duration) var(--ease);
+}
+
+.panel-resize:hover::after,
+.resizing .panel-resize::after {
+  background: var(--accent);
 }
 
 .panel-resize:hover {
@@ -2161,7 +2180,7 @@ mark.find-hit {
   border-color: var(--accent);
 }
 
-/* Scope row: three icons on the left, the manager on the right. */
+/* Scope row: one segmented control, three quiet icons, a count badge only where it means something. */
 .scope-row {
   display: flex;
   align-items: center;
@@ -2172,38 +2191,67 @@ mark.find-hit {
 .scope-icons {
   display: flex;
   gap: 2px;  /* size */
-  padding: 2px;  /* size */
+  padding: 3px;  /* size */
   background: var(--surface-sunken);
-  border-radius: var(--radius-full);
+  border: 1px solid var(--border);
+  border-radius: 10px;  /* size */
 }
 
 .scope-icon {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;  /* size */
-  height: 26px;  /* size */
+  width: 34px;  /* size */
+  height: 28px;  /* size */
   padding: 0;
   color: var(--ink-muted);
   background: transparent;
   border: none;
-  border-radius: var(--radius-full);
+  border-radius: 7px;  /* size */
   cursor: pointer;
+  transition:
+    color var(--duration) var(--ease),
+    background var(--duration) var(--ease);
 }
 
 .scope-icon:hover {
   color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
 }
 
 .scope-icon.active {
   color: var(--accent);
   background: var(--surface);
-  box-shadow: var(--shadow-1);
+  box-shadow:
+    0 1px 2px rgb(24 18 36 / 8%),  /* size */
+    inset 0 0 0 1px color-mix(in srgb, var(--accent) 16%, var(--border));
 }
 
-.scope-count {
-  font-size: var(--text-xs);
-  color: var(--ink-muted);
+.scope-icon:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;  /* size */
+}
+
+.scope-badge {
+  position: absolute;
+  top: -5px;  /* size */
+  right: -5px;  /* size */
+  min-width: 15px;  /* size */
+  height: 15px;  /* size */
+  padding: 0 4px;  /* size */
+  font-size: 9px;  /* size */
+  line-height: 15px;  /* size */
+  color: var(--surface);
+  text-align: center;
+  background: var(--accent);
+  border-radius: var(--radius-full);
+  box-shadow: 0 0 0 2px var(--surface);  /* size */
+  pointer-events: none;
+}
+
+.scope-badge:empty {
+  display: none;
 }
 
 .scope-manage {

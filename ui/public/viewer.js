@@ -1909,6 +1909,26 @@ window.PDFScope = {
     }
   },
 
+  /// The document point under the centre of the stage, in the stage's content coordinates.
+  captureStageAnchor() {
+    const stage = stageElement();
+    if (!stage) return null;
+    return {
+      x: stage.scrollLeft + stage.clientWidth / 2,
+      y: stage.scrollTop + stage.clientHeight / 2,
+    };
+  },
+
+  /// Puts that same content point back under the centre, after the stage has been resized.
+  restoreStageAnchor(x, y) {
+    const stage = stageElement();
+    if (!stage || !Number.isFinite(x) || !Number.isFinite(y)) return;
+    requestAnimationFrame(() => {
+      stage.scrollLeft = Math.max(0, x - stage.clientWidth / 2);
+      stage.scrollTop = Math.max(0, y - stage.clientHeight / 2);
+    });
+  },
+
   /// Scrolls a page thumbnail to the middle of its container, naturally clamped at the ends.
   centerThumb(containerId, pageNumber) {
     const container = document.getElementById(containerId);
