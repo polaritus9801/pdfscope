@@ -11,6 +11,7 @@
 
 pub mod anthropic;
 pub mod openai;
+pub mod search;
 pub mod sse;
 
 use std::fmt;

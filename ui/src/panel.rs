@@ -212,6 +212,13 @@ struct Conversation {
     turns: Vec<Turn>,
 }
 
+/// One web result kept for the citation row.
+#[derive(Clone, PartialEq)]
+struct Source {
+    title: String,
+    url: String,
+}
+
 /// A text file the reader attached to a question.
 #[derive(Clone, PartialEq)]
 struct UserFile {
@@ -283,6 +290,8 @@ pub fn AiPanel(
     let images = RwSignal::new(Vec::<UserImage>::new());
     let next_image = RwSignal::new(0_u64);
     let files = RwSignal::new(Vec::<UserFile>::new());
+    let web = RwSignal::new(false);
+    let sources = RwSignal::new(Vec::<Source>::new());
     let next_file = RwSignal::new(0_u64);
     let editor_ref = NodeRef::<leptos::html::Div>::new();
     let failed = RwSignal::new(false);
@@ -604,6 +613,8 @@ pub fn AiPanel(
         streaming.set(true);
         failed.set(false);
         status.set("准备上下文…".to_owned());
+        let web_now = web.get();
+        sources.set(Vec::new());
 
         let passages_now = passages.get();
         let regions_now = regions.get();
@@ -624,6 +635,61 @@ pub fn AiPanel(
         let explicit = page_set.get();
 
         spawn_local(async move {
+            let mut model_question = asked.clone();
+            if web_now {
+                status.set("联网搜索中…".to_owned());
+                let Some(promise) = bridge("search", &[JsValue::from_str(&asked)]) else {
+                    status.set("联网搜索不可用：这是浏览器版本。".to_owned());
+                    failed.set(true);
+                    streaming.set(false);
+                    return;
+                };
+                match JsFuture::from(js_sys::Promise::from(promise)).await {
+                    Ok(value) => {
+                        let mut found = Vec::new();
+                        if let Ok(list) = value.dyn_into::<js_sys::Array>() {
+                            for entry in list.iter() {
+                                let title =
+                                    crate::model::read_string(&entry, "title").unwrap_or_default();
+                                let url =
+                                    crate::model::read_string(&entry, "url").unwrap_or_default();
+                                if url.is_empty() {
+                                    continue;
+                                }
+                                let content = crate::model::read_string(&entry, "content")
+                                    .unwrap_or_default();
+                                found.push(Source {
+                                    title: title.clone(),
+                                    url: url.clone(),
+                                });
+                                model_question.push_str(&format!(
+                                    "\n\n[来源 {}] {}\n{}\n{}",
+                                    found.len(),
+                                    title,
+                                    url,
+                                    content
+                                ));
+                            }
+                        }
+                        if found.is_empty() {
+                            status.set("没有搜到结果，继续用本地上下文。".to_owned());
+                        } else {
+                            sources.set(found);
+                            status.set("已联网，正在整理…".to_owned());
+                        }
+                    }
+                    Err(error) => {
+                        let message = error
+                            .as_string()
+                            .unwrap_or_else(|| "请检查搜索 API Key".to_owned());
+                        status.set(format!("联网搜索失败：{message}"));
+                        failed.set(true);
+                        streaming.set(false);
+                        return;
+                    }
+                }
+            }
+
             // Page text is fetched here, not in Rust: the renderer owns the document.
             let mut context: Vec<(u32, String)> = Vec::new();
 
@@ -866,7 +932,7 @@ pub fn AiPanel(
             let _ = bridge(
                 "ask",
                 &[
-                    JsValue::from_str(&asked),
+                    JsValue::from_str(&model_question),
                     references.into(),
                     images.into(),
                     pages_array.into(),
@@ -1098,6 +1164,7 @@ pub fn AiPanel(
         question.set(String::new());
         mentions.set(Vec::new());
         known_mentions.set(Vec::new());
+        sources.set(Vec::new());
         let _ = composer("clear", &[JsValue::from_bool(true)]);
     };
 
@@ -1944,10 +2011,12 @@ pub fn AiPanel(
                     let cited = answers.get();
                     let pictures = images.get();
                     let documents = files.get();
+                    let citations = sources.get();
                     if quotes.is_empty()
                         && shots.is_empty()
                         && pictures.is_empty()
                         && documents.is_empty()
+                        && citations.is_empty()
                         && pages_selected.is_empty()
                         && cited.is_empty()
                     {
@@ -2158,6 +2227,38 @@ pub fn AiPanel(
                         }
                     });
 
+                    let source_row = (!citations.is_empty()).then(|| {
+                        view! {
+                            <div class="shelf-row">
+                                <span class="shelf-label">"来源"</span>
+                                <div class="shelf-track">
+                                    {citations
+                                        .into_iter()
+                                        .enumerate()
+                                        .map(|(index, source)| {
+                                            let url = source.url.clone();
+                                            view! {
+                                                <div
+                                                    class="attach-chip"
+                                                    title=source.url.clone()
+                                                    on:click=move |_| {
+                                                        let _ = crate::call(
+                                                            "openUrl",
+                                                            &[JsValue::from_str(&url)],
+                                                        );
+                                                    }
+                                                >
+                                                    <span class="chip-kind">{format!("{}", index + 1)}</span>
+                                                    <span class="chip-text">{source.title.clone()}</span>
+                                                </div>
+                                            }
+                                        })
+                                        .collect_view()}
+                                </div>
+                            </div>
+                        }
+                    });
+
                     let answer_row = (!cited.is_empty()).then(|| {
                         view! {
                             <div class="shelf-row">
@@ -2209,6 +2310,7 @@ pub fn AiPanel(
                             {shot_row}
                             {image_row}
                             {file_row}
+                            {source_row}
                             {page_row}
                             {answer_row}
                         </div>
@@ -2544,7 +2646,18 @@ pub fn AiPanel(
                     }
                 ></div>
                 <div class="composer-row">
-                    <label class="icon-button attach-button" title="附加图片">
+                    <button
+                        class="icon-button attach-button"
+                        class:active=move || web.get()
+                        title="联网搜索（需要 Tavily Key）"
+                        on:click=move |_| web.update(|on| *on = !*on)
+                    >
+                        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="8.5" />
+                            <path d="M3.5 12h17M12 3.5c2.4 2.3 3.6 5.1 3.6 8.5s-1.2 6.2-3.6 8.5c-2.4-2.3-3.6-5.1-3.6-8.5S9.6 5.8 12 3.5z" />
+                        </svg>
+                    </button>
+                    <label class="icon-button attach-button" title="附加图片或文本文件">
                         <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M20 11.5l-7.8 7.8a5 5 0 0 1-7.1-7.1l8.2-8.2a3.4 3.4 0 0 1 4.8 4.8l-8.2 8.2a1.8 1.8 0 0 1-2.5-2.5l7.4-7.4" />
                         </svg>

@@ -220,6 +220,20 @@ before sending).
   (`file_block` in core, four tests). They live for one send and are cleared afterwards.
 - Adding a file is not yet part of the reference undo snapshot, same as images.
 
+## 7h. Progress — web search
+
+- Settings → 接口 gains 搜索 API Key（Tavily）; the key is stored in its own `search-key` file with
+  0600 permissions, never returned to the webview (`has_search_key` only).
+- `pdfscope-ai::search::tavily` isolates the provider (endpoint, result shape, snippet limit) so
+  another provider can replace it; six tests cover result parsing, missing titles/URLs, the five-result
+  cap and snippet truncation.
+- A globe toggle beside the composer turns search on for the next question. The command searches with
+  the typed question, appends up to five numbered `[来源 n]` blocks to the model context, and keeps the
+  title/URL pair in a 来源 shelf row. Clicking a chip opens it in the system browser.
+- Failures are explicit: no key, browser build, or a provider error stops the turn with a message and
+  does not fall back silently. An empty result set is reported and the question proceeds locally.
+- The 来源 chips are the citation cards; inline hover cards inside an answer are not built.
+
 ## 8. Gaps beyond the first inventory
 
 A second pass over mature assistants adds these, which the program should cover rather than

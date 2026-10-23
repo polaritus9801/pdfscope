@@ -2811,9 +2811,14 @@ body.selection-quiet .textLayer :is(span, br)::selection {
   cursor: pointer;
 }
 
-.attach-button:hover {
+.attach-button:hover,
+.attach-button.active {
   color: var(--accent);
   border-color: var(--accent);
+}
+
+.attach-button.active {
+  background: var(--accent-soft);
 }
 
 /* A conversation that is deliberately not written to storage. */

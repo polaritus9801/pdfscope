@@ -118,6 +118,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Web search through Tavily: a search key in settings, a globe toggle in the composer, numbered
+  results appended to the request and a 来源 shelf row that opens citations.
+
+
 - Attach text files to a question; they appear in the shelf, are counted in the budget and are sent
   as labelled, character-limited blocks.
 

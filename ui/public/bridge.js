@@ -20,6 +20,11 @@ window.Bridge = {
     return api.core.invoke("save_settings", { settings });
   },
 
+  async search(query) {
+    if (!available) throw new Error("联网搜索只在桌面版可用");
+    return api.core.invoke("web_search", { query });
+  },
+
   async stop() {
     if (!available) return;
     return api.core.invoke("stop_ask");

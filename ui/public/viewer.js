@@ -1909,6 +1909,11 @@ window.PDFScope = {
     }
   },
 
+  /// Opens a citation in the system browser.
+  openUrl(url) {
+    window.open(url, "_blank", "noopener");
+  },
+
   /// Reads the attachments chosen in a file input: images as data URLs, text files as text.
   async readAttachments(inputId) {
     const input = document.getElementById(inputId);

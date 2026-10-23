@@ -61,6 +61,8 @@ pub(crate) fn SettingsSheet(
     let form_mode = RwSignal::new("continuous".to_owned());
     let form_page_limit = RwSignal::new(0_u32);
     let form_timeout = RwSignal::new("0".to_owned());
+    let form_search_key = RwSignal::new(String::new());
+    let search_key_stored = RwSignal::new(false);
 
     let form_spread_offset = RwSignal::new(false);
 
@@ -121,6 +123,12 @@ pub(crate) fn SettingsSheet(
                         .unwrap_or_else(|| "0".to_owned()),
                 );
                 apply_request_timeout(&form_timeout.get());
+                search_key_stored.set(
+                    js_sys::Reflect::get(&value, &JsValue::from_str("has_search_key"))
+                        .ok()
+                        .and_then(|flag| flag.as_bool())
+                        .unwrap_or(false),
+                );
                 let _ = crate::call("setPageMode", &[JsValue::from_str(&form_mode.get())]);
                 let _ = crate::call(
                     "setDefaultZoom",
@@ -218,6 +226,15 @@ pub(crate) fn SettingsSheet(
             &JsValue::from_str("request_timeout"),
             &JsValue::from_f64(form_timeout.get().parse::<f64>().unwrap_or(0.0)),
         );
+        let search_key = form_search_key.get();
+        if !search_key.trim().is_empty() {
+            let _ = js_sys::Reflect::set(
+                &payload,
+                &JsValue::from_str("search_api_key"),
+                &JsValue::from_str(&search_key),
+            );
+        }
+        let _ = js_sys::Reflect::set(&payload, &JsValue::from_str("_placeholder"), &JsValue::NULL);
         let _ = js_sys::Reflect::set(
             &payload,
             &JsValue::from_str("default_zoom"),
@@ -253,6 +270,10 @@ pub(crate) fn SettingsSheet(
                         apply_font_size(&form_font_size.get());
                         page_limit.set(form_page_limit.get());
                         apply_request_timeout(&form_timeout.get());
+                        if !form_search_key.get().trim().is_empty() {
+                            search_key_stored.set(true);
+                        }
+                        form_search_key.set(String::new());
                         let _ = crate::call(
                             "setRememberPosition",
                             &[JsValue::from_bool(form_remember.get())],
@@ -601,6 +622,27 @@ pub(crate) fn SettingsSheet(
                                         </label>
                                         <p class="settings-hint">
                                             "0 表示不设限：模型思考多久都等。只有网络卡死时才会用到。"
+                                        </p>
+
+                                        <label class="settings-row">
+                                            <span>"搜索 API Key（Tavily）"</span>
+                                            <input
+                                                type="password"
+                                                placeholder=move || {
+                                                    if search_key_stored.get() {
+                                                        "已保存 · 留空保持不变"
+                                                    } else {
+                                                        "tvly-…"
+                                                    }
+                                                }
+                                                prop:value=move || form_search_key.get()
+                                                on:input=move |event| {
+                                                    form_search_key.set(event_target_value(&event))
+                                                }
+                                            />
+                                        </label>
+                                        <p class="settings-hint">
+                                            "用于联网搜索。默认使用 Tavily；填写后保存即可启用。"
                                         </p>
 
                                     <section class="settings-section">

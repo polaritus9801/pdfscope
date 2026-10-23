@@ -45,6 +45,9 @@ pub(crate) struct WindowState {
 /// reading your files — is not one the keychain removes for the same user either.
 const KEY_FILE: &str = "api-key";
 
+/// The search provider key lives beside the model key, with the same permissions.
+const SEARCH_KEY_FILE: &str = "search-key";
+
 /// What is stored on disk.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct Settings {
@@ -180,6 +183,9 @@ pub(crate) struct SettingsInput {
     pub(crate) request_timeout: Option<u32>,
     /// A new key, when the user typed one. `None` keeps the stored key.
     pub(crate) api_key: Option<String>,
+    /// A new search key, when the user typed one. `None` keeps the stored key.
+    #[serde(default)]
+    pub(crate) search_api_key: Option<String>,
 }
 
 /// What the webview is allowed to see.
@@ -215,6 +221,8 @@ pub(crate) struct SettingsView {
     pub(crate) request_timeout: u32,
     /// Whether a key is stored. The key itself never crosses this boundary.
     pub(crate) has_key: bool,
+    /// Whether a search-provider key is stored.
+    pub(crate) has_search_key: bool,
 }
 
 /// Reads the last recorded window geometry, if any.
@@ -285,6 +293,35 @@ fn has_key(app: &tauri::AppHandle) -> bool {
     read_key(app).is_some()
 }
 
+fn search_key_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let directory = app
+        .path()
+        .app_config_dir()
+        .map_err(|error| format!("无法定位配置目录：{error}"))?;
+    std::fs::create_dir_all(&directory).map_err(|error| format!("无法创建配置目录：{error}"))?;
+    Ok(directory.join(SEARCH_KEY_FILE))
+}
+
+fn read_search_key(app: &tauri::AppHandle) -> Option<String> {
+    let path = search_key_path(app).ok()?;
+    let key = std::fs::read_to_string(path).ok()?;
+    let key = key.trim().to_owned();
+    (!key.is_empty()).then_some(key)
+}
+
+fn write_search_key(app: &tauri::AppHandle, key: &str) -> Result<(), String> {
+    let path = search_key_path(app)?;
+    std::fs::write(&path, key).map_err(|error| format!("无法写入搜索 API Key：{error}"))?;
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
+    }
+
+    Ok(())
+}
+
 /// Reads the stored configuration for the webview.
 #[tauri::command]
 pub(crate) fn load_settings(app: tauri::AppHandle) -> Result<SettingsView, String> {
@@ -305,6 +342,7 @@ pub(crate) fn load_settings(app: tauri::AppHandle) -> Result<SettingsView, Strin
         page_limit: settings.page_limit,
         request_timeout: settings.request_timeout,
         has_key: has_key(&app),
+        has_search_key: read_search_key(&app).is_some(),
     })
 }
 
@@ -321,6 +359,11 @@ pub(crate) fn save_settings(app: tauri::AppHandle, settings: SettingsInput) -> R
     if let Some(key) = settings.api_key.as_deref().map(str::trim) {
         if !key.is_empty() {
             write_key(&app, key)?;
+        }
+    }
+    if let Some(key) = settings.search_api_key.as_deref().map(str::trim) {
+        if !key.is_empty() {
+            write_search_key(&app, key)?;
         }
     }
 
@@ -351,6 +394,18 @@ pub(crate) fn save_settings(app: tauri::AppHandle, settings: SettingsInput) -> R
         .map_err(|error| format!("无法序列化设置：{error}"))?;
     std::fs::write(path, json).map_err(|error| format!("无法写入设置：{error}"))?;
     Ok(())
+}
+
+/// Searches the web through the configured provider.
+#[tauri::command]
+pub(crate) async fn web_search(
+    app: tauri::AppHandle,
+    query: String,
+) -> Result<Vec<pdfscope_ai::search::WebResult>, String> {
+    let key = read_search_key(&app).ok_or_else(|| "还没有保存搜索 API Key".to_owned())?;
+    pdfscope_ai::search::tavily(&pdfscope_ai::Secret::new(key), &query)
+        .await
+        .map_err(|error| error.to_string())
 }
 
 /// Sends one tiny request so the reader can find out whether the settings work before saving them.

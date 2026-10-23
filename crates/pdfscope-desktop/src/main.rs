@@ -56,6 +56,7 @@ fn main() -> anyhow::Result<()> {
             settings::load_settings,
             settings::save_settings,
             settings::test_settings,
+            settings::web_search,
             ask::ask,
             ask::stop_ask
         ])
