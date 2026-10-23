@@ -10,6 +10,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Changed
 
+- The progress line now covers the header's bottom border, so it is flush at the edge, and the header
+  paints above the page so the dot is no longer cut in half.
+
+
 - The rail keeps its circle-plus-capsule shape while floating; the progress hairline is flush with the
   header edge, thicker on hover, with a plain purple dot.
 

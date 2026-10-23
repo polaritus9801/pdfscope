@@ -124,6 +124,7 @@ body {
 
 .bar {
   position: relative;
+  z-index: 5;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1548,15 +1549,16 @@ body {
   }
 }
 
-/* Reading progress: a hairline flush with the header's bottom edge. The line is drawn by the
-   container, so it sits exactly on the edge; the input is transparent but still drives dragging and
-   the arrow keys, and the dot is painted rather than borrowed from the native thumb. */
+/* Reading progress: the line covers the header's 1 px bottom border, so its outer edge *is* the
+   bottom edge — no hairline of border underneath it. The header paints above the stage (z-index), so
+   the dot can straddle that edge without being covered by the page. The input stays transparent but
+   keeps drag, click and arrow keys working. */
 .page-seek {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 0;
-  height: 16px;  /* size */
+  bottom: -1px;  /* size */
+  height: 17px;  /* size */
   z-index: 6;
 }
 
@@ -1595,7 +1597,8 @@ body {
 .seek-dot {
   position: absolute;
   bottom: -3px;  /* size */
-  left: var(--progress, 0%);
+  /* Clamped so the dot stays whole at the first and last page instead of being cut by the window. */
+  left: clamp(5px, var(--progress, 0%), calc(100% - 5px));
   width: 10px;  /* size */
   height: 10px;  /* size */
   margin-left: -5px;  /* size */

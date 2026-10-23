@@ -439,6 +439,10 @@ references, the composer says so before asking. The hidden fourth state is gone 
   pages. (An attempt to split it into four separate circles was rejected — the capsule is the design.)
 - The progress line is drawn by its container and sits flush with the header's bottom edge (3 px,
   4 px while hovered); its dot is painted purple with no ring and appears only on hover or focus.
+  Flush needed two things: the line covers the header's 1 px bottom border instead of sitting above
+  it, and the header paints above the stage (z-index) so the dot may straddle the edge without the
+  page covering its lower half. The dot is clamped 5 px from either end so page 1 and the last page
+  never cut it.
 - The page slider left the bottom strip (which is gone) and became a hairline on the bottom edge of
   the header: page 1 at the far left, the last page at the far right, with the accent fill showing
   progress. The handle appears only when the pointer is on the line or it has keyboard focus.
