@@ -1361,6 +1361,7 @@ fn App() -> impl IntoView {
                 page_limit=page_limit
                 answers=answers
                 next_answer=next_answer
+                document_key=file_name
             />
             </div>
         </div>

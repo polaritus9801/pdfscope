@@ -118,6 +118,9 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Conversations persist per document across restarts, with a 新对话 action to start clean.
+
+
 - The @ picker is keyboard-driven (↑/↓/Enter/Esc), and any sent question can be edited and resent,
   replacing that turn and the ones after it.
 

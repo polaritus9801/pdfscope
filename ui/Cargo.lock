@@ -920,6 +920,8 @@ dependencies = [
  "js-sys",
  "leptos",
  "pdfscope-core",
+ "serde",
+ "serde_json",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",

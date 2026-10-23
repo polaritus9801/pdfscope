@@ -12,6 +12,19 @@ use crate::scope_ui::PageManager;
 use crate::settings::SettingsSheet;
 use crate::{Passage, Region, truncate};
 
+/// Writes one document's transcript to the webview's storage.
+fn persist_turns(key: &str, turns: &[Turn]) {
+    if key.trim().is_empty() {
+        return;
+    }
+    if let Ok(json) = serde_json::to_string(turns) {
+        let _ = crate::call(
+            "saveTranscript",
+            &[JsValue::from_str(key), JsValue::from_str(&json)],
+        );
+    }
+}
+
 /// Replaces pill markers with numbered references; an orphaned marker becomes plain text.
 fn inline_question(raw: &str, order: &[String]) -> String {
     let mut text = raw.to_owned();
@@ -175,7 +188,7 @@ async fn fetch_page_text(number: u32) -> String {
 }
 
 /// One finished exchange.
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub(crate) struct Turn {
     question: String,
     answer: String,
@@ -210,6 +223,7 @@ pub fn AiPanel(
     page_limit: RwSignal<u32>,
     answers: RwSignal<Vec<crate::AnswerRef>>,
     next_answer: RwSignal<u64>,
+    document_key: RwSignal<String>,
 ) -> impl IntoView {
     let model = RwSignal::new("未配置".to_owned());
     let answer = RwSignal::new(String::new());
@@ -302,6 +316,7 @@ pub fn AiPanel(
             interrupted: interrupted.get(),
         };
         turns.update(|list| list.push(finished));
+        persist_turns(&document_key.get(), &turns.get());
         current_question.set(String::new());
         answer.set(String::new());
         reasoning.set(String::new());
@@ -395,6 +410,23 @@ pub fn AiPanel(
         if let Ok(init) = init.dyn_into::<js_sys::Function>() {
             let _ = init.call1(&composer, &element);
         }
+    });
+
+    // A different document starts from its own transcript, or from nothing.
+    Effect::new(move |_| {
+        let key = document_key.get();
+        if key.trim().is_empty() {
+            turns.set(Vec::new());
+            return;
+        }
+        let stored = crate::call("loadTranscript", &[JsValue::from_str(&key)])
+            .and_then(|value| value.as_string());
+        turns.set(
+            stored
+                .and_then(|json| serde_json::from_str::<Vec<Turn>>(&json).ok())
+                .unwrap_or_default(),
+        );
+        show_all.set(false);
     });
 
     let send_text = move |asked: String| {
@@ -952,7 +984,29 @@ pub fn AiPanel(
                 </button>
                 <span class="panel-title">"AI"</span>
                 <span class="panel-model">{move || model.get()}</span>
-
+                <button
+                    class="panel-new"
+                    title="新对话"
+                    on:click=move |_| {
+                        if streaming.get() {
+                            return;
+                        }
+                        turns.set(Vec::new());
+                        current_question.set(String::new());
+                        answer.set(String::new());
+                        reasoning.set(String::new());
+                        failed.set(false);
+                        show_all.set(false);
+                        let key = document_key.get();
+                        if !key.trim().is_empty() {
+                            let _ = crate::call("clearTranscript", &[JsValue::from_str(&key)]);
+                        }
+                    }
+                >
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+                        <path d="M12 5v14M5 12h14" />
+                    </svg>
+                </button>
             </div>
 
             <button

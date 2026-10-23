@@ -225,7 +225,7 @@ body {
   font: inherit;
   color: var(--ink);
   background: var(--surface-sunken);
-  border: 1px solid transparent;  /* size */
+  border: 1px solid transparent;  /* size */  /* size */
   border-radius: var(--radius-sm);
 }
 
@@ -1256,7 +1256,7 @@ body {
   font-size: var(--text-xs);
   color: var(--ink-muted);
   background: transparent;
-  border: 1px solid transparent;  /* size */
+  border: 1px solid transparent;  /* size */  /* size */
   border-radius: var(--radius-xs);
   cursor: pointer;
 }
@@ -2613,4 +2613,24 @@ body.selection-quiet .textLayer :is(span, br)::selection {
 
 .editing-banner .link {
   flex: none;
+}
+
+.panel-new {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;  /* size */
+  height: 26px;  /* size */
+  margin-left: auto;
+  padding: 0;
+  color: var(--ink-muted);
+  background: transparent;
+  border: 1px solid transparent;  /* size */
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.panel-new:hover {
+  color: var(--accent);
+  background: var(--accent-soft);
 }

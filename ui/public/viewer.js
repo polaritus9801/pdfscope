@@ -1909,6 +1909,31 @@ window.PDFScope = {
     }
   },
 
+  /// The transcript of one document, persisted in the webview's local storage.
+  loadTranscript(key) {
+    try {
+      return window.localStorage.getItem(`pdfscope.transcript.${key}`);
+    } catch {
+      return null;
+    }
+  },
+
+  saveTranscript(key, json) {
+    try {
+      window.localStorage.setItem(`pdfscope.transcript.${key}`, json);
+    } catch {
+      // Storage may be full or disabled; losing persistence is better than losing the answer.
+    }
+  },
+
+  clearTranscript(key) {
+    try {
+      window.localStorage.removeItem(`pdfscope.transcript.${key}`);
+    } catch {
+      // Nothing to clear.
+    }
+  },
+
   /// The text the reader has selected inside one element, if the selection starts there.
   selectedTextWithin(id) {
     const element = document.getElementById(id);

@@ -171,6 +171,14 @@ before sending).
   active row highlighted) and Enter picks; Esc closes it. Every turn has 编辑, which puts its question
   back in the editor behind a banner and, on send, replaces that turn and everything after it.
 
+## 7c. Progress — persistence
+
+- Each document's transcript is stored in the webview's local storage under its file name and loaded
+  when that document opens, so closing the app no longer loses the conversation.
+- `新对话` clears the transcript and its stored copy; it refuses while a turn streams.
+- Still missing from the history model: multiple conversations, search, rename, pin and delete.
+  A full manager needs a conversation record (id, title, timestamps) rather than one array per file.
+
 ## 8. Gaps beyond the first inventory
 
 A second pass over mature assistants adds these, which the program should cover rather than
