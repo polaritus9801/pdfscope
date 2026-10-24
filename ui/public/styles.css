@@ -3905,12 +3905,10 @@ body.selection-quiet .textLayer :is(span, br)::selection {
 @keyframes turn-in {
   from {
     opacity: 0;
-    transform: translateY(4px);  /* size */
   }
 
   to {
     opacity: 1;
-    transform: none;
   }
 }
 
@@ -4388,20 +4386,24 @@ body.panel-dragging .panel-resize::after {
 }
 
 .question-refs-popover {
-  position: absolute;
-  top: calc(100% + 6px);  /* size */
-  right: 4px;  /* size */
-  left: auto;
+  position: fixed;
+  top: 0;
+  left: 0;
   z-index: 31;
   display: flex;
   flex-direction: column;
   width: min(300px, calc(100vw - 40px));  /* size */
-  max-height: 300px;  /* size */
+  max-height: min(300px, calc(100vh - 24px));  /* size */
   overflow: hidden;
+  visibility: hidden;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-3);
+}
+
+.question-refs-popover.positioned {
+  visibility: visible;
 }
 
 .question-refs-head {
@@ -4545,14 +4547,34 @@ body.panel-dragging .panel-resize::after {
   white-space: nowrap;
 }
 
-/* Finder drops: one region opens a PDF, the other feeds the composer attachment pipeline. */
-.stage.drop-active {
-  outline: 2px dashed var(--accent-strong);  /* size */
-  outline-offset: -10px;  /* size */
+/* Finder drops: only the region under the pointer dims, blurs and shows the destination icon. */
+.region-drop-cover {
+  position: fixed;
+  z-index: 95;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: #ffffff;
+  background: rgb(20 16 26 / 52%);
+  backdrop-filter: blur(4px);  /* size */
+  pointer-events: none;
 }
 
-.panel.drop-active {
-  box-shadow: inset 0 0 0 2px var(--accent-strong);  /* size */
+.region-drop-cover svg {
+  width: min(42%, 200px);  /* size */
+  height: auto;
+  max-height: 46%;
+  fill: currentColor;
+}
+
+.region-drop-cover span {
+  position: absolute;
+  bottom: max(16px, 9%);  /* size */
+  font-size: clamp(17px, 2.4vw, 26px);  /* size */
+  font-weight: 600;
+  color: #ffffff;
+  text-shadow: 0 1px 8px rgb(0 0 0 / 24%);  /* size */
 }
 
 .app-drop-notice {
@@ -4588,54 +4610,4 @@ body.panel-dragging .panel-resize::after {
   width: 180px;  /* size */
   height: auto;
   border-radius: 2px;  /* size */
-}
-
-/* Finder dragging: dim and blur the whole app so the drop destination is unmistakable. */
-.file-drop-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 95;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgb(24 20 32 / 34%);
-  backdrop-filter: blur(3px);  /* size */
-  pointer-events: none;
-}
-
-.file-drop-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;  /* size */
-  min-width: 280px;  /* size */
-  padding: 24px 32px;  /* size */
-  color: var(--ink);
-  text-align: center;
-  background: var(--surface);
-  border: 1px dashed var(--accent-strong);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-3);
-}
-
-.file-drop-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 52px;  /* size */
-  height: 52px;  /* size */
-  margin-bottom: 2px;  /* size */
-  color: var(--accent);
-  background: var(--accent-soft);
-  border-radius: var(--radius-full);
-}
-
-.file-drop-card strong {
-  font-size: var(--text-lg);
-  font-weight: 600;
-}
-
-.file-drop-card span {
-  color: var(--ink-muted);
-  font-size: var(--text-sm);
 }

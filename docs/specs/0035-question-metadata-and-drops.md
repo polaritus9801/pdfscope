@@ -33,8 +33,9 @@ same `readAttachments` path as the paperclip button.
 - Dropping on the reader opens the first PDF.
 - Dropping a non-PDF on the reader shows `阅读器只支持打开 PDF；其他文件请拖到右侧 AI 面板`.
 - Drop targets get a purple outline while a file is dragged.
-- While files are dragged, the whole app dims and blurs behind a centered upload card; the card text
-  changes between “松开以添加到输入框”, “松开以打开 PDF”, and the no-target guidance.
+- While files are dragged, only the region under the pointer dims and blurs: the PDF stage or the AI
+  panel. A large white upload glyph (the supplied SVG) sits in the middle; the white caption at the
+  bottom reads “打开文件” on the reader and “上传文件” on the panel. There is no third overlay state.
 
 Tauri's native drag interception is disabled (`dragDropEnabled: false`) so the webview receives real
 `File` objects. Dropped PDFs therefore open through the reader's normal file input; the bytes path is
@@ -47,7 +48,7 @@ used and the recents entry has no native path.
 - Pasting an image/file into the editor adds a composer attachment.
 - Dropping an image/file on the panel adds it to the composer.
 - Dropping a PDF on the reader opens it; an unsupported file shows the notice.
-- Dragging over either side shows the dim/blur upload card with the correct destination copy.
+- Dragging over either side dims/blurs only that region and shows the correct white caption.
 - Duplicate reference activation adds nothing and shows the red “已经在上下文里了” notice.
 - Creating a new conversation focuses the composer.
 - `just check` green.

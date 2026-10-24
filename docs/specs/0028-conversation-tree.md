@@ -66,6 +66,6 @@ per node, hidden when the node has no alternative and while a turn streams. The 
 
 ## Resume selection
 
-Opening a document selects its newest conversation by default. Settings → 阅读 → 打开文档时 can switch
-to “置顶对话优先”; within the pinned group and the unpinned group, the newest `updated` conversation is
-first. The drawer always sorts pinned conversations above unpinned ones and each group newest-first.
+Opening a document selects its newest conversation by default: pinned conversations first, and the
+newest pinned conversation when several are pinned. Settings → 阅读 → 打开文档时 can switch to
+“最新对话优先”; within either group the newest `updated` conversation is first. The drawer always sorts pinned conversations above unpinned ones and each group newest-first.

@@ -65,11 +65,10 @@ fn format_moment_full(timestamp: f64) -> String {
 pub(crate) const RESUME_PREFERENCE_KEY: &str = "pdfscope.resume-pinned";
 
 fn resume_prefers_pinned() -> bool {
-    web_sys::window()
+    let stored = web_sys::window()
         .and_then(|window| window.local_storage().ok().flatten())
-        .and_then(|storage| storage.get_item(RESUME_PREFERENCE_KEY).ok().flatten())
-        .as_deref()
-        == Some("pinned")
+        .and_then(|storage| storage.get_item(RESUME_PREFERENCE_KEY).ok().flatten());
+    stored.as_deref() != Some("latest")
 }
 
 /// Consecutive page numbers collapsed into inclusive ranges.

@@ -59,8 +59,9 @@ with the bubble:
 
 - Clicking the capsule opens one popover below it; clicking again, clicking outside (scrim), or Esc
   closes it. It stays open after a reference row is clicked, so several can be added.
-- The popover is 300px wide and right-aligned to the capsule, so it opens leftward and stays inside
-  the AI panel even when the question bubble is at the right edge.
+- The popover is capped at 300px. It starts at the capsule's left edge and extends right; if that
+  would cross the AI panel edge it shifts left only as far as needed, and on a narrow panel it is
+  clamped to the panel width.
 - The popover lists every stored reference with a kind icon, label and page/kind metadata.
 - Hovering a passage, region or page sets the shared `hovered` highlight; the reader does **not**
   scroll. If that page is outside the viewport, a small page image appears beside the popover instead.

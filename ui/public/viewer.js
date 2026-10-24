@@ -2543,14 +2543,6 @@ function dropNotice(message) {
   window.setTimeout(() => notice.remove(), 3200);
 }
 
-function dropTargets() {
-  return [...document.querySelectorAll(".stage.drop-active, .panel.drop-active")];
-}
-
-function clearDropTargets() {
-  for (const element of dropTargets()) element.classList.remove("drop-active");
-}
-
 function isPdfFile(file) {
   return file.name.toLowerCase().endsWith(".pdf") || file.type === "application/pdf";
 }
@@ -2566,48 +2558,44 @@ function openDroppedPdf(file) {
   return true;
 }
 
-let dropOverlay = null;
+let dropCover = null;
 
-function ensureDropOverlay() {
-  if (dropOverlay?.isConnected) return dropOverlay;
-  const overlay = document.createElement("div");
-  overlay.className = "file-drop-overlay";
-  overlay.innerHTML = `
-    <div class="file-drop-card">
-      <div class="file-drop-icon">
-        <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor"
-          stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M12 16V4M6 10l6-6 6 6"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/>
-        </svg>
-      </div>
-      <strong></strong>
-      <span></span>
-    </div>`;
-  document.body.append(overlay);
-  dropOverlay = overlay;
-  return overlay;
+const DROP_ICON = `<svg viewBox="0 0 1024 1024" fill="currentColor" aria-hidden="true">
+  <path d="M895.5 831.7H128c-35.1 0-63.8 28.7-63.8 63.8 0 35.1 28.7 63.8 63.8 63.8h767.5c35.1 0 63.8-28.7 63.8-63.8 0-35.1-28.7-63.8-63.8-63.8zM213.2 448.2H352v259.2c0 33.3 27 60.4 60.4 60.4h199.4c33.3 0 60.4-27 60.4-60.4V448.2H811c26.7 0 40.7-31.8 22.5-51.5L534.6 73.2c-12.1-13.1-32.9-13.1-45.1 0L190.7 396.7c-18.1 19.7-4.2 51.5 22.5 51.5z"></path>
+</svg>`;
+
+function ensureDropCover() {
+  if (dropCover?.isConnected) return dropCover;
+  const cover = document.createElement("div");
+  cover.className = "region-drop-cover";
+  cover.innerHTML = `${DROP_ICON}<span></span>`;
+  document.body.append(cover);
+  dropCover = cover;
+  return cover;
 }
 
-function updateDropOverlay(zone) {
-  const overlay = ensureDropOverlay();
-  const title = overlay.querySelector("strong");
-  const hint = overlay.querySelector("span");
-  overlay.dataset.zone = zone;
-  if (zone === "panel") {
-    title.textContent = "松开以添加到输入框";
-    hint.textContent = "图片、PDF、Office、文本或代码文件";
-  } else if (zone === "stage") {
-    title.textContent = "松开以打开 PDF";
-    hint.textContent = "阅读器只打开 PDF；其他文件请拖到右侧 AI 面板";
-  } else {
-    title.textContent = "拖到左侧打开 PDF，或拖到右侧添加附件";
-    hint.textContent = "支持 PDF、图片、Office 与文本/代码文件";
+function updateDropCover(target) {
+  const panel = target?.closest?.(".panel") ?? null;
+  const stage = target?.closest?.(".stage") ?? null;
+  const zone = panel ? "panel" : stage ? "stage" : null;
+  if (!zone) {
+    hideDropCover();
+    return;
   }
+  const region = panel ?? stage;
+  const rect = region.getBoundingClientRect();
+  const cover = ensureDropCover();
+  cover.dataset.zone = zone;
+  cover.style.left = `${rect.left}px`;
+  cover.style.top = `${rect.top}px`;
+  cover.style.width = `${rect.width}px`;
+  cover.style.height = `${rect.height}px`;
+  cover.querySelector("span").textContent = zone === "panel" ? "上传文件" : "打开文件";
 }
 
-function hideDropOverlay() {
-  dropOverlay?.remove();
-  dropOverlay = null;
+function hideDropCover() {
+  dropCover?.remove();
+  dropCover = null;
 }
 
 function initFileDrops() {
@@ -2615,27 +2603,18 @@ function initFileDrops() {
     if (!hasFileDrop(event)) return;
     event.preventDefault();
     if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
-    clearDropTargets();
     const target = event.target instanceof Element ? event.target : null;
-    const panel = target?.closest(".panel");
-    const stage = target?.closest(".stage");
-    if (panel) panel.classList.add("drop-active");
-    else if (stage) stage.classList.add("drop-active");
-    updateDropOverlay(panel ? "panel" : stage ? "stage" : "none");
+    updateDropCover(target);
   });
 
   document.addEventListener("dragleave", (event) => {
-    if (event.relatedTarget === null) {
-      clearDropTargets();
-      hideDropOverlay();
-    }
+    if (event.relatedTarget === null) hideDropCover();
   });
 
   document.addEventListener("drop", (event) => {
     if (!hasFileDrop(event)) return;
     event.preventDefault();
-    clearDropTargets();
-    hideDropOverlay();
+    hideDropCover();
     const files = [...(event.dataTransfer?.files ?? [])];
     if (files.length === 0) return;
     const target = event.target instanceof Element ? event.target : null;
@@ -2655,10 +2634,7 @@ function initFileDrops() {
     dropNotice("把 PDF 拖到左侧阅读器，或把附件拖到右侧 AI 面板");
   });
 
-  document.addEventListener("dragend", () => {
-    clearDropTargets();
-    hideDropOverlay();
-  });
+  document.addEventListener("dragend", () => hideDropCover());
 }
 
 
@@ -3505,6 +3481,58 @@ async function showReferencePreview(row, number) {
   box.style.top = `${Math.max(8, Math.min(target.top, window.innerHeight - box.offsetHeight - 8))}px`;
   if (left < 8) box.style.left = `${Math.min(window.innerWidth - box.offsetWidth - 8, target.right + 10)}px`;
 }
+
+let referencePlacementFrame = 0;
+
+function placeReferencePopovers() {
+  if (referencePlacementFrame) cancelAnimationFrame(referencePlacementFrame);
+  referencePlacementFrame = requestAnimationFrame(() => {
+    referencePlacementFrame = 0;
+    const panel = document.querySelector(".panel");
+    if (!panel) return;
+    const panelBox = panel.getBoundingClientRect();
+    for (const popover of document.querySelectorAll(".question-refs-popover")) {
+      const badge = popover.closest(".question-refs")?.querySelector(".question-refs-badge");
+      if (!badge) continue;
+      const capsule = badge.getBoundingClientRect();
+      // Start at the capsule's left edge and extend right; only flip left when the panel edge is
+      // reached. The width is capped so a narrow panel simply truncates the row labels.
+      const width = Math.min(300, Math.max(180, panelBox.width - 16));
+      popover.style.width = `${width}px`;
+      let left = capsule.left;
+      if (left + width > panelBox.right - 8) left = panelBox.right - width - 8;
+      if (left < panelBox.left + 8) left = panelBox.left + 8;
+      const height = popover.getBoundingClientRect().height;
+      let top = capsule.bottom + 6;
+      if (top + height > window.innerHeight - 8) {
+        top = Math.max(8, capsule.top - height - 6);
+      }
+      popover.style.left = `${Math.round(left)}px`;
+      popover.style.top = `${Math.round(top)}px`;
+      popover.classList.add("positioned");
+    }
+  });
+}
+
+function initReferencePlacement() {
+  document.addEventListener(
+    "click",
+    (event) => {
+      if (event.target instanceof Element && event.target.closest(".question-refs-badge")) {
+        window.setTimeout(placeReferencePopovers, 0);
+      }
+    },
+    true,
+  );
+  document.addEventListener("scroll", placeReferencePopovers, true);
+  window.addEventListener("resize", placeReferencePopovers);
+  const observer = new MutationObserver(() => {
+    if (document.querySelector(".question-refs-popover")) placeReferencePopovers();
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+}
+
+initReferencePlacement();
 
 function initReferencePreviews() {
   document.addEventListener("pointerover", (event) => {

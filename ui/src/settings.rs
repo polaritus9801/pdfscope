@@ -29,7 +29,7 @@ fn read_resume_preference() -> String {
         .and_then(|window| window.local_storage().ok().flatten())
         .and_then(|storage| storage.get_item(RESUME_PREFERENCE_KEY).ok().flatten())
         .filter(|value| value == "pinned" || value == "latest")
-        .unwrap_or_else(|| "latest".to_owned())
+        .unwrap_or_else(|| "pinned".to_owned())
 }
 
 fn write_resume_preference(value: &str) {
@@ -557,11 +557,11 @@ pub(crate) fn SettingsSheet(
                                                 form_resume.set(value.clone());
                                                 write_resume_preference(&value);
                                             }>
+                                                <option value="pinned" selected=move || form_resume.get() == "pinned">
+                                                    "置顶对话优先（默认）"
+                                                </option>
                                                 <option value="latest" selected=move || form_resume.get() == "latest">
                                                     "最新对话优先"
-                                                </option>
-                                                <option value="pinned" selected=move || form_resume.get() == "pinned">
-                                                    "置顶对话优先"
                                                 </option>
                                             </select>
                                         </label>
@@ -608,8 +608,8 @@ pub(crate) fn SettingsSheet(
                                                 on:click=move |_| {
                                                     form_zoom.set("100".to_owned());
                                                     form_remember.set(true);
-                                                    form_resume.set("latest".to_owned());
-                                                    write_resume_preference("latest");
+                                                    form_resume.set("pinned".to_owned());
+                                                    write_resume_preference("pinned");
                                                 }
                                             >
                                                 "恢复阅读默认"
