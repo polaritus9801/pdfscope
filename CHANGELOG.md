@@ -130,8 +130,9 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
-- The empty reader is one panel with an inset vertical rule: a compressed guide on the left and a
-  right library split into “最近打开” and “推荐打开”. Both sections show five compact rows with the
+- The empty reader is a floating OOBE overlay above the whole app (dimmed blurred backdrop, centred
+  max-1040px panel, internal scroll and a narrow-screen stack), with an inset vertical rule, a
+  compressed guide on the left and a right library split into “最近打开” and “推荐打开”. Both sections show five compact rows with the
   supplied PDF type mark; recents keep bytes and paths in IndexedDB, while the desktop shell scans
   Downloads, Desktop, Documents and the five recent directories for direct PDF children, newest
   first. Native file picking/opening, missing-file handling and a browser fallback are included.

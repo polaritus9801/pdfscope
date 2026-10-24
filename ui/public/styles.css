@@ -299,16 +299,34 @@ body {
   display: none !important;
 }
 
-.empty {
-  position: absolute;
+.oobe-overlay {
+  position: fixed;
   inset: 0;
-  container-type: inline-size;
+  z-index: 60;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--space-1);
-  pointer-events: none;
+  overflow: auto;
+  padding: var(--space-6);
+  background: rgb(24 20 32 / 46%);
+  backdrop-filter: blur(7px);  /* size */
+  overscroll-behavior: contain;
+  container-type: inline-size;
+}
+
+.oobe-error {
+  position: absolute;
+  left: 50%;
+  bottom: var(--space-5);
+  max-width: min(620px, calc(100% - 2 * var(--space-5)));
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  color: var(--danger);
+  background: var(--surface);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-2);
+  transform: translateX(-50%);
 }
 
 /* First run: three steps, each naming a control the reader can see. */
@@ -316,9 +334,9 @@ body {
   display: flex;
   flex-wrap: wrap;
   align-items: stretch;
-  width: min(980px, 100%);  /* size */
+  width: min(1040px, 100%);  /* size */
   max-height: 100%;
-  overflow: hidden;
+  overflow: auto;
   text-align: left;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -4258,15 +4276,12 @@ body.panel-dragging .panel-resize::after {
 
 
 
-/* When the stage is too narrow for a side-by-side guide, stack the two halves without the vertical
-   rule. The container is .empty, so this responds to the reader width rather than the viewport. */
-@container (max-width: 760px) {  /* size */
+/* The overlay is the container: the floating panel stays centred and readable at every window size. */
+@container (max-width: 800px) {  /* size */
   .welcome-shell {
     flex-direction: column;
     flex-wrap: nowrap;
     width: min(560px, 100%);  /* size */
-    max-height: 100%;
-    overflow: auto;
   }
 
   .welcome {

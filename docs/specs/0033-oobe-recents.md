@@ -4,7 +4,13 @@
 
 ## Layout
 
-The empty reader is a single surface (`980px` max) with one internal vertical rule:
+The empty reader is a **fixed overlay above the whole application**, not a child of the PDF stage:
+a dimmed/blurred backdrop covers the header, stage, rail and AI panel, and a floating panel is
+centred in the remaining viewport with 32px breathing room. The panel is max `1040px` wide,
+`max-height: 100%` with internal scrolling, and stacks below an 800px overlay width. This makes the
+OOBE independent of the PDF stage/panel width and usable at any window size.
+
+Inside that floating panel is a single surface with one internal vertical rule:
 
 - **Left** — the existing guide (eyebrow, title, three steps, two actions), compressed to a `330px`
   column so the right side gets the space. The actions have an 8 px gap. `text-wrap: pretty` keeps the
@@ -16,9 +22,11 @@ The empty reader is a single surface (`980px` max) with one internal vertical ru
 - Each row is compact: the supplied red PDF type mark, one-line name, `size · relative age`, and a
   chevron. Both sections use the same header, count, row, empty and loading styles. Five entries per
   section keeps the panel shallow while showing enough files.
-- At a stage narrower than 760 px (container query on `.empty`), the panel stacks vertically, hides
-  the vertical rule, and scrolls if needed.
-- Double-clicking the panel does not bubble to the stage’s “open file” handler.
+- At an overlay narrower than 800 px (container query on `.oobe-overlay`), the panel stacks
+  vertically, hides the vertical rule, and scrolls internally if the height is short.
+- Double-clicking the panel does not bubble to the stage’s “open file” handler; the backdrop blocks
+  the rest of the application. Errors raised while the OOBE is open appear in an `.oobe-error` toast
+  above the backdrop.
 
 ## Recent documents
 

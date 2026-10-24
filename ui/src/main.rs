@@ -1121,776 +1121,785 @@ fn App() -> impl IntoView {
     });
 
     view! {
-        <div
-            class="app"
-            class:reading=move || reading.get()
-            id="app-root"
-            tabindex="0"
-            on:keydown=on_key
-        >
-            <header class="bar">
-                <div class="bar-left">
-                    <span class="brand">"PDFScope"</span>
-                    <label
-                        class="button button-primary"
-                        on:click=move |event: web_sys::MouseEvent| {
-                            if call("nativeOpenAvailable", &[])
-                                .and_then(|value| value.as_bool())
-                                .unwrap_or(false)
-                            {
-                                event.prevent_default();
-                                open_native();
+            <div
+                class="app"
+                class:reading=move || reading.get()
+                id="app-root"
+                tabindex="0"
+                on:keydown=on_key
+            >
+                <header class="bar">
+                    <div class="bar-left">
+                        <span class="brand">"PDFScope"</span>
+                        <label
+                            class="button button-primary"
+                            on:click=move |event: web_sys::MouseEvent| {
+                                if call("nativeOpenAvailable", &[])
+                                    .and_then(|value| value.as_bool())
+                                    .unwrap_or(false)
+                                {
+                                    event.prevent_default();
+                                    open_native();
+                                }
                             }
-                        }
-                    >
-                        "打开 PDF"
-                        <input
-                            id="file-input"
-                            class="file-input"
-                            type="file"
-                            accept="application/pdf"
-                            on:change=open
-                        />
-                    </label>
-                    <span class="file-name">{move || file_name.get()}</span>
-
-                </div>
-
-                <div class="bar-center">
-                    <button
-                        class="button"
-                        title="上一页"
-                        prop:disabled=move || { page.get() <= 1 }
-                        on:click=move |_| go(-1)
-                    >
-                        "‹"
-                    </button>
-                    <input
-                        class="page-field"
-                        type="text"
-                        inputmode="numeric"
-                        prop:value=move || page.get().to_string()
-                        prop:disabled=move || !ready.get()
-                        on:change=jump
-                    />
-                    <span class="page-total">
-                        {move || {
-                            if pages.get() == 0 { "/ —".to_owned() } else { format!("/ {}", pages.get()) }
-                        }}
-                    </span>
-                    <button
-                        class="button"
-                        title="下一页"
-                        prop:disabled=move || { pages.get() == 0 || page.get() >= pages.get() }
-                        on:click=move |_| go(1)
-                    >
-                        "›"
-                    </button>
-                </div>
-
-                <div class="bar-right">
-                    <button
-                        class="button icon-only"
-                        title="目录与缩略图"
-                        prop:disabled=move || !ready.get()
-                        on:click=move |_| outline_open.update(|open| *open = !*open)
-                    >
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
-                            <path d="M4 6h3M10 6h10M4 12h3M10 12h10M4 18h3M10 18h10" />
-                        </svg>
-                    </button>
-                    <button
-                        class="button"
-                        title="缩小"
-                        prop:disabled=move || { !ready.get() || zoom.get() <= 50 }
-                        on:click=move |_| zoom_by(-1)
-                    >
-                        "−"
-                    </button>
-                    <span class="zoom">{move || format!("{}%", zoom.get())}</span>
-                    <button
-                        class="button"
-                        title="放大"
-                        prop:disabled=move || { !ready.get() || zoom.get() >= 400 }
-                        on:click=move |_| zoom_by(1)
-                    >
-                        "+"
-                    </button>
-                    <button
-                        class="button"
-                        prop:disabled=move || !ready.get()
-                        on:click=move |_| fit_width(())
-                    >
-                        "适应宽度"
-                    </button>
-                    <button
-                        class="button"
-                        title="设置"
-                        on:click=move |_| settings_open.set(true)
-                    >
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="12" cy="12" r="3" />
-                            <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" />
-                        </svg>
-                    </button>
-                </div>
-                <div
-                    class="page-seek"
-                    class:hidden=move || !ready.get()
-                    style=move || {
-                        let total = f64::from(pages.get().max(1));
-                        let position = (f64::from(page.get()) - 1.0).clamp(0.0, total - 1.0);
-                        let percent = position / (total - 1.0).max(1.0) * 100.0;
-                        format!("--progress: {percent:.2}%")
-                    }
-                >
-                    <input
-                        class="seek-range"
-                        type="range"
-                        min="1"
-                        max=move || pages.get().max(1).to_string()
-                        prop:value=move || page.get().to_string()
-                        aria-label="阅读进度"
-                        on:input=jump
-                    />
-                    <span class="seek-dot" aria-hidden="true"></span>
-                </div>
-            </header>
-
-
-
-            <Show when=move || !configured.get()>
-                <div class="key-banner">
-                    <span>"还没有配置模型，提问前需要填一个 API Key。"</span>
-                    <button class="button" on:click=move |_| settings_open.set(true)>
-                        "去设置"
-                    </button>
-                </div>
-            </Show>
-
-            <div class="workspace">
-                {move || {
-                    if !find_open.get() {
-                        return ().into_any();
-                    }
-                    view! {
-                        <div class="find-bar">
+                        >
+                            "打开 PDF"
                             <input
-                                id="find-input"
-                                class="find-input"
-                                type="text"
-                                placeholder="查找… 回车"
-                                prop:value=move || find_text.get()
-                                on:input=move |event| find_text.set(event_target_value(&event))
-                                on:keydown=move |event: web_sys::KeyboardEvent| {
-                                    if event.key() == "Enter" {
-                                        event.prevent_default();
-                                        run_find();
-                                    }
-                                }
+                                id="file-input"
+                                class="file-input"
+                                type="file"
+                                accept="application/pdf"
+                                on:change=open
                             />
-                            <span class="find-count">
-                                {move || {
-                                    if find_text.get().trim().is_empty() {
-                                        String::new()
-                                    } else if find_total.get() == 0 {
-                                        "没有匹配".to_owned()
-                                    } else {
-                                        format!(
-                                            "{} 处 · {}/{}",
-                                            find_total.get(),
-                                            find_index.get() + 1,
-                                            find_pages.get().len(),
-                                        )
-                                    }
-                                }}
-                            </span>
-                            <button
-                                class="icon-button"
-                                title="上一处"
-                                prop:disabled=move || find_pages.get().is_empty()
-                                on:click=move |_| step_find(-1)
-                            >
-                                "‹"
-                            </button>
-                            <button
-                                class="icon-button"
-                                title="下一处"
-                                prop:disabled=move || find_pages.get().is_empty()
-                                on:click=move |_| step_find(1)
-                            >
-                                "›"
-                            </button>
-                            <button
-                                class="icon-button"
-                                title="关闭"
-                                on:click=move |_| {
-                                    find_open.set(false);
-                                    let _ = call("clearFind", &[]);
-                                }
-                            >
-                                "✕"
-                            </button>
-                        </div>
-                    }
-                        .into_any()
-                }}
+                        </label>
+                        <span class="file-name">{move || file_name.get()}</span>
 
-                <Show when=move || outline_open.get()>
-                    <aside class="outline">
-                        <div class="outline-head">
-                            <div class="rail-tabs">
-                                <button
-                                    class="rail-tab"
-                                    class:active=move || rail_tab.get() == 0
-                                    on:click=move |_| rail_tab.set(0)
-                                >
-                                    "目录"
-                                </button>
-                                <button
-                                    class="rail-tab"
-                                    class:active=move || rail_tab.get() == 1
-                                    on:click=move |_| {
-                                        rail_tab.set(1);
-                                        schedule_thumbnails();
-                                    }
-                                >
-                                    "缩略图"
-                                </button>
-                            </div>
-                            <button
-                                class="icon-button"
-                                title="关闭"
-                                on:click=move |_| outline_open.set(false)
-                            >
-                                "✕"
-                            </button>
-                        </div>
-                        {move || {
-                            if rail_tab.get() == 1 {
-                                view! {
-                                    <div class="thumb-list">
-                                        {(1..=pages.get())
-                                            .map(|number| {
-                                                view! {
-                                                    <button
-                                                        class="thumb"
-                                                        data-page=number
-                                                        title=format!("第 {number} 页")
-                                                        on:click=move |_| {
-                                                            page.set(number);
-                                                            outline_open.set(false);
-                                                        }
-                                                    >
-                                                        <span class="thumb-number">{number}</span>
-                                                    </button>
-                                                }
-                                            })
-                                            .collect_view()}
-                                    </div>
-                                }
-                                    .into_any()
-                            } else {
-                                view! {
-                                    <div class="outline-list">
-                            {move || {
-                                outline
-                                    .get()
-                                    .is_empty()
-                                    .then(|| view! { <p class="outline-empty">"这份文件没有目录"</p> })
-                            }}
-                            {move || {
-                                outline
-                                    .get()
-                                    .into_iter()
-                                    .map(|(title, target, depth)| {
-                                        let label = if title.trim().is_empty() {
-                                            format!("第 {target} 页")
-                                        } else {
-                                            title
-                                        };
-                                        view! {
-                                            <button
-                                                class="outline-item"
-                                                style=format!(
-                                                    "padding-left: calc(var(--space-3) + {}px)",
-                                                    u32::from(depth) * 12,
-                                                )
-                                                prop:disabled=target == 0
-                                                on:click=move |_| {
-                                                    if target > 0 {
-                                                        page.set(target);
-                                                        outline_open.set(false);
-                                                    }
-                                                }
-                                            >
-                                                {label}
-                                            </button>
-                                        }
-                                    })
-                                    .collect_view()
-                            }}
-                                    </div>
-                                }
-                                    .into_any()
-                            }
-                        }}
-                    </aside>
-                </Show>
+                    </div>
 
-                <div class="tool-rail">
-                    <button
-                        class="rail-pointer"
-                        class:active=move || tool.get() == 0
-                        title="指针：正常阅读与选择（V）"
-                        on:click=move |_| choose_tool(0)
-                    >
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M5 3l6.5 16 2.4-6.1L20 10.5 5 3z" />
-                        </svg>
-                    </button>
-                    <div class="rail-capsule">
+                    <div class="bar-center">
                         <button
-                            class="rail-tool"
-                            class:active=move || tool.get() == 1
-                            class:borrowed=move || tool.get() != 1 && borrowed_tool.get() == Some(1)
-                            title="文字：划选即加入引用（T · ⇧ 临时）"
+                            class="button"
+                            title="上一页"
+                            prop:disabled=move || { page.get() <= 1 }
+                            on:click=move |_| go(-1)
+                        >
+                            "‹"
+                        </button>
+                        <input
+                            class="page-field"
+                            type="text"
+                            inputmode="numeric"
+                            prop:value=move || page.get().to_string()
                             prop:disabled=move || !ready.get()
-                            on:click=move |_| choose_tool(1)
+                            on:change=jump
+                        />
+                        <span class="page-total">
+                            {move || {
+                                if pages.get() == 0 { "/ —".to_owned() } else { format!("/ {}", pages.get()) }
+                            }}
+                        </span>
+                        <button
+                            class="button"
+                            title="下一页"
+                            prop:disabled=move || { pages.get() == 0 || page.get() >= pages.get() }
+                            on:click=move |_| go(1)
+                        >
+                            "›"
+                        </button>
+                    </div>
+
+                    <div class="bar-right">
+                        <button
+                            class="button icon-only"
+                            title="目录与缩略图"
+                            prop:disabled=move || !ready.get()
+                            on:click=move |_| outline_open.update(|open| *open = !*open)
                         >
                             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
-                                <path d="M4 6h16M4 12h11M4 18h16" />
+                                <path d="M4 6h3M10 6h10M4 12h3M10 12h10M4 18h3M10 18h10" />
                             </svg>
                         </button>
                         <button
-                            class="rail-tool"
-                            class:active=move || tool.get() == 2
-                            class:borrowed=move || tool.get() != 2 && borrowed_tool.get() == Some(2)
-                            title="框选：拖出矩形（B · ⌥ 临时）"
-                            prop:disabled=move || !ready.get()
-                            on:click=move |_| choose_tool(2)
+                            class="button"
+                            title="缩小"
+                            prop:disabled=move || { !ready.get() || zoom.get() <= 50 }
+                            on:click=move |_| zoom_by(-1)
                         >
-                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
-                            </svg>
+                            "−"
+                        </button>
+                        <span class="zoom">{move || format!("{}%", zoom.get())}</span>
+                        <button
+                            class="button"
+                            title="放大"
+                            prop:disabled=move || { !ready.get() || zoom.get() >= 400 }
+                            on:click=move |_| zoom_by(1)
+                        >
+                            "+"
                         </button>
                         <button
-                            class="rail-tool"
-                            class:active=move || tool.get() == 3
-                            class:borrowed=move || tool.get() != 3 && borrowed_tool.get() == Some(3)
-                            title="页面：点击或拖动选择页面（D · ⌘ 临时）"
+                            class="button"
                             prop:disabled=move || !ready.get()
-                            on:click=move |_| choose_tool(3)
+                            on:click=move |_| fit_width(())
+                        >
+                            "适应宽度"
+                        </button>
+                        <button
+                            class="button"
+                            title="设置"
+                            on:click=move |_| settings_open.set(true)
                         >
                             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-                                <rect x="5" y="3" width="12" height="16" rx="1.5" />
-                                <path d="M9 21h8a2 2 0 0 0 2-2V8" />
+                                <circle cx="12" cy="12" r="3" />
+                                <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" />
                             </svg>
                         </button>
                     </div>
-                </div>
-            <main
-                class="stage"
-                on:dblclick=move |_| {
-                    // The empty reader opens a file on double click; an open document must not.
-                    if pages.get() > 0 {
-                        return;
-                    }
-                    request_open();
-                }
-            >
-
-                <div
-                    class="pages-scaler"
-                    id="pages-scaler"
-                    class:hidden=move || !ready.get()
-                >
-                    <div class="pages" id="pages">
-                    {move || {
-                        page_sizes
-                            .get()
-                            .into_iter()
-                            .enumerate()
-                            .map(|(index, size)| {
-                                view! {
-                                    <PageView
-                                        number={(index + 1) as u32}
-                                        width=size.width
-                                        height=size.height
-                                        passages=passages
-                                        regions=regions
-                                        selection=selection
-                                        hovered=hovered
-                                        next_ref=next_ref
-                                        undo_push=undo_push
-                                        active_ref=active_ref
-                                        focused_ref=focused_ref
-                                        edit_epoch=edit_epoch
-                                        page_set=page_set
-                                        scope_mode=scope_mode
-                                        tool=tool
-                                        anchor=anchor
-                                        hover_page=hover_page
-                                    />
-                                }
-                            })
-                            .collect_view()
-                    }}
-                    </div>
-                </div>
-
-                <div class="empty" class:hidden=move || ready.get()>
                     <div
-                        class="welcome-shell"
-                        on:dblclick=move |event: web_sys::MouseEvent| event.stop_propagation()
+                        class="page-seek"
+                        class:hidden=move || !ready.get()
+                        style=move || {
+                            let total = f64::from(pages.get().max(1));
+                            let position = (f64::from(page.get()) - 1.0).clamp(0.0, total - 1.0);
+                            let percent = position / (total - 1.0).max(1.0) * 100.0;
+                            format!("--progress: {percent:.2}%")
+                        }
                     >
-                        <div class="welcome">
-                            <p class="welcome-eyebrow">"PDFScope"</p>
-                            <h1 class="welcome-title">"边读边问，答案带页码"</h1>
-                            <ol class="welcome-steps">
-                                <li>
-                                    <span class="step-index">"1"</span>
-                                    <div>
-                                        <b>"打开一本 PDF"</b>
-                                        <small>"⌘O，或把文件拖进来"</small>
-                                    </div>
-                                </li>
-                                <li>
-                                    <span class="step-index">"2"</span>
-                                    <div>
-                                        <b>"选中一段文字"</b>
-                                        <small>"也可以用左上角的「框」框住图表"</small>
-                                    </div>
-                                </li>
-                                <li>
-                                    <span class="step-index">"3"</span>
-                                    <div>
-                                        <b>"在右侧提问"</b>
-                                        <small>"答案里的 p.31 可以点，会带你回原文"</small>
-                                    </div>
-                                </li>
-                            </ol>
-                            <div class="welcome-actions">
+                        <input
+                            class="seek-range"
+                            type="range"
+                            min="1"
+                            max=move || pages.get().max(1).to_string()
+                            prop:value=move || page.get().to_string()
+                            aria-label="阅读进度"
+                            on:input=jump
+                        />
+                        <span class="seek-dot" aria-hidden="true"></span>
+                    </div>
+                </header>
+
+
+
+                <Show when=move || !configured.get()>
+                    <div class="key-banner">
+                        <span>"还没有配置模型，提问前需要填一个 API Key。"</span>
+                        <button class="button" on:click=move |_| settings_open.set(true)>
+                            "去设置"
+                        </button>
+                    </div>
+                </Show>
+
+                <div class="workspace">
+                    {move || {
+                        if !find_open.get() {
+                            return ().into_any();
+                        }
+                        view! {
+                            <div class="find-bar">
+                                <input
+                                    id="find-input"
+                                    class="find-input"
+                                    type="text"
+                                    placeholder="查找… 回车"
+                                    prop:value=move || find_text.get()
+                                    on:input=move |event| find_text.set(event_target_value(&event))
+                                    on:keydown=move |event: web_sys::KeyboardEvent| {
+                                        if event.key() == "Enter" {
+                                            event.prevent_default();
+                                            run_find();
+                                        }
+                                    }
+                                />
+                                <span class="find-count">
+                                    {move || {
+                                        if find_text.get().trim().is_empty() {
+                                            String::new()
+                                        } else if find_total.get() == 0 {
+                                            "没有匹配".to_owned()
+                                        } else {
+                                            format!(
+                                                "{} 处 · {}/{}",
+                                                find_total.get(),
+                                                find_index.get() + 1,
+                                                find_pages.get().len(),
+                                            )
+                                        }
+                                    }}
+                                </span>
                                 <button
-                                    class="button welcome-action"
+                                    class="icon-button"
+                                    title="上一处"
+                                    prop:disabled=move || find_pages.get().is_empty()
+                                    on:click=move |_| step_find(-1)
+                                >
+                                    "‹"
+                                </button>
+                                <button
+                                    class="icon-button"
+                                    title="下一处"
+                                    prop:disabled=move || find_pages.get().is_empty()
+                                    on:click=move |_| step_find(1)
+                                >
+                                    "›"
+                                </button>
+                                <button
+                                    class="icon-button"
+                                    title="关闭"
                                     on:click=move |_| {
-                                        let _ = call(
-                                            "openSample",
-                                            &[JsValue::from_str("sample.pdf")],
-                                        );
+                                        find_open.set(false);
+                                        let _ = call("clearFind", &[]);
                                     }
                                 >
-                                    "试试示例"
-                                </button>
-                                <button
-                                    class="button button-primary welcome-action"
-                                    on:click=move |_| request_open()
-                                >
-                                    "打开 PDF"
+                                    "✕"
                                 </button>
                             </div>
-                        </div>
+                        }
+                            .into_any()
+                    }}
 
-                        <div class="oobe-divider"></div>
-
-                        <aside class="oobe-side" aria-label="打开文档">
-                            <section class="oobe-section" aria-label="最近打开">
-                                <div class="recent-head">
-                                    <div>
-                                        <h2 class="recent-title">"最近打开"</h2>
-                                        <p class="recent-sub">"从上次停下的地方继续"</p>
-                                    </div>
-                                    <span class="recent-count">
-                                        {move || {
-                                            let count = recents.get().len().min(5);
-                                            if count > 0 { count.to_string() } else { String::new() }
-                                        }}
-                                    </span>
+                    <Show when=move || outline_open.get()>
+                        <aside class="outline">
+                            <div class="outline-head">
+                                <div class="rail-tabs">
+                                    <button
+                                        class="rail-tab"
+                                        class:active=move || rail_tab.get() == 0
+                                        on:click=move |_| rail_tab.set(0)
+                                    >
+                                        "目录"
+                                    </button>
+                                    <button
+                                        class="rail-tab"
+                                        class:active=move || rail_tab.get() == 1
+                                        on:click=move |_| {
+                                            rail_tab.set(1);
+                                            schedule_thumbnails();
+                                        }
+                                    >
+                                        "缩略图"
+                                    </button>
                                 </div>
-                                <div class="file-list">
-                                    {move || {
-                                        if !recents_ready.get() {
-                                            return view! {
-                                                <p class="recent-loading">"正在读取最近打开…"</p>
-                                            }
-                                                .into_any();
-                                        }
-                                        let all = recents.get();
-                                        if all.is_empty() {
-                                            return view! {
-                                                <div class="recent-empty">
-                                                    <span class="recent-empty-icon">
-                                                        {icons::pdf_file(24)}
-                                                    </span>
-                                                    <p>"还没有打开过文档"</p>
-                                                    <small>"打开一本 PDF，下次它会出现在这里。"</small>
-                                                </div>
-                                            }
-                                                .into_any();
-                                        }
-                                        all.into_iter()
-                                            .take(5)
-                                            .map(|recent| {
-                                                let id = recent.id;
-                                                let name = recent.name;
-                                                let path = recent.path;
-                                                let meta = format!(
-                                                    "{} · {}",
-                                                    recent_size(recent.size),
-                                                    recent_age(recent.updated),
-                                                );
-                                                let open_name = name.clone();
-                                                view! {
-                                                    <button
-                                                        class="file-row"
-                                                        title=name.clone()
-                                                        on:click=move |_| {
-                                                            open_recent.run((
-                                                                id.clone(),
-                                                                open_name.clone(),
-                                                                path.clone(),
-                                                            ));
+                                <button
+                                    class="icon-button"
+                                    title="关闭"
+                                    on:click=move |_| outline_open.set(false)
+                                >
+                                    "✕"
+                                </button>
+                            </div>
+                            {move || {
+                                if rail_tab.get() == 1 {
+                                    view! {
+                                        <div class="thumb-list">
+                                            {(1..=pages.get())
+                                                .map(|number| {
+                                                    view! {
+                                                        <button
+                                                            class="thumb"
+                                                            data-page=number
+                                                            title=format!("第 {number} 页")
+                                                            on:click=move |_| {
+                                                                page.set(number);
+                                                                outline_open.set(false);
+                                                            }
+                                                        >
+                                                            <span class="thumb-number">{number}</span>
+                                                        </button>
+                                                    }
+                                                })
+                                                .collect_view()}
+                                        </div>
+                                    }
+                                        .into_any()
+                                } else {
+                                    view! {
+                                        <div class="outline-list">
+                                {move || {
+                                    outline
+                                        .get()
+                                        .is_empty()
+                                        .then(|| view! { <p class="outline-empty">"这份文件没有目录"</p> })
+                                }}
+                                {move || {
+                                    outline
+                                        .get()
+                                        .into_iter()
+                                        .map(|(title, target, depth)| {
+                                            let label = if title.trim().is_empty() {
+                                                format!("第 {target} 页")
+                                            } else {
+                                                title
+                                            };
+                                            view! {
+                                                <button
+                                                    class="outline-item"
+                                                    style=format!(
+                                                        "padding-left: calc(var(--space-3) + {}px)",
+                                                        u32::from(depth) * 12,
+                                                    )
+                                                    prop:disabled=target == 0
+                                                    on:click=move |_| {
+                                                        if target > 0 {
+                                                            page.set(target);
+                                                            outline_open.set(false);
                                                         }
-                                                    >
-                                                        <span class="file-icon">
-                                                            {icons::pdf_file(18)}
-                                                        </span>
-                                                        <span class="file-copy">
-                                                            <span class="file-name">{name.clone()}</span>
-                                                            <span class="file-meta">{meta}</span>
-                                                        </span>
-                                                        <span class="file-arrow">
-                                                            {icons::icon("chevron-right", 12)}
-                                                        </span>
-                                                    </button>
-                                                }
-                                            })
-                                            .collect_view()
-                                            .into_any()
-                                    }}
-                                </div>
-                            </section>
+                                                    }
+                                                >
+                                                    {label}
+                                                </button>
+                                            }
+                                        })
+                                        .collect_view()
+                                }}
+                                        </div>
+                                    }
+                                        .into_any()
+                                }
+                            }}
+                        </aside>
+                    </Show>
 
-                            <section class="oobe-section" aria-label="推荐打开">
-                                <div class="recent-head">
-                                    <div>
-                                        <h2 class="recent-title">"推荐打开"</h2>
-                                        <p class="recent-sub">"下载、桌面和文稿里的新 PDF"</p>
+                    <div class="tool-rail">
+                        <button
+                            class="rail-pointer"
+                            class:active=move || tool.get() == 0
+                            title="指针：正常阅读与选择（V）"
+                            on:click=move |_| choose_tool(0)
+                        >
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M5 3l6.5 16 2.4-6.1L20 10.5 5 3z" />
+                            </svg>
+                        </button>
+                        <div class="rail-capsule">
+                            <button
+                                class="rail-tool"
+                                class:active=move || tool.get() == 1
+                                class:borrowed=move || tool.get() != 1 && borrowed_tool.get() == Some(1)
+                                title="文字：划选即加入引用（T · ⇧ 临时）"
+                                prop:disabled=move || !ready.get()
+                                on:click=move |_| choose_tool(1)
+                            >
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+                                    <path d="M4 6h16M4 12h11M4 18h16" />
+                                </svg>
+                            </button>
+                            <button
+                                class="rail-tool"
+                                class:active=move || tool.get() == 2
+                                class:borrowed=move || tool.get() != 2 && borrowed_tool.get() == Some(2)
+                                title="框选：拖出矩形（B · ⌥ 临时）"
+                                prop:disabled=move || !ready.get()
+                                on:click=move |_| choose_tool(2)
+                            >
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
+                                </svg>
+                            </button>
+                            <button
+                                class="rail-tool"
+                                class:active=move || tool.get() == 3
+                                class:borrowed=move || tool.get() != 3 && borrowed_tool.get() == Some(3)
+                                title="页面：点击或拖动选择页面（D · ⌘ 临时）"
+                                prop:disabled=move || !ready.get()
+                                on:click=move |_| choose_tool(3)
+                            >
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="5" y="3" width="12" height="16" rx="1.5" />
+                                    <path d="M9 21h8a2 2 0 0 0 2-2V8" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                <main
+                    class="stage"
+                    on:dblclick=move |_| {
+                        // The empty reader opens a file on double click; an open document must not.
+                        if pages.get() > 0 {
+                            return;
+                        }
+                        request_open();
+                    }
+                >
+
+                    <div
+                        class="pages-scaler"
+                        id="pages-scaler"
+                        class:hidden=move || !ready.get()
+                    >
+                        <div class="pages" id="pages">
+                        {move || {
+                            page_sizes
+                                .get()
+                                .into_iter()
+                                .enumerate()
+                                .map(|(index, size)| {
+                                    view! {
+                                        <PageView
+                                            number={(index + 1) as u32}
+                                            width=size.width
+                                            height=size.height
+                                            passages=passages
+                                            regions=regions
+                                            selection=selection
+                                            hovered=hovered
+                                            next_ref=next_ref
+                                            undo_push=undo_push
+                                            active_ref=active_ref
+                                            focused_ref=focused_ref
+                                            edit_epoch=edit_epoch
+                                            page_set=page_set
+                                            scope_mode=scope_mode
+                                            tool=tool
+                                            anchor=anchor
+                                            hover_page=hover_page
+                                        />
+                                    }
+                                })
+                                .collect_view()
+                        }}
+                        </div>
+                    </div>
+
+
+
+                    {move || {
+                        error
+                            .get()
+                            .map(|message| {
+                                view! { <p class="error">{message}</p> }
+                            })
+                    }}
+
+                </main>
+                    <div class="oobe-overlay" class:hidden=move || ready.get()>
+                        <div
+                            class="welcome-shell"
+                            on:dblclick=move |event: web_sys::MouseEvent| event.stop_propagation()
+                        >
+                            <div class="welcome">
+                                <p class="welcome-eyebrow">"PDFScope"</p>
+                                <h1 class="welcome-title">"边读边问，答案带页码"</h1>
+                                <ol class="welcome-steps">
+                                    <li>
+                                        <span class="step-index">"1"</span>
+                                        <div>
+                                            <b>"打开一本 PDF"</b>
+                                            <small>"⌘O，或把文件拖进来"</small>
+                                        </div>
+                                    </li>
+                                    <li>
+                                        <span class="step-index">"2"</span>
+                                        <div>
+                                            <b>"选中一段文字"</b>
+                                            <small>"也可以用左上角的「框」框住图表"</small>
+                                        </div>
+                                    </li>
+                                    <li>
+                                        <span class="step-index">"3"</span>
+                                        <div>
+                                            <b>"在右侧提问"</b>
+                                            <small>"答案里的 p.31 可以点，会带你回原文"</small>
+                                        </div>
+                                    </li>
+                                </ol>
+                                <div class="welcome-actions">
+                                    <button
+                                        class="button welcome-action"
+                                        on:click=move |_| {
+                                            let _ = call(
+                                                "openSample",
+                                                &[JsValue::from_str("sample.pdf")],
+                                            );
+                                        }
+                                    >
+                                        "试试示例"
+                                    </button>
+                                    <button
+                                        class="button button-primary welcome-action"
+                                        on:click=move |_| request_open()
+                                    >
+                                        "打开 PDF"
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="oobe-divider"></div>
+
+                            <aside class="oobe-side" aria-label="打开文档">
+                                <section class="oobe-section" aria-label="最近打开">
+                                    <div class="recent-head">
+                                        <div>
+                                            <h2 class="recent-title">"最近打开"</h2>
+                                            <p class="recent-sub">"从上次停下的地方继续"</p>
+                                        </div>
+                                        <span class="recent-count">
+                                            {move || {
+                                                let count = recents.get().len().min(5);
+                                                if count > 0 { count.to_string() } else { String::new() }
+                                            }}
+                                        </span>
                                     </div>
-                                    <span class="recent-count">
+                                    <div class="file-list">
                                         {move || {
+                                            if !recents_ready.get() {
+                                                return view! {
+                                                    <p class="recent-loading">"正在读取最近打开…"</p>
+                                                }
+                                                    .into_any();
+                                            }
+                                            let all = recents.get();
+                                            if all.is_empty() {
+                                                return view! {
+                                                    <div class="recent-empty">
+                                                        <span class="recent-empty-icon">
+                                                            {icons::pdf_file(24)}
+                                                        </span>
+                                                        <p>"还没有打开过文档"</p>
+                                                        <small>"打开一本 PDF，下次它会出现在这里。"</small>
+                                                    </div>
+                                                }
+                                                    .into_any();
+                                            }
+                                            all.into_iter()
+                                                .take(5)
+                                                .map(|recent| {
+                                                    let id = recent.id;
+                                                    let name = recent.name;
+                                                    let path = recent.path;
+                                                    let meta = format!(
+                                                        "{} · {}",
+                                                        recent_size(recent.size),
+                                                        recent_age(recent.updated),
+                                                    );
+                                                    let open_name = name.clone();
+                                                    view! {
+                                                        <button
+                                                            class="file-row"
+                                                            title=name.clone()
+                                                            on:click=move |_| {
+                                                                open_recent.run((
+                                                                    id.clone(),
+                                                                    open_name.clone(),
+                                                                    path.clone(),
+                                                                ));
+                                                            }
+                                                        >
+                                                            <span class="file-icon">
+                                                                {icons::pdf_file(18)}
+                                                            </span>
+                                                            <span class="file-copy">
+                                                                <span class="file-name">{name.clone()}</span>
+                                                                <span class="file-meta">{meta}</span>
+                                                            </span>
+                                                            <span class="file-arrow">
+                                                                {icons::icon("chevron-right", 12)}
+                                                            </span>
+                                                        </button>
+                                                    }
+                                                })
+                                                .collect_view()
+                                                .into_any()
+                                        }}
+                                    </div>
+                                </section>
+
+                                <section class="oobe-section" aria-label="推荐打开">
+                                    <div class="recent-head">
+                                        <div>
+                                            <h2 class="recent-title">"推荐打开"</h2>
+                                            <p class="recent-sub">"下载、桌面和文稿里的新 PDF"</p>
+                                        </div>
+                                        <span class="recent-count">
+                                            {move || {
+                                                let recent_paths: Vec<String> = recents
+                                                    .get()
+                                                    .into_iter()
+                                                    .map(|recent| recent.path)
+                                                    .filter(|path| !path.is_empty())
+                                                    .collect();
+                                                let count = recommended
+                                                    .get()
+                                                    .into_iter()
+                                                    .filter(|item| !recent_paths.contains(&item.path))
+                                                    .take(5)
+                                                    .count();
+                                                if count > 0 { count.to_string() } else { String::new() }
+                                            }}
+                                        </span>
+                                    </div>
+                                    <div class="file-list">
+                                        {move || {
+                                            if !recommended_ready.get() {
+                                                return view! {
+                                                    <p class="recent-loading">"正在整理推荐…"</p>
+                                                }
+                                                    .into_any();
+                                            }
                                             let recent_paths: Vec<String> = recents
                                                 .get()
                                                 .into_iter()
                                                 .map(|recent| recent.path)
                                                 .filter(|path| !path.is_empty())
                                                 .collect();
-                                            let count = recommended
+                                            let all: Vec<RecommendedDoc> = recommended
                                                 .get()
                                                 .into_iter()
                                                 .filter(|item| !recent_paths.contains(&item.path))
                                                 .take(5)
-                                                .count();
-                                            if count > 0 { count.to_string() } else { String::new() }
-                                        }}
-                                    </span>
-                                </div>
-                                <div class="file-list">
-                                    {move || {
-                                        if !recommended_ready.get() {
-                                            return view! {
-                                                <p class="recent-loading">"正在整理推荐…"</p>
-                                            }
-                                                .into_any();
-                                        }
-                                        let recent_paths: Vec<String> = recents
-                                            .get()
-                                            .into_iter()
-                                            .map(|recent| recent.path)
-                                            .filter(|path| !path.is_empty())
-                                            .collect();
-                                        let all: Vec<RecommendedDoc> = recommended
-                                            .get()
-                                            .into_iter()
-                                            .filter(|item| !recent_paths.contains(&item.path))
-                                            .take(5)
-                                            .collect();
-                                        if all.is_empty() {
-                                            return view! {
-                                                <div class="recent-empty compact">
-                                                    <span class="recent-empty-icon">
-                                                        {icons::pdf_file(24)}
-                                                    </span>
-                                                    <p>"还没有可推荐的 PDF"</p>
-                                                    <small>"把文件放进下载、桌面或文稿目录，这里会自动出现。"</small>
-                                                </div>
-                                            }
-                                                .into_any();
-                                        }
-                                        all.into_iter()
-                                            .map(|item| {
-                                                let path = item.path;
-                                                let name = item.name;
-                                                let meta = format!(
-                                                    "{} · {}",
-                                                    recent_size(item.size),
-                                                    recent_age(item.modified),
-                                                );
-                                                let open_path_value = path.clone();
-                                                view! {
-                                                    <button
-                                                        class="file-row"
-                                                        title=name.clone()
-                                                        on:click=move |_| {
-                                                            recommended.update(|list| {
-                                                                list.retain(|entry| entry.path != path);
-                                                            });
-                                                            open_path.run(open_path_value.clone());
-                                                        }
-                                                    >
-                                                        <span class="file-icon">
-                                                            {icons::pdf_file(18)}
+                                                .collect();
+                                            if all.is_empty() {
+                                                return view! {
+                                                    <div class="recent-empty compact">
+                                                        <span class="recent-empty-icon">
+                                                            {icons::pdf_file(24)}
                                                         </span>
-                                                        <span class="file-copy">
-                                                            <span class="file-name">{name.clone()}</span>
-                                                            <span class="file-meta">{meta}</span>
-                                                        </span>
-                                                        <span class="file-arrow">
-                                                            {icons::icon("chevron-right", 12)}
-                                                        </span>
-                                                    </button>
+                                                        <p>"还没有可推荐的 PDF"</p>
+                                                        <small>"把文件放进下载、桌面或文稿目录，这里会自动出现。"</small>
+                                                    </div>
                                                 }
-                                            })
-                                            .collect_view()
-                                            .into_any()
-                                    }}
-                                </div>
-                            </section>
-                        </aside>
-                    </div>
+                                                    .into_any();
+                                            }
+                                            all.into_iter()
+                                                .map(|item| {
+                                                    let path = item.path;
+                                                    let name = item.name;
+                                                    let meta = format!(
+                                                        "{} · {}",
+                                                        recent_size(item.size),
+                                                        recent_age(item.modified),
+                                                    );
+                                                    let open_path_value = path.clone();
+                                                    view! {
+                                                        <button
+                                                            class="file-row"
+                                                            title=name.clone()
+                                                            on:click=move |_| {
+                                                                recommended.update(|list| {
+                                                                    list.retain(|entry| entry.path != path);
+                                                                });
+                                                                open_path.run(open_path_value.clone());
+                                                            }
+                                                        >
+                                                            <span class="file-icon">
+                                                                {icons::pdf_file(18)}
+                                                            </span>
+                                                            <span class="file-copy">
+                                                                <span class="file-name">{name.clone()}</span>
+                                                                <span class="file-meta">{meta}</span>
+                                                            </span>
+                                                            <span class="file-arrow">
+                                                                {icons::icon("chevron-right", 12)}
+                                                            </span>
+                                                        </button>
+                                                    }
+                                                })
+                                                .collect_view()
+                                                .into_any()
+                                        }}
+                                    </div>
+                                </section>
+                            </aside>
+                        </div>
+
+                        {move || {
+                            error
+                                .get()
+                                .map(|message| {
+                                    view! { <p class="oobe-error">{message}</p> }
+                                })
+                        }}
+    </div>
+
+                <Show when=move || reading.get()>
+                    <button
+                        class="reading-exit"
+                        title="退出阅读模式（Esc）"
+                        on:click=move |_| reading.set(false)
+                    >
+                        "退出阅读模式"
+                    </button>
+                </Show>
+
+                <div class="toasts">
+                    {move || {
+                        toasts
+                            .get()
+                            .into_iter()
+                            .map(|(id, message)| {
+                                view! {
+                                    <div
+                                        class="toast"
+                                        on:mouseenter=move |_| {
+                                            paused_toasts.update(|list| {
+                                                if !list.contains(&id) {
+                                                    list.push(id);
+                                                }
+                                            });
+                                        }
+                                        on:mouseleave=move |_| {
+                                            paused_toasts.update(|list| {
+                                                list.retain(|toast| *toast != id);
+                                            });
+                                            arm(id);
+                                        }
+                                    >
+                                        {message}
+                                    </div>
+                                }
+                            })
+                            .collect_view()
+                    }}
                 </div>
 
-                {move || {
-                    error
-                        .get()
-                        .map(|message| {
-                            view! { <p class="error">{message}</p> }
-                        })
-                }}
-
-            </main>
-
-            <Show when=move || reading.get()>
-                <button
-                    class="reading-exit"
-                    title="退出阅读模式（Esc）"
-                    on:click=move |_| reading.set(false)
+                <div
+                    class="rail"
+                    on:pointerdown=move |event: web_sys::PointerEvent| {
+                        if event.button() != 0 {
+                            return;
+                        }
+                        event.prevent_default();
+                        // No pointer capture: WebKit keeps :hover on a capturing rail after the drag,
+                        // which would leave a purple band behind the pointer.
+                        if let Some(root) = web_sys::window()
+                            .and_then(|window| window.document())
+                            .and_then(|document| document.document_element())
+                        {
+                            let _ = root.class_list().add_1("resizing");
+                        }
+                        let _ = crate::call("beginPanelResize", &[]);
+                    }
+                    on:pointerup=move |_| {
+                        let _ = crate::call("finishPanelResize", &[]);
+                        if let Some(root) = web_sys::window()
+                            .and_then(|window| window.document())
+                            .and_then(|document| document.document_element())
+                        {
+                            let _ = root.class_list().remove_1("resizing");
+                        }
+                    }
                 >
-                    "退出阅读模式"
-                </button>
-            </Show>
+                    {move || {
+                        hovered
+                            .get()
+                            .map(|(target, _)| {
+                                let total = pages.get().max(1) as f64;
+                                let top = (target as f64 - 0.5) / total * 100.0;
+                                view! {
+                                    <div
+                                        class="rail-marker"
+                                        style=format!("top:{top:.2}%")
+                                    ></div>
+                                }
+                            })
+                    }}
+                </div>
 
-            <div class="toasts">
-                {move || {
-                    toasts
-                        .get()
-                        .into_iter()
-                        .map(|(id, message)| {
-                            view! {
-                                <div
-                                    class="toast"
-                                    on:mouseenter=move |_| {
-                                        paused_toasts.update(|list| {
-                                            if !list.contains(&id) {
-                                                list.push(id);
-                                            }
-                                        });
-                                    }
-                                    on:mouseleave=move |_| {
-                                        paused_toasts.update(|list| {
-                                            list.retain(|toast| *toast != id);
-                                        });
-                                        arm(id);
-                                    }
-                                >
-                                    {message}
-                                </div>
-                            }
-                        })
-                        .collect_view()
-                }}
+                <panel::AiPanel
+                    passages=passages
+                    regions=regions
+                    page=page
+                    pages=pages
+                    hovered=hovered
+                    clear_selection=clear_selection
+                    open=settings_open
+                    notify=notify
+                    configured=configured
+                    undo_push=undo_push
+                    reset_history=Callback::new(move |_| {
+                        history.set(pdfscope_core::history::History::new(50));
+                    })
+                    scope_mode=scope_mode
+                    page_set=page_set
+                    page_limit=page_limit
+                    context_limit=context_limit
+                    model_choices=model_choices
+                    provider_preset=provider_preset
+                    answers=answers
+                    next_answer=next_answer
+                    document_key=file_name
+                />
+                </div>
             </div>
-
-            <div
-                class="rail"
-                on:pointerdown=move |event: web_sys::PointerEvent| {
-                    if event.button() != 0 {
-                        return;
-                    }
-                    event.prevent_default();
-                    // No pointer capture: WebKit keeps :hover on a capturing rail after the drag,
-                    // which would leave a purple band behind the pointer.
-                    if let Some(root) = web_sys::window()
-                        .and_then(|window| window.document())
-                        .and_then(|document| document.document_element())
-                    {
-                        let _ = root.class_list().add_1("resizing");
-                    }
-                    let _ = crate::call("beginPanelResize", &[]);
-                }
-                on:pointerup=move |_| {
-                    let _ = crate::call("finishPanelResize", &[]);
-                    if let Some(root) = web_sys::window()
-                        .and_then(|window| window.document())
-                        .and_then(|document| document.document_element())
-                    {
-                        let _ = root.class_list().remove_1("resizing");
-                    }
-                }
-            >
-                {move || {
-                    hovered
-                        .get()
-                        .map(|(target, _)| {
-                            let total = pages.get().max(1) as f64;
-                            let top = (target as f64 - 0.5) / total * 100.0;
-                            view! {
-                                <div
-                                    class="rail-marker"
-                                    style=format!("top:{top:.2}%")
-                                ></div>
-                            }
-                        })
-                }}
-            </div>
-
-            <panel::AiPanel
-                passages=passages
-                regions=regions
-                page=page
-                pages=pages
-                hovered=hovered
-                clear_selection=clear_selection
-                open=settings_open
-                notify=notify
-                configured=configured
-                undo_push=undo_push
-                reset_history=Callback::new(move |_| {
-                    history.set(pdfscope_core::history::History::new(50));
-                })
-                scope_mode=scope_mode
-                page_set=page_set
-                page_limit=page_limit
-                context_limit=context_limit
-                model_choices=model_choices
-                provider_preset=provider_preset
-                answers=answers
-                next_answer=next_answer
-                document_key=file_name
-            />
-            </div>
-        </div>
-    }
+        }
 }
 
 fn main() {
