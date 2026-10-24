@@ -2156,13 +2156,13 @@ function panelBodyElement() {
 
 const PANEL_BOTTOM_SLOP = 12;
 const PANEL_FOLLOW_SLOP = 8;
-const PANEL_ANCHOR_RATIO = 0.5;
+const PANEL_ANCHOR_RATIO = 0.35;
 const PANEL_ANCHOR_BLOCKS =
   "p, li, pre, blockquote, h1, h2, h3, h4, h5, h6, .turn-question, .answer-text, .think-pill, .turn, .empty-state, .error-card";
 
 // FOLLOW-END state. It is armed by a send and disarmed only by a deliberate upward scroll; while
 // armed, every content growth or panel resize keeps the transcript at its end. When disarmed, panel
-// resizes anchor the content at the vertical centre instead.
+// resizes anchor the content at the 35% reading line instead.
 let panelFollowing = false;
 let panelBodyBound = null;
 let panelMutation = null;
@@ -2253,9 +2253,10 @@ function armPanelFollow() {
   keepPanelAtEnd();
 }
 
-/// A vertical reading anchor for the transcript: the smallest block under the centre plus the
-/// fraction into it. A pure scrollTop ratio would drift as text rewraps; a block ratio follows the
-/// same paragraph through width changes.
+/// A vertical reading anchor for the transcript at 35% of the viewport (the same reading line as the
+/// PDF stage). The anchor is the smallest block under that line plus the fraction into it. A pure
+/// scrollTop ratio would drift as text rewraps; a block ratio follows the same paragraph through
+/// width changes.
 function capturePanelAnchor() {
   if (panelFollowing) return null;
   const body = panelBodyElement();
@@ -2301,8 +2302,8 @@ function restorePanelAnchor(anchor) {
   if (anchor.element?.isConnected) {
     const rect = anchor.element.getBoundingClientRect();
     if (rect.height > 0) {
-      const centre = body.getBoundingClientRect().top + body.clientHeight * PANEL_ANCHOR_RATIO;
-      top = body.scrollTop + rect.top + anchor.ratio * rect.height - centre;
+      const line = body.getBoundingClientRect().top + body.clientHeight * PANEL_ANCHOR_RATIO;
+      top = body.scrollTop + rect.top + anchor.ratio * rect.height - line;
     }
   }
   if (top === null && anchor.scrollRatio !== undefined) {

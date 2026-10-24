@@ -130,8 +130,8 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
-- The AI panel keeps the paragraph at its vertical centre while the panel is resized, and a
-  FOLLOW-END state: sending arms it, transcript growth follows the end, and an upward scroll detaches
+- The AI panel keeps the paragraph at a 35% reading line (shared with the PDF stage) while the panel
+  is resized, and a FOLLOW-END state: sending arms it, transcript growth follows the end, and an upward scroll detaches
   until the reader returns to the bottom. No per-token IPC; MutationObserver/ResizeObserver follow
   synchronously, and a panel drag keeps one scroll mode from pointer-down to pointer-up.
 
