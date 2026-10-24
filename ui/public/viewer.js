@@ -43,6 +43,8 @@ let initialized = false;
 /** Base layout at 100 %: the column never reflows during a zoom. */
 let baseWidth = 0;
 let baseHeight = 0;
+/** The CSS page gap at the reference layout, stored as a fraction of the base width. */
+let pageGapRatio = 0;
 let baseEpoch = 0;
 let baseDirty = true;
 
@@ -462,6 +464,19 @@ function measureBaseLayout(force = false) {
   const width = Math.round(stageContentWidth(stage));
   const changed = force || baseWidth <= 0 || Math.abs(width - baseWidth) > 1;
   if (!changed) return false;
+
+  // Keep the gap proportional to the page width. During a panel drag the whole column is scaled,
+  // so a fixed 16px base gap would visibly grow back to 16px when the new base layout is committed.
+  // Capturing the initial CSS gap as a ratio preserves the designed gap at first layout and makes
+  // every later reflow match the drag's visual gap.
+  if (baseWidth <= 0) {
+    pages.style.removeProperty("gap");
+    const cssGap = parseFloat(getComputedStyle(pages).gap);
+    pageGapRatio = (Number.isFinite(cssGap) && cssGap > 0 ? cssGap : 16) / width;
+  } else {
+    const gap = pageGapRatio > 0 ? pageGapRatio * width : 16;
+    pages.style.gap = `${gap.toFixed(2)}px`;
+  }
 
   baseWidth = width;
   pages.style.width = `${width}px`;
@@ -2277,6 +2292,7 @@ window.PDFScope = {
     releaseAll();
     baseWidth = 0;
     baseHeight = 0;
+    pageGapRatio = 0;
     baseEpoch += 1;
     baseDirty = true;
     metrics = [];
@@ -2292,6 +2308,7 @@ window.PDFScope = {
     if (pages) {
       pages.style.setProperty("--view-scale", "1");
       pages.style.setProperty("--ui-scale", "1");
+      pages.style.removeProperty("gap");
       pages.classList.remove("zooming");
     }
 

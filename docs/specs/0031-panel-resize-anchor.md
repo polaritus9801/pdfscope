@@ -30,6 +30,13 @@ every release jumped once and repeated drags accumulated a vertical drift.
   choose a new anchor).
 - The panel width is rounded only after the final frame; the ≤1 px difference is absorbed by the
   anchor restoration.
+- The page gap is part of the base layout. It is stored as a ratio captured from the initial CSS gap
+  (`16 / 1032` in the probe) and applied as `ratio × baseWidth` on every reflow. During a drag the
+  whole column is transformed, so the visual gap is `baseGap × dragScale`; after reflow the new base
+  gap is `ratio × newBaseWidth`, which equals that same visual value. A fixed 16 px base gap would
+  snap from 14.73 px back to 16 px at release.
+- Zoom is a transform, not a reflow: the gap deliberately scales with `displayScale` (16 px at 100 %,
+  64 px at 400 %, 8 px at 50 %). It is part of the page column, not fixed UI chrome.
 
 ## Acceptance
 
@@ -38,6 +45,8 @@ every release jumped once and repeated drags accumulated a vertical drift.
   (measured ≤1 px in the browser probe).
 - Repeated push/pull cycles do not accumulate vertical movement.
 - A short (vertically centred) document does not jump at release.
+- Page gaps during the drag and after release match within 0.02 px; the zoomed gap scales with the
+  page column rather than snapping to a fixed screen size.
 - A mounted canvas never exceeds its page layer during the reflow; only its backing store is
   replaced asynchronously.
 - `just check` green.
