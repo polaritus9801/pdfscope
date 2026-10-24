@@ -1609,11 +1609,10 @@ fn App() -> impl IntoView {
                                     <div class="recent-head">
                                         <div>
                                             <h2 class="recent-title">"最近打开"</h2>
-                                            <p class="recent-sub">"从上次停下的地方继续"</p>
                                         </div>
                                         <span class="recent-count">
                                             {move || {
-                                                let count = recents.get().len().min(5);
+                                                let count = recents.get().len().min(7);
                                                 if count > 0 { count.to_string() } else { String::new() }
                                             }}
                                         </span>
@@ -1640,7 +1639,7 @@ fn App() -> impl IntoView {
                                                     .into_any();
                                             }
                                             all.into_iter()
-                                                .take(5)
+                                                .take(7)
                                                 .map(|recent| {
                                                     let id = recent.id;
                                                     let name = recent.name;
@@ -1654,6 +1653,7 @@ fn App() -> impl IntoView {
                                                     view! {
                                                         <button
                                                             class="file-row"
+                                                            data-preview-recent=id.clone()
                                                             title=name.clone()
                                                             on:click=move |_| {
                                                                 open_recent.run((
@@ -1686,7 +1686,6 @@ fn App() -> impl IntoView {
                                     <div class="recent-head">
                                         <div>
                                             <h2 class="recent-title">"推荐打开"</h2>
-                                            <p class="recent-sub">"下载、桌面和文稿里的新 PDF"</p>
                                         </div>
                                         <span class="recent-count">
                                             {move || {
@@ -1700,7 +1699,7 @@ fn App() -> impl IntoView {
                                                     .get()
                                                     .into_iter()
                                                     .filter(|item| !recent_paths.contains(&item.path))
-                                                    .take(5)
+                                                    .take(7)
                                                     .count();
                                                 if count > 0 { count.to_string() } else { String::new() }
                                             }}
@@ -1724,7 +1723,7 @@ fn App() -> impl IntoView {
                                                 .get()
                                                 .into_iter()
                                                 .filter(|item| !recent_paths.contains(&item.path))
-                                                .take(5)
+                                                .take(7)
                                                 .collect();
                                             if all.is_empty() {
                                                 return view! {
@@ -1751,6 +1750,7 @@ fn App() -> impl IntoView {
                                                     view! {
                                                         <button
                                                             class="file-row"
+                                                            data-preview-path=path.clone()
                                                             title=name.clone()
                                                             on:click=move |_| {
                                                                 recommended.update(|list| {

@@ -2313,6 +2313,189 @@ function restorePanelAnchor(anchor) {
   if (top !== null) scrollPanelTo(body, Math.max(0, top));
 }
 
+// ── OOBE document preview ─────────────────────────────────────────────────────────────────────
+//
+// Hovering a recent/recommended row for a moment loads that PDF independently of the open document
+// and renders the first N pages into a one-row bubble above the row. Recent bytes come from IndexedDB;
+// recommended files come through the native bridge. Nothing is retained after the bubble closes.
+
+const PREVIEW_DELAY = 600;
+const PREVIEW_PAGE_WIDTH = 78;
+const PREVIEW_CACHE_LIMIT = 24;
+const previewCache = new Map();
+let previewTimer = 0;
+let previewToken = 0;
+let previewRow = null;
+let previewElement = null;
+
+function clearPreview() {
+  if (previewTimer) {
+    clearTimeout(previewTimer);
+    previewTimer = 0;
+  }
+  previewToken += 1;
+  previewRow = null;
+  previewElement?.remove();
+  previewElement = null;
+}
+
+function previewLimit() {
+  const width = Math.min(window.innerWidth - 32, 780);
+  return Math.max(3, Math.min(12, Math.floor((width - 24) / PREVIEW_PAGE_WIDTH)));
+}
+
+async function previewBytes(row) {
+  const recentId = row.dataset.previewRecent;
+  if (recentId && window.Recents) {
+    const record = await window.Recents.load(recentId);
+    return record?.bytes ?? null;
+  }
+  const path = row.dataset.previewPath;
+  if (path && window.Bridge?.available) {
+    return await window.Bridge.readPdf(path);
+  }
+  return null;
+}
+
+async function renderPreviewPages(bytes, limit) {
+  const documentTask = pdfjs.getDocument({ data: new Uint8Array(bytes) });
+  const document_ = await documentTask.promise;
+  try {
+    const pages = [];
+    const count = Math.min(document_.numPages, limit);
+    for (let number = 1; number <= count; number += 1) {
+      const page = await document_.getPage(number);
+      const base = page.getViewport({ scale: 1 });
+      const viewport = page.getViewport({ scale: (PREVIEW_PAGE_WIDTH * 2) / base.width });
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.ceil(viewport.width));
+      canvas.height = Math.max(1, Math.ceil(viewport.height));
+      await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+      pages.push({
+        number,
+        url: canvas.toDataURL("image/png"),
+        width: canvas.width,
+        height: canvas.height,
+      });
+    }
+    return { pages, total: document_.numPages };
+  } finally {
+    await document_.destroy();
+  }
+}
+
+function cachedPreview(key, loader) {
+  let pending = previewCache.get(key);
+  if (!pending) {
+    pending = loader().catch((error) => {
+      previewCache.delete(key);
+      throw error;
+    });
+    previewCache.set(key, pending);
+    if (previewCache.size > PREVIEW_CACHE_LIMIT) {
+      const oldest = previewCache.keys().next().value;
+      if (oldest !== undefined) previewCache.delete(oldest);
+    }
+  }
+  return pending;
+}
+
+function positionPreview(row, element) {
+  const rowRect = row.getBoundingClientRect();
+  const rect = element.getBoundingClientRect();
+  const left = Math.min(
+    Math.max(12, rowRect.left + rowRect.width / 2 - rect.width / 2),
+    window.innerWidth - rect.width - 12,
+  );
+  let top = rowRect.top - rect.height - 10;
+  if (top < 12) top = rowRect.bottom + 10;
+  element.style.left = `${Math.max(12, left)}px`;
+  element.style.top = `${top}px`;
+}
+
+async function showPreview(row) {
+  if (!row.isConnected || !row.matches(":hover")) return;
+  const token = previewToken;
+  const key = row.dataset.previewRecent
+    ? `recent:${row.dataset.previewRecent}`
+    : row.dataset.previewPath
+      ? `path:${row.dataset.previewPath}`
+      : "";
+  if (!key) return;
+  try {
+    const data = await cachedPreview(key, async () => {
+      const bytes = await previewBytes(row);
+      if (!bytes) throw new Error("preview unavailable");
+      return renderPreviewPages(bytes, previewLimit());
+    });
+    if (token !== previewToken || !row.isConnected) return;
+
+    const bubble = document.createElement("div");
+    bubble.className = "oobe-preview";
+    bubble.setAttribute("role", "tooltip");
+    const strip = document.createElement("div");
+    strip.className = "oobe-preview-strip";
+    for (const page of data.pages) {
+      const figure = document.createElement("figure");
+      figure.className = "oobe-preview-page";
+      const image = document.createElement("img");
+      image.src = page.url;
+      image.width = page.width;
+      image.height = page.height;
+      image.alt = `第 ${page.number} 页`;
+      const caption = document.createElement("figcaption");
+      caption.textContent = String(page.number);
+      figure.append(image, caption);
+      strip.append(figure);
+    }
+    if (data.total > data.pages.length) {
+      const more = document.createElement("span");
+      more.className = "oobe-preview-more";
+      more.textContent = `+${data.total - data.pages.length}`;
+      strip.append(more);
+    }
+    bubble.append(strip);
+    document.body.append(bubble);
+    previewElement = bubble;
+    positionPreview(row, bubble);
+    requestAnimationFrame(() => {
+      if (bubble.isConnected) positionPreview(row, bubble);
+    });
+  } catch {
+    // A moved/deleted/corrupt file simply has no preview; the row remains usable.
+  }
+}
+
+function onPreviewOver(event) {
+  const row = event.target instanceof Element ? event.target.closest(".file-row") : null;
+  if (!row || row === previewRow) return;
+  clearPreview();
+  previewRow = row;
+  const token = previewToken;
+  previewTimer = window.setTimeout(() => {
+    previewTimer = 0;
+    if (token === previewToken) showPreview(row);
+  }, PREVIEW_DELAY);
+}
+
+function onPreviewOut(event) {
+  const row = event.target instanceof Element ? event.target.closest(".file-row") : null;
+  if (!row || row !== previewRow) return;
+  if (event.relatedTarget instanceof Node && row.contains(event.relatedTarget)) return;
+  clearPreview();
+}
+
+function initOobePreview() {
+  document.addEventListener("pointerover", onPreviewOver, true);
+  document.addEventListener("pointerout", onPreviewOut, true);
+  document.addEventListener("scroll", clearPreview, true);
+  document.addEventListener("click", clearPreview, true);
+  window.addEventListener("resize", clearPreview);
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") clearPreview();
+  });
+}
+
 function panelElement() {
   return document.querySelector(".panel");
 }
@@ -3096,3 +3279,5 @@ function stopZoom() {
   pendingPanY = 0;
   pagesElement()?.classList.remove("zooming");
 }
+
+initOobePreview();
