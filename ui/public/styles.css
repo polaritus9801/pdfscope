@@ -4010,12 +4010,16 @@ body.panel-dragging .panel-resize::after {
   display: block;
   width: 18px;  /* size */
   height: 18px;  /* size */
+  /* Match the paperclip's rendered wire after scaling through the 24-unit viewBox. */
+  stroke-width: 1.87;
 }
 
 .composer-toolbar .tool-search > svg {
   display: block;
   width: 20px;  /* size */
   height: 20px;  /* size */
+  /* Match the paperclip's rendered wire after scaling through the 24-unit viewBox. */
+  stroke-width: 1.68;
 }
 
 .composer-toolbar .tool-attach > svg {

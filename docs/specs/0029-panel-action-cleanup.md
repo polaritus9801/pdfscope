@@ -27,6 +27,9 @@
 - The three tools are optically matched: the 24-grid at glyph renders at 18 px, the globe at 20 px,
   and the 16-grid paperclip at 16 px. Their visual bounds are all about 15 px and their centres share
   the 28 px button's centre, so the top and bottom edges align.
+- Their rendered wire is also matched: the paperclip's filled wire is 1.4004 px (1.05 pt) thick. The
+  at glyph uses SVG stroke-width 1.87 at 18 px, and the globe 1.68 at 20 px; both render at 1.4 px
+  (1.05 pt). No shape is redrawn.
 - Editing recalls a question with the caret at the end (set synchronously and again on the next frame,
   because WebKit restores its old caret after focus).
 
