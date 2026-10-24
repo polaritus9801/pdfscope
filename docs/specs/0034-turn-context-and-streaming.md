@@ -18,6 +18,10 @@ The fix is to make the empty-state condition depend only on `turns`, `streaming`
 - Copy is hidden while streaming; it appears after completion or stop, alongside the other completed
   turn actions.
 - `answer` is not read by the outer branch, so token updates cannot recreate the transcript.
+- Text tokens are coalesced into a 50ms flush. Both that flush and `flush_pending` now collapse the
+  thinking details on the first non-empty answer. The auto-collapse was introduced in `0adfe99`
+  (2026-10-24 13:54) after coalescing existed, but its check was placed only in `flush_pending`,
+  which normal coalesced text bypasses; it therefore fired only at done/stop/error.
 
 ## Per-question references
 

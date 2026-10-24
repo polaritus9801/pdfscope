@@ -1514,7 +1514,9 @@ pub fn AiPanel(
                     if !text.is_empty() {
                         answer.update(|buffer| buffer.push_str(&text));
                         // Thinking is done once answer tokens arrive; the reader may still reopen it.
-                        if !reasoning_auto_collapsed.get() && !answer.get().trim().is_empty() {
+                        if !reasoning_auto_collapsed.get_untracked()
+                            && !answer.get_untracked().trim().is_empty()
+                        {
                             reasoning_open.set(false);
                             reasoning_auto_collapsed.set(true);
                         }
@@ -1553,6 +1555,13 @@ pub fn AiPanel(
                                     pending.set(String::new());
                                     if !text.is_empty() {
                                         answer.update(|buffer| buffer.push_str(&text));
+                                        // Coalesced text bypasses flush_pending; collapse thinking here too.
+                                        if !reasoning_auto_collapsed.get_untracked()
+                                            && !answer.get_untracked().trim().is_empty()
+                                        {
+                                            reasoning_open.set(false);
+                                            reasoning_auto_collapsed.set(true);
+                                        }
                                     }
                                 });
                                 if let Some(window) = web_sys::window() {

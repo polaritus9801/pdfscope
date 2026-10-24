@@ -130,6 +130,9 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Fixed
 
+- Thinking now collapses as soon as the first answer tokens arrive. The auto-collapse added in
+  0adfe99 was checked only inside flush_pending, which the coalesced text path (718c71f) bypasses;
+  it therefore ran only at done/stop and the pill stayed open during the answer.
 - The first answer no longer flashes per token: the empty-state branch no longer reads the streaming
   answer, so tokens cannot rebuild the transcript. Markdown and `[p.N]` citations still render
   incrementally; copy is hidden until completion/stop.
