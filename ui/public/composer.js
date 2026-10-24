@@ -46,6 +46,16 @@ function emit() {
   }
 }
 
+function placeCaretEnd() {
+  if (!root) return;
+  const range = document.createRange();
+  range.selectNodeContents(root);
+  range.collapse(false);
+  const selection = window.getSelection();
+  selection?.removeAllRanges();
+  selection?.addRange(range);
+}
+
 function caretInRoot() {
   const selection = window.getSelection();
   if (!selection || selection.rangeCount === 0 || !root) return null;
@@ -174,6 +184,15 @@ window.Composer = {
     root.replaceChildren(document.createTextNode(text ?? ""));
     emit();
     root.focus();
+    placeCaretEnd();
+    // WebKit may restore its old caret after focus; the next frame wins.
+    requestAnimationFrame(placeCaretEnd);
+  },
+
+  focusEnd() {
+    root?.focus();
+    placeCaretEnd();
+    requestAnimationFrame(placeCaretEnd);
   },
 
   focus() {

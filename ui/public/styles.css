@@ -3274,8 +3274,8 @@ body.selection-quiet .textLayer :is(span, br)::selection {
 .turn {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-2) 0 var(--space-3);
+  gap: 6px;  /* size */
+  padding: 4px 0 8px;  /* size */
 }
 
 .question-row {
@@ -3319,11 +3319,6 @@ body.selection-quiet .textLayer :is(span, br)::selection {
   white-space: nowrap;
 }
 
-.answer-meta {
-  margin-left: auto;
-  color: var(--ink-faint);
-  font-variant-numeric: tabular-nums;
-}
 
 .think-pill {
   align-self: flex-start;
@@ -3335,8 +3330,7 @@ body.selection-quiet .textLayer :is(span, br)::selection {
   transition: border-color 120ms ease;
 }
 
-.think-pill[open],
-.think-pill.is-live {
+.think-pill[open] {
   width: 100%;
   border-radius: var(--radius-md);
 }
@@ -3932,28 +3926,74 @@ body.panel-dragging .panel-resize::after {
   color: var(--accent);
 }
 
-/* Edit belongs to the user's question bubble, as a compact icon underneath it. */
-.question-stack {
+/* Question actions live on the model row, right-aligned and vertically centred with it. */
+.answer-head {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  max-width: 86%;
-  gap: 2px;  /* size */
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 24px;  /* size */
 }
 
-.question-stack .turn-question {
-  max-width: 100%;
+.answer-head .question-actions {
+  margin-left: auto;
 }
 
 .question-actions {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
   gap: 2px;  /* size */
   opacity: 0.55;
   transition: opacity 120ms ease;
 }
 
-.question-row:hover .question-actions,
-.question-row:focus-within .question-actions {
+.turn:hover .question-actions,
+.turn:focus-within .question-actions {
   opacity: 1;
+}
+
+/* Branch navigation: plain arrows and count, no grey chrome. */
+.branch-nav {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;  /* size */
+  color: var(--ink-muted);
+}
+
+.branch-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;  /* size */
+  height: 22px;  /* size */
+  padding: 0;
+  color: var(--ink-faint);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+
+.branch-step:hover {
+  color: var(--ink);
+  background: transparent;
+}
+
+.branch-count {
+  min-width: 34px;  /* size */
+  padding: 0 1px;  /* size */
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+
+/* Quote, search and attachment share one 16 px optical box. */
+.composer-toolbar .icon-button > svg {
+  display: block;
+  width: 16px;  /* size */
+  height: 16px;  /* size */
 }

@@ -8,7 +8,7 @@ use wasm_bindgen_futures::JsFuture;
 
 use pdfscope_core::{Segment, estimate_tokens, link_source_markers, segments, transcript_markdown};
 
-use crate::icons::{icon, provider_tile};
+use crate::icons::{icon, paperclip, provider_tile};
 use crate::scope_ui::PageManager;
 use crate::settings::SettingsSheet;
 use crate::{Passage, Region, truncate};
@@ -432,6 +432,7 @@ pub fn AiPanel(
     let reasoning_auto_collapsed = RwSignal::new(false);
     let think_started = RwSignal::new(0.0_f64);
     let think_seconds = RwSignal::new(0.0_f64);
+    let think_ticker = RwSignal::new(0_i32);
     let status = RwSignal::new(String::new());
     let streaming = RwSignal::new(false);
     let question = RwSignal::new(String::new());
@@ -1630,7 +1631,8 @@ pub fn AiPanel(
         }
     };
 
-    let regenerate_last = move || {
+    // Recreate one turn as a sibling at its own parent; this works for any node, not just the last.
+    let regenerate_at = Callback::new(move |index: usize| {
         if streaming.get() {
             return;
         }
@@ -1639,9 +1641,6 @@ pub fn AiPanel(
             return;
         }
         let all = turns.get();
-        let Some(index) = all.len().checked_sub(1) else {
-            return;
-        };
         let Some(turn) = all.get(index).cloned() else {
             return;
         };
@@ -1659,7 +1658,7 @@ pub fn AiPanel(
         } else {
             pending_branch.set(None);
         }
-    };
+    });
 
     // Branch info for one node on the active path: exactly the versions of this question.
     let branch_at = move |index: usize| -> Option<(usize, usize)> {
@@ -1724,6 +1723,38 @@ pub fn AiPanel(
         editing.set(None);
     });
 
+    // The thinking timer ticks while the model is in its reasoning phase and stops at the first
+    // answer token; the final duration then stays frozen in the collapsed pill.
+    Effect::new(move |_| {
+        let running = streaming.get() && answer.get().is_empty();
+        let previous = think_ticker.get_untracked();
+        if previous != 0 {
+            if let Some(window) = web_sys::window() {
+                let _ = window.clear_interval_with_handle(previous);
+            }
+            think_ticker.set(0);
+        }
+        if !running {
+            return;
+        }
+        let Some(window) = web_sys::window() else {
+            return;
+        };
+        let tick = Closure::<dyn Fn()>::new(move || {
+            let started = think_started.get_untracked();
+            if started > 0.0 {
+                think_seconds.set(((js_sys::Date::now() - started) / 1000.0).max(0.1));
+            }
+        });
+        if let Ok(id) = window.set_interval_with_callback_and_timeout_and_arguments_0(
+            tick.as_ref().unchecked_ref(),
+            100,
+        ) {
+            think_ticker.set(id);
+        }
+        tick.forget();
+    });
+
     let continue_last = move || {
         let all = turns.get();
         let Some(last) = all.len().checked_sub(1) else {
@@ -1761,7 +1792,9 @@ pub fn AiPanel(
                         event.prevent_default();
                     }
                     "r" => {
-                        regenerate_last();
+                        if let Some(index) = turns.get().len().checked_sub(1) {
+                            regenerate_at.run(index);
+                        }
                         event.prevent_default();
                     }
                     "g" => {
@@ -1949,41 +1982,6 @@ pub fn AiPanel(
         history_open.set(false);
     };
 
-    let branch_conversation = move |index: usize| {
-        if streaming.get() {
-            notify.run("回答生成中，结束后再分支".to_owned());
-            return;
-        }
-        let prefix: Vec<Turn> = turns.get().into_iter().take(index + 1).collect();
-        if prefix.is_empty() {
-            return;
-        }
-        let parent_title = conversations
-            .get()
-            .into_iter()
-            .find(|conversation| conversation.id == active.get())
-            .map(|conversation| conversation.title)
-            .unwrap_or_else(|| "对话".to_owned());
-        let id = new_conversation_id();
-        conversations.update(|list| {
-            list.push(Conversation {
-                title: format!("{parent_title} · 分支"),
-                id: id.clone(),
-                updated: js_sys::Date::now(),
-                pinned: false,
-                model: session_model.get(),
-                turns: prefix.clone(),
-                tree: tree_from_turns(&prefix),
-            });
-        });
-        temporary.set(None);
-        active.set(id);
-        turns.set(prefix);
-        reset_transient();
-        save_conversations();
-        notify.run("已从这条回答分支".to_owned());
-    };
-
     let toggle_pin = move |id: String| {
         conversations.update(|list| {
             if let Some(conversation) = list.iter_mut().find(|entry| entry.id == id) {
@@ -2010,1847 +2008,1824 @@ pub fn AiPanel(
     };
 
     view! {
-        <aside
-            class="panel"
-            class:collapsed=move || collapsed.get()
-            style=move || {
-                if collapsed.get() {
-                    "width: 44px".to_owned()
-                } else {
-                    format!("width: {}px", width.get())
-                }
-            }
-        >
-            <div
-                class="panel-resize"
-                on:pointerdown=move |event: web_sys::PointerEvent| {
-                    event.prevent_default();
-                    if let Some(target) = event
-                        .current_target()
-                        .and_then(|target| target.dyn_into::<web_sys::HtmlElement>().ok())
-                    {
-                        let _ = target.set_pointer_capture(event.pointer_id());
-                    }
-                    // Without this a fast drag starts selecting text on both sides of the split.
-                    if let Some(root) = web_sys::window()
-                        .and_then(|window| window.document())
-                        .and_then(|document| document.document_element())
-                    {
-                        let _ = root.class_list().add_1("resizing");
-                    }
-                    let _ = crate::call("clearSelection", &[]);
-                    let _ = crate::call("beginPanelResize", &[]);
-                }
-                on:dblclick=move |_| {
-                    width.set(380);
-                    let _ = crate::call("savePanelWidth", &[JsValue::from_f64(380.0)]);
-                }
-                on:pointerup=move |_| {
-                    let _ = crate::call("finishPanelResize", &[]);
-                    let final_width = crate::call("panelWidth", &[])
-                        .and_then(|value| value.as_f64())
-                        .map(|value| value as u32)
-                        .unwrap_or_else(|| width.get());
-                    width.set(final_width);
-                    let _ = crate::call(
-                        "savePanelWidth",
-                        &[JsValue::from_f64(f64::from(final_width))],
-                    );
-                    if let Some(root) = web_sys::window()
-                        .and_then(|window| window.document())
-                        .and_then(|document| document.document_element())
-                    {
-                        let _ = root.class_list().remove_1("resizing");
+            <aside
+                class="panel"
+                class:collapsed=move || collapsed.get()
+                style=move || {
+                    if collapsed.get() {
+                        "width: 44px".to_owned()
+                    } else {
+                        format!("width: {}px", width.get())
                     }
                 }
-            ></div>
-            <div class="panel-head">
-                <button
-                    class="icon-button panel-toggle"
-                    title="收起"
-                    on:click=move |_| collapsed.set(true)
-                >
-                    {icon("chevron-right", 18)}
-                </button>
-                <span class="provider-slot">
-                    {move || provider_tile(provider_preset.get(), 28)}
-                </span>
-                <div class="panel-identity">
-                    <span class="panel-title">"AI 助手"</span>
-                    <div class="model-anchor">
-                        <button
-                            class="model-chip"
-                            title="选择模型"
-                            on:click=move |_| model_menu.update(|open| *open = !*open)
-                        >
-                            <span class="model-chip-label">
-                                {move || {
-                                    session_model.get().unwrap_or_else(|| model.get())
-                                }}
-                            </span>
-                            {icon("chevron-down", 12)}
-                        </button>
-                        <Show when=move || model_menu.get()>
-                            <div
-                                class="model-backdrop"
-                                on:pointerdown=move |_| model_menu.set(false)
-                            ></div>
-                            <div class="model-menu">
-                                <div class="model-menu-head">
-                                    {provider_tile(provider_preset.get(), 18)}
-                                    <span>"选择模型"</span>
-                                </div>
-                                <button
-                                    class="model-option"
-                                    on:click=move |_| {
-                                        session_model.set(None);
-                                        let id = active.get();
-                                        conversations.update(|list| {
-                                            if let Some(conversation) =
-                                                list.iter_mut().find(|entry| entry.id == id)
-                                            {
-                                                conversation.model = None;
-                                                conversation.updated = js_sys::Date::now();
-                                            }
-                                        });
-                                        save_conversations();
-                                        model_menu.set(false);
-                                    }
-                                >
-                                    <span class="model-option-icon">
+            >
+                <div
+                    class="panel-resize"
+                    on:pointerdown=move |event: web_sys::PointerEvent| {
+                        event.prevent_default();
+                        if let Some(target) = event
+                            .current_target()
+                            .and_then(|target| target.dyn_into::<web_sys::HtmlElement>().ok())
+                        {
+                            let _ = target.set_pointer_capture(event.pointer_id());
+                        }
+                        // Without this a fast drag starts selecting text on both sides of the split.
+                        if let Some(root) = web_sys::window()
+                            .and_then(|window| window.document())
+                            .and_then(|document| document.document_element())
+                        {
+                            let _ = root.class_list().add_1("resizing");
+                        }
+                        let _ = crate::call("clearSelection", &[]);
+                        let _ = crate::call("beginPanelResize", &[]);
+                    }
+                    on:dblclick=move |_| {
+                        width.set(380);
+                        let _ = crate::call("savePanelWidth", &[JsValue::from_f64(380.0)]);
+                    }
+                    on:pointerup=move |_| {
+                        let _ = crate::call("finishPanelResize", &[]);
+                        let final_width = crate::call("panelWidth", &[])
+                            .and_then(|value| value.as_f64())
+                            .map(|value| value as u32)
+                            .unwrap_or_else(|| width.get());
+                        width.set(final_width);
+                        let _ = crate::call(
+                            "savePanelWidth",
+                            &[JsValue::from_f64(f64::from(final_width))],
+                        );
+                        if let Some(root) = web_sys::window()
+                            .and_then(|window| window.document())
+                            .and_then(|document| document.document_element())
+                        {
+                            let _ = root.class_list().remove_1("resizing");
+                        }
+                    }
+                ></div>
+                <div class="panel-head">
+                    <button
+                        class="icon-button panel-toggle"
+                        title="收起"
+                        on:click=move |_| collapsed.set(true)
+                    >
+                        {icon("chevron-right", 18)}
+                    </button>
+                    <span class="provider-slot">
+                        {move || provider_tile(provider_preset.get(), 28)}
+                    </span>
+                    <div class="panel-identity">
+                        <span class="panel-title">"AI 助手"</span>
+                        <div class="model-anchor">
+                            <button
+                                class="model-chip"
+                                title="选择模型"
+                                on:click=move |_| model_menu.update(|open| *open = !*open)
+                            >
+                                <span class="model-chip-label">
+                                    {move || {
+                                        session_model.get().unwrap_or_else(|| model.get())
+                                    }}
+                                </span>
+                                {icon("chevron-down", 12)}
+                            </button>
+                            <Show when=move || model_menu.get()>
+                                <div
+                                    class="model-backdrop"
+                                    on:pointerdown=move |_| model_menu.set(false)
+                                ></div>
+                                <div class="model-menu">
+                                    <div class="model-menu-head">
                                         {provider_tile(provider_preset.get(), 18)}
-                                    </span>
-                                    <span class="model-option-label">
-                                        {format!("默认 · {}", model.get())}
-                                    </span>
-                                    <Show when=move || session_model.get().is_none()>
-                                        {icon("check", 14)}
-                                    </Show>
-                                </button>
-                                {move || {
-                                    let current = session_model.get();
-                                    model_choices
-                                        .get()
-                                        .into_iter()
-                                        .map(|choice| {
-                                            let selected = current.as_deref() == Some(choice.as_str());
-                                            let next = choice.clone();
-                                            view! {
-                                                <button
-                                                    class="model-option"
-                                                    on:click=move |_| {
-                                                        let next = Some(next.clone());
-                                                        session_model.set(next.clone());
-                                                        let id = active.get();
-                                                        conversations.update(|list| {
-                                                            if let Some(conversation) =
-                                                                list.iter_mut().find(|entry| entry.id == id)
-                                                            {
-                                                                conversation.model = next;
-                                                                conversation.updated = js_sys::Date::now();
-                                                            }
-                                                        });
-                                                        save_conversations();
-                                                        model_menu.set(false);
-                                                    }
-                                                >
-                                                    <span class="model-option-icon">
-                                                        {provider_tile(provider_preset.get(), 18)}
-                                                    </span>
-                                                    <span class="model-option-label">{choice}</span>
-                                                    <Show when=move || selected>
-                                                        {icon("check", 14)}
-                                                    </Show>
-                                                </button>
-                                            }
-                                        })
-                                        .collect_view()
-                                }}
-                                <div class="model-menu-sep"></div>
-                                <button
-                                    class="model-menu-foot"
-                                    on:click=move |_| {
-                                        model_menu.set(false);
-                                        open.set(true);
-                                    }
-                                >
-                                    {icon("settings", 14)}
-                                    "管理模型"
-                                </button>
-                            </div>
-                        </Show>
-                    </div>
-                </div>
-                <Show when=move || temporary.get().is_some()>
-                    <span class="temp-badge" title="这个对话不会被保存">"临时"</span>
-                </Show>
-                <div class="panel-head-actions">
-                    <button
-                        class="icon-button"
-                        title="历史对话"
-                        on:click=move |_| history_open.set(true)
-                    >
-                        {icon("history", 17)}
-                    </button>
-                    <button
-                        class="icon-button"
-                        title="新对话"
-                        on:click=move |_| create_conversation()
-                    >
-                        {icon("plus", 17)}
-                    </button>
-                </div>
-            </div>
-
-            <Show when=move || history_open.get()>
-                <div class="history-drawer">
-                    <header class="history-head">
-                        <span class="history-heading">"对话"</span>
-                        <button
-                            class="icon-button"
-                            title="关闭"
-                            on:click=move |_| history_open.set(false)
-                        >
-                            {icon("close", 16)}
-                        </button>
-                    </header>
-                    <div class="history-tools">
-                        <input
-                            class="history-search"
-                            type="search"
-                            placeholder="搜索对话"
-                            prop:value=move || history_query.get()
-                            on:input=move |event| history_query.set(event_target_value(&event))
-                        />
-                        <button class="button button-primary" on:click=move |_| create_conversation()>
-                            "新对话"
-                        </button>
-                        <button
-                            class="button"
-                            title="临时对话：关闭后不保留"
-                            on:click=move |_| start_temporary()
-                        >
-                            "临时"
-                        </button>
-                        <button
-                            class="button"
-                            title="把当前对话导出为 Markdown 文件"
-                            on:click=move |_| {
-                                let pairs: Vec<(String, String)> = conversations
-                                    .get()
-                                    .into_iter()
-                                    .find(|conversation| conversation.id == active.get())
-                                    .map(|conversation| {
-                                        conversation
-                                            .turns
-                                            .iter()
-                                            .map(|turn| (turn.question.clone(), turn.answer.clone()))
-                                            .collect()
-                                    })
-                                    .unwrap_or_default();
-                                let markdown = transcript_markdown(&pairs);
-                                if markdown.is_empty() {
-                                    notify.run("当前对话还没有内容".to_owned());
-                                    return;
-                                }
-                                let title = conversations
-                                    .get()
-                                    .into_iter()
-                                    .find(|conversation| conversation.id == active.get())
-                                    .map(|conversation| conversation.title)
-                                    .unwrap_or_else(|| "对话".to_owned());
-                                let filename = format!("{title}.md");
-                                let Some(promise) = bridge(
-                                    "exportMarkdown",
-                                    &[JsValue::from_str(&filename), JsValue::from_str(&markdown)],
-                                ) else {
-                                    copy_to_clipboard(&markdown);
-                                    notify.run("已复制 Markdown".to_owned());
-                                    return;
-                                };
-                                spawn_local(async move {
-                                    match JsFuture::from(js_sys::Promise::from(promise)).await {
-                                        Ok(value) => {
-                                            let path = value.as_string().unwrap_or_default();
-                                            notify.run(format!("已导出到 {path}"));
-                                        }
-                                        Err(_) => {
-                                            copy_to_clipboard(&markdown);
-                                            notify.run("文件导出不可用，已复制 Markdown".to_owned());
-                                        }
-                                    }
-                                });
-                            }
-                        >
-                            "导出"
-                        </button>
-                    </div>
-                    <div class="history-list">
-                        {move || {
-                            let query = history_query.get().to_lowercase();
-                            let mut list = conversations.get();
-                            list.retain(|conversation| !conversation.turns.is_empty());
-                            list.sort_by(|left, right| {
-                                right
-                                    .pinned
-                                    .cmp(&left.pinned)
-                                    .then_with(|| {
-                                        right
-                                            .updated
-                                            .partial_cmp(&left.updated)
-                                            .unwrap_or(std::cmp::Ordering::Equal)
-                                    })
-                            });
-                            if !query.is_empty() {
-                                list.retain(|conversation| {
-                                    conversation.title.to_lowercase().contains(&query)
-                                        || conversation.turns.iter().any(|turn| {
-                                            turn.question.to_lowercase().contains(&query)
-                                                || turn.answer.to_lowercase().contains(&query)
-                                        })
-                                });
-                            }
-                            if list.is_empty() {
-                                return view! { <p class="history-empty">"没有找到对话"</p> }
-                                    .into_any();
-                            }
-
-                            list.into_iter()
-                                .map(|conversation| {
-                                    let id = conversation.id.clone();
-                                    let title = conversation.title.clone();
-                                    let pinned = conversation.pinned;
-                                    let count = conversation.turns.len();
-                                    let is_active = active.get() == id;
-                                    let is_renaming = renaming
-                                        .get()
-                                        .map(|(renaming_id, _)| renaming_id == id)
-                                        .unwrap_or(false);
-                                    let rename_value = renaming
-                                        .get()
-                                        .filter(|(renaming_id, _)| *renaming_id == id)
-                                        .map(|(_, value)| value)
-                                        .unwrap_or_default();
-                                    let deleting = confirm_delete.get() == Some(id.clone());
-
-                                    let id_for_open = id.clone();
-                                    let id_for_pin = id.clone();
-                                    let id_for_rename = id.clone();
-                                    let title_for_rename = title.clone();
-                                    let id_for_input = id.clone();
-                                    let id_for_key = id.clone();
-                                    let id_for_blur = id.clone();
-                                    let id_for_delete = id.clone();
-                                    let id_for_confirm = id.clone();
-
-                                    view! {
-                                        <div class="history-row" class:active=is_active>
-                                            <button
-                                                class="history-pin"
-                                                class:active=pinned
-                                                title=if pinned { "取消置顶" } else { "置顶" }
-                                                on:click=move |_| toggle_pin(id_for_pin.clone())
-                                            >
-                                                {icon("pin", 14)}
-                                            </button>
-                                            {if is_renaming {
-                                                view! {
-                                                    <input
-                                                        class="history-rename"
-                                                        prop:value=rename_value
-                                                        on:input=move |event: web_sys::Event| {
-                                                            renaming.set(Some((
-                                                                id_for_input.clone(),
-                                                                event_target_value(&event),
-                                                            )));
-                                                        }
-                                                        on:keydown=move |event: web_sys::KeyboardEvent| {
-                                                            if event.key() == "Enter" {
-                                                                let value = renaming
-                                                                    .get()
-                                                                    .map(|(_, value)| value)
-                                                                    .unwrap_or_default();
-                                                                commit_rename(id_for_key.clone(), value);
-                                                            } else if event.key() == "Escape" {
-                                                                renaming.set(None);
-                                                            }
-                                                        }
-                                                        on:blur=move |_| {
-                                                            // Enter already committed and closed the field; a blur
-                                                            // that arrives afterwards must not rename again with "".
-                                                            let Some((current, value)) = renaming.get() else {
-                                                                return;
-                                                            };
-                                                            if current != id_for_blur {
-                                                                return;
-                                                            }
-                                                            commit_rename(current, value);
-                                                        }
-                                                    />
+                                        <span>"选择模型"</span>
+                                    </div>
+                                    <button
+                                        class="model-option"
+                                        on:click=move |_| {
+                                            session_model.set(None);
+                                            let id = active.get();
+                                            conversations.update(|list| {
+                                                if let Some(conversation) =
+                                                    list.iter_mut().find(|entry| entry.id == id)
+                                                {
+                                                    conversation.model = None;
+                                                    conversation.updated = js_sys::Date::now();
                                                 }
-                                                    .into_any()
-                                            } else {
+                                            });
+                                            save_conversations();
+                                            model_menu.set(false);
+                                        }
+                                    >
+                                        <span class="model-option-icon">
+                                            {provider_tile(provider_preset.get(), 18)}
+                                        </span>
+                                        <span class="model-option-label">
+                                            {format!("默认 · {}", model.get())}
+                                        </span>
+                                        <Show when=move || session_model.get().is_none()>
+                                            {icon("check", 14)}
+                                        </Show>
+                                    </button>
+                                    {move || {
+                                        let current = session_model.get();
+                                        model_choices
+                                            .get()
+                                            .into_iter()
+                                            .map(|choice| {
+                                                let selected = current.as_deref() == Some(choice.as_str());
+                                                let next = choice.clone();
                                                 view! {
                                                     <button
-                                                        class="history-open"
-                                                        on:click=move |_| switch_conversation(id_for_open.clone())
+                                                        class="model-option"
+                                                        on:click=move |_| {
+                                                            let next = Some(next.clone());
+                                                            session_model.set(next.clone());
+                                                            let id = active.get();
+                                                            conversations.update(|list| {
+                                                                if let Some(conversation) =
+                                                                    list.iter_mut().find(|entry| entry.id == id)
+                                                                {
+                                                                    conversation.model = next;
+                                                                    conversation.updated = js_sys::Date::now();
+                                                                }
+                                                            });
+                                                            save_conversations();
+                                                            model_menu.set(false);
+                                                        }
                                                     >
-                                                        <span class="history-name">{title.clone()}</span>
-                                                        <span class="history-count">
-                                                            {format!("{count} 轮")}
+                                                        <span class="model-option-icon">
+                                                            {provider_tile(provider_preset.get(), 18)}
                                                         </span>
+                                                        <span class="model-option-label">{choice}</span>
+                                                        <Show when=move || selected>
+                                                            {icon("check", 14)}
+                                                        </Show>
                                                     </button>
                                                 }
-                                                    .into_any()
-                                            }}
-                                            <button
-                                                class="history-act"
-                                                title="重命名"
-                                                on:click=move |_| {
-                                                    renaming.set(Some((
-                                                        id_for_rename.clone(),
-                                                        title_for_rename.clone(),
-                                                    )));
-                                                }
-                                            >
-                                                {icon("edit", 14)}
-                                            </button>
-                                            <button
-                                                class="history-act danger"
-                                                class:confirming=deleting
-                                                title=if deleting { "再点一次删除" } else { "删除" }
-                                                on:click=move |_| {
-                                                    if confirm_delete.get() == Some(id_for_delete.clone()) {
-                                                        delete_conversation(id_for_delete.clone());
-                                                    } else {
-                                                        confirm_delete.set(Some(id_for_confirm.clone()));
-                                                    }
-                                                }
-                                            >
-                                                {if deleting {
-                                                    view! { "确认" }.into_any()
-                                                } else {
-                                                    icon("close", 14).into_any()
-                                                }}
-                                            </button>
-                                        </div>
-                                    }
-                                })
-                                .collect_view()
-                                .into_any()
-                        }}
-                    </div>
-                </div>
-            </Show>
-
-            <button
-                class="panel-expand"
-                title="展开 AI 面板"
-                on:click=move |_| collapsed.set(false)
-            >
-                {icon("chevron-left", 18)}
-            </button>
-
-            <div class="panel-body">
-                {move || {
-                    if !configured.get() {
-                        view! {
-                            <div class="empty-state">
-                                {provider_tile(provider_preset.get(), 40)}
-                                <h3>"先连接一个模型"</h3>
-                                <p>"在设置里填入接口、模型与 Key，然后回来提问。"</p>
-                                <button
-                                    class="empty-action"
-                                    on:click=move |_| open.set(true)
-                                >
-                                    {icon("settings", 14)}
-                                    "打开设置"
-                                </button>
-                            </div>
-                        }
-                            .into_any()
-                    } else if turns.get().is_empty() && answer.get().is_empty() && !streaming.get() {
-                        view! {
-                            <div class="empty-state">
-                                {provider_tile(provider_preset.get(), 40)}
-                                <h3>"从这页开始问"</h3>
-                                <p>"选中文字或框选页面加入引用，再问任何问题。"</p>
-                                <div class="empty-suggestions">
+                                            })
+                                            .collect_view()
+                                    }}
+                                    <div class="model-menu-sep"></div>
                                     <button
+                                        class="model-menu-foot"
                                         on:click=move |_| {
-                                            let _ = composer("setPlainText", &[JsValue::from_str("总结当前页的要点")]);
-                                            let _ = composer("focus", &[]);
+                                            model_menu.set(false);
+                                            open.set(true);
                                         }
                                     >
-                                        "总结本页"
-                                    </button>
-                                    <button
-                                        on:click=move |_| {
-                                            let _ = composer("setPlainText", &[JsValue::from_str("解释我选中的段落")]);
-                                            let _ = composer("focus", &[]);
-                                        }
-                                    >
-                                        "解释选中段落"
-                                    </button>
-                                    <button
-                                        on:click=move |_| {
-                                            let _ = composer("setPlainText", &[JsValue::from_str("对比上一轮回答和当前页")]);
-                                            let _ = composer("focus", &[]);
-                                        }
-                                    >
-                                        "和上一轮对比"
+                                        {icon("settings", 14)}
+                                        "管理模型"
                                     </button>
                                 </div>
-                            </div>
-                        }
-                            .into_any()
-                    } else {
-                        view! {
-                            <div
-                                id="transcript"
-                                class="transcript"
-                                on:click=move |event: web_sys::MouseEvent| {
-                                    let Some(target) = event
-                                        .target()
-                                        .and_then(|target| target.dyn_into::<web_sys::Element>().ok())
-                                    else {
+                            </Show>
+                        </div>
+                    </div>
+                    <Show when=move || temporary.get().is_some()>
+                        <span class="temp-badge" title="这个对话不会被保存">"临时"</span>
+                    </Show>
+                    <div class="panel-head-actions">
+                        <button
+                            class="icon-button"
+                            title="历史对话"
+                            on:click=move |_| history_open.set(true)
+                        >
+                            {icon("history", 17)}
+                        </button>
+                        <button
+                            class="icon-button"
+                            title="新对话"
+                            on:click=move |_| create_conversation()
+                        >
+                            {icon("plus", 17)}
+                        </button>
+                    </div>
+                </div>
+
+                <Show when=move || history_open.get()>
+                    <div class="history-drawer">
+                        <header class="history-head">
+                            <span class="history-heading">"对话"</span>
+                            <button
+                                class="icon-button"
+                                title="关闭"
+                                on:click=move |_| history_open.set(false)
+                            >
+                                {icon("close", 16)}
+                            </button>
+                        </header>
+                        <div class="history-tools">
+                            <input
+                                class="history-search"
+                                type="search"
+                                placeholder="搜索对话"
+                                prop:value=move || history_query.get()
+                                on:input=move |event| history_query.set(event_target_value(&event))
+                            />
+                            <button class="button button-primary" on:click=move |_| create_conversation()>
+                                "新对话"
+                            </button>
+                            <button
+                                class="button"
+                                title="临时对话：关闭后不保留"
+                                on:click=move |_| start_temporary()
+                            >
+                                "临时"
+                            </button>
+                            <button
+                                class="button"
+                                title="把当前对话导出为 Markdown 文件"
+                                on:click=move |_| {
+                                    let pairs: Vec<(String, String)> = conversations
+                                        .get()
+                                        .into_iter()
+                                        .find(|conversation| conversation.id == active.get())
+                                        .map(|conversation| {
+                                            conversation
+                                                .turns
+                                                .iter()
+                                                .map(|turn| (turn.question.clone(), turn.answer.clone()))
+                                                .collect()
+                                        })
+                                        .unwrap_or_default();
+                                    let markdown = transcript_markdown(&pairs);
+                                    if markdown.is_empty() {
+                                        notify.run("当前对话还没有内容".to_owned());
+                                        return;
+                                    }
+                                    let title = conversations
+                                        .get()
+                                        .into_iter()
+                                        .find(|conversation| conversation.id == active.get())
+                                        .map(|conversation| conversation.title)
+                                        .unwrap_or_else(|| "对话".to_owned());
+                                    let filename = format!("{title}.md");
+                                    let Some(promise) = bridge(
+                                        "exportMarkdown",
+                                        &[JsValue::from_str(&filename), JsValue::from_str(&markdown)],
+                                    ) else {
+                                        copy_to_clipboard(&markdown);
+                                        notify.run("已复制 Markdown".to_owned());
                                         return;
                                     };
-                                    if let Some(url) = target.get_attribute("data-url") {
-                                        event.prevent_default();
-                                        let _ = crate::call("openUrl", &[JsValue::from_str(&url)]);
-                                        return;
-                                    }
-                                    if let Some(number) = target
-                                        .get_attribute("data-page")
-                                        .and_then(|value| value.parse::<u32>().ok())
-                                    {
-                                        event.prevent_default();
-                                        jump(number);
-                                    }
+                                    spawn_local(async move {
+                                        match JsFuture::from(js_sys::Promise::from(promise)).await {
+                                            Ok(value) => {
+                                                let path = value.as_string().unwrap_or_default();
+                                                notify.run(format!("已导出到 {path}"));
+                                            }
+                                            Err(_) => {
+                                                copy_to_clipboard(&markdown);
+                                                notify.run("文件导出不可用，已复制 Markdown".to_owned());
+                                            }
+                                        }
+                                    });
                                 }
                             >
-                                {move || {
-                                    if !(failed.get() && !streaming.get()) {
-                                        return ().into_any();
-                                    }
-                                    view! {
-                                        <div class="error-card" role="alert">
-                                            <span class="error-icon">{icon("alert", 18)}</span>
-                                            <div class="error-copy">
-                                                <strong>"这次没有成功"</strong>
-                                                <span>{status.get()}</span>
-                                            </div>
-                                            <div class="error-actions">
-                                                {icon_action(
-                                                    "retry",
-                                                    "重试",
-                                                    move |_event: web_sys::MouseEvent| {
-                                                        regenerate_last();
-                                                    },
-                                                )}
-                                                {icon_action(
-                                                    "settings",
-                                                    "打开设置",
-                                                    move |_event: web_sys::MouseEvent| open.set(true),
-                                                )}
-                                            </div>
-                                        </div>
-                                    }
-                                        .into_any()
-                                }}
+                                "导出"
+                            </button>
+                        </div>
+                        <div class="history-list">
+                            {move || {
+                                let query = history_query.get().to_lowercase();
+                                let mut list = conversations.get();
+                                list.retain(|conversation| !conversation.turns.is_empty());
+                                list.sort_by(|left, right| {
+                                    right
+                                        .pinned
+                                        .cmp(&left.pinned)
+                                        .then_with(|| {
+                                            right
+                                                .updated
+                                                .partial_cmp(&left.updated)
+                                                .unwrap_or(std::cmp::Ordering::Equal)
+                                        })
+                                });
+                                if !query.is_empty() {
+                                    list.retain(|conversation| {
+                                        conversation.title.to_lowercase().contains(&query)
+                                            || conversation.turns.iter().any(|turn| {
+                                                turn.question.to_lowercase().contains(&query)
+                                                    || turn.answer.to_lowercase().contains(&query)
+                                            })
+                                    });
+                                }
+                                if list.is_empty() {
+                                    return view! { <p class="history-empty">"没有找到对话"</p> }
+                                        .into_any();
+                                }
 
-                                {move || {
-                                    let all = turns.get();
-                                    let last = all.len().saturating_sub(1);
-                                    all
-                                        .into_iter()
-                                        .enumerate()
-                                        .map(|(index, turn)| {
-                                            let detail = if turn.reasoning.is_empty() {
-                                                ().into_any()
-                                            } else {
-                                                view! {
-                                                    <details class="think-pill">
-                                                        <summary>
-                                                            {icon("brain", 14)}
-                                                            <span>{format!("思考 {:.1} 秒", turn.seconds.max(0.1))}</span>
-                                                            <span class="think-chevron">{icon("chevron-down", 12)}</span>
-                                                        </summary>
-                                                        <pre class="think-text">{turn.reasoning.clone()}</pre>
-                                                    </details>
-                                                }
-                                                    .into_any()
-                                            };
+                                list.into_iter()
+                                    .map(|conversation| {
+                                        let id = conversation.id.clone();
+                                        let title = conversation.title.clone();
+                                        let pinned = conversation.pinned;
+                                        let count = conversation.turns.len();
+                                        let is_active = active.get() == id;
+                                        let is_renaming = renaming
+                                            .get()
+                                            .map(|(renaming_id, _)| renaming_id == id)
+                                            .unwrap_or(false);
+                                        let rename_value = renaming
+                                            .get()
+                                            .filter(|(renaming_id, _)| *renaming_id == id)
+                                            .map(|(_, value)| value)
+                                            .unwrap_or_default();
+                                        let deleting = confirm_delete.get() == Some(id.clone());
 
-                                            let body = if turn.answer.trim().is_empty() {
-                                                view! {
-                                                    <p class="turn-empty">
-                                                        "模型只返回了思考过程，没有正文。"
-                                                    </p>
-                                                }
-                                                    .into_any()
-                                            } else {
-                                                view! {
-                                                    <div
-                                                        id=format!("answer-{index}")
-                                                        class="answer-text markdown"
-                                                        inner_html=link_source_markers(
-                                                            &pdfscope_core::to_html(&turn.answer),
-                                                            &turn
-                                                                .sources
-                                                                .iter()
-                                                                .map(|source| (source.title.clone(), source.url.clone()))
-                                                                .collect::<Vec<_>>(),
-                                                        )
-                                                    ></div>
-                                                }
-                                                    .into_any()
-                                            };
+                                        let id_for_open = id.clone();
+                                        let id_for_pin = id.clone();
+                                        let id_for_rename = id.clone();
+                                        let title_for_rename = title.clone();
+                                        let id_for_input = id.clone();
+                                        let id_for_key = id.clone();
+                                        let id_for_blur = id.clone();
+                                        let id_for_delete = id.clone();
+                                        let id_for_confirm = id.clone();
+                                        let copy_turns = conversation.turns.clone();
 
-                                            let copied = turn.answer.clone();
-                                            let locate = segments(&turn.answer)
-                                                .into_iter()
-                                                .find_map(|segment| match segment {
-                                                    Segment::Citation(target) => Some(target),
-                                                    Segment::Text(_) => None,
-                                                });
-                                            let located = locate.map(|target| {
-                                                icon_action(
-                                                    "page",
-                                                    "定位到引用页",
-                                                    move |_event: web_sys::MouseEvent| jump(target),
-                                                )
-                                            });
-                                            let regenerate = (index == last).then(|| {
-                                                icon_action(
-                                                    "retry",
-                                                    "重新生成",
-                                                    move |_event: web_sys::MouseEvent| {
-                                                        regenerate_last()
-                                                    },
-                                                )
-                                            });
-                                            let continued = (index == last && turn.interrupted).then(|| {
-                                                icon_action(
-                                                    "send",
-                                                    "继续生成",
-                                                    move |_event: web_sys::MouseEvent| continue_last(),
-                                                )
-                                            });
-
-                                            let edit_text = turn
-                                                .question
-                                                .split("\n\n[引用的先前回答]")
-                                                .next()
-                                                .unwrap_or_default()
-                                                .to_owned();
-                                            let branch_nav = move || {
-                                                branch_at(index).map(|(position, total)| {
+                                        view! {
+                                            <div class="history-row" class:active=is_active>
+                                                <button
+                                                    class="history-pin"
+                                                    class:active=pinned
+                                                    title=if pinned { "取消置顶" } else { "置顶" }
+                                                    on:click=move |_| toggle_pin(id_for_pin.clone())
+                                                >
+                                                    {icon("pin", 14)}
+                                                </button>
+                                                {if is_renaming {
                                                     view! {
-                                                        <div class="branch-nav" title="切换这个问题的其他版本">
-                                                            <button
-                                                                class="branch-step"
-                                                                aria-label="上一个版本"
-                                                                on:click=move |_| shift_branch_at.run((index, -1))
-                                                            >
-                                                                {icon("chevron-left", 12)}
-                                                            </button>
-                                                            <span class="branch-count">
-                                                                {format!("{position} / {total}")}
+                                                        <input
+                                                            class="history-rename"
+                                                            prop:value=rename_value
+                                                            on:input=move |event: web_sys::Event| {
+                                                                renaming.set(Some((
+                                                                    id_for_input.clone(),
+                                                                    event_target_value(&event),
+                                                                )));
+                                                            }
+                                                            on:keydown=move |event: web_sys::KeyboardEvent| {
+                                                                if event.key() == "Enter" {
+                                                                    let value = renaming
+                                                                        .get()
+                                                                        .map(|(_, value)| value)
+                                                                        .unwrap_or_default();
+                                                                    commit_rename(id_for_key.clone(), value);
+                                                                } else if event.key() == "Escape" {
+                                                                    renaming.set(None);
+                                                                }
+                                                            }
+                                                            on:blur=move |_| {
+                                                                // Enter already committed and closed the field; a blur
+                                                                // that arrives afterwards must not rename again with "".
+                                                                let Some((current, value)) = renaming.get() else {
+                                                                    return;
+                                                                };
+                                                                if current != id_for_blur {
+                                                                    return;
+                                                                }
+                                                                commit_rename(current, value);
+                                                            }
+                                                        />
+                                                    }
+                                                        .into_any()
+                                                } else {
+                                                    view! {
+                                                        <button
+                                                            class="history-open"
+                                                            on:click=move |_| switch_conversation(id_for_open.clone())
+                                                        >
+                                                            <span class="history-name">{title.clone()}</span>
+                                                            <span class="history-count">
+                                                                {format!("{count} 轮")}
                                                             </span>
-                                                            <button
-                                                                class="branch-step"
-                                                                aria-label="下一个版本"
-                                                                on:click=move |_| shift_branch_at.run((index, 1))
-                                                            >
-                                                                {icon("chevron-right", 12)}
-                                                            </button>
+                                                        </button>
+                                                    }
+                                                        .into_any()
+                                                }}
+                                                <button
+                                                    class="history-act"
+                                                    title="复制对话"
+                                                    on:click=move |_| {
+                                                        let pairs: Vec<(String, String)> = copy_turns
+                                                            .iter()
+                                                            .map(|turn| (turn.question.clone(), turn.answer.clone()))
+                                                            .collect();
+                                                        let markdown = transcript_markdown(&pairs);
+                                                        if markdown.is_empty() {
+                                                            return;
+                                                        }
+                                                        copy_to_clipboard(&markdown);
+                                                        notify.run("已复制对话".to_owned());
+                                                    }
+                                                >
+                                                    {icon("copy", 14)}
+                                                </button>
+                                                <button
+                                                    class="history-act"
+                                                    title="重命名"
+                                                    on:click=move |_| {
+                                                        renaming.set(Some((
+                                                            id_for_rename.clone(),
+                                                            title_for_rename.clone(),
+                                                        )));
+                                                    }
+                                                >
+                                                    {icon("edit", 14)}
+                                                </button>
+                                                <button
+                                                    class="history-act danger"
+                                                    class:confirming=deleting
+                                                    title=if deleting { "再点一次删除" } else { "删除" }
+                                                    on:click=move |_| {
+                                                        if confirm_delete.get() == Some(id_for_delete.clone()) {
+                                                            delete_conversation(id_for_delete.clone());
+                                                        } else {
+                                                            confirm_delete.set(Some(id_for_confirm.clone()));
+                                                        }
+                                                    }
+                                                >
+                                                    {if deleting {
+                                                        view! { "确认" }.into_any()
+                                                    } else {
+                                                        icon("trash", 14).into_any()
+                                                    }}
+                                                </button>
+                                            </div>
+                                        }
+                                    })
+                                    .collect_view()
+                                    .into_any()
+                            }}
+                        </div>
+                    </div>
+                </Show>
+
+                <button
+                    class="panel-expand"
+                    title="展开 AI 面板"
+                    on:click=move |_| collapsed.set(false)
+                >
+                    {icon("chevron-left", 18)}
+                </button>
+
+                <div class="panel-body">
+                    {move || {
+                        if !configured.get() {
+                            view! {
+                                <div class="empty-state">
+                                    {provider_tile(provider_preset.get(), 40)}
+                                    <h3>"先连接一个模型"</h3>
+                                    <p>"在设置里填入接口、模型与 Key，然后回来提问。"</p>
+                                    <button
+                                        class="empty-action"
+                                        on:click=move |_| open.set(true)
+                                    >
+                                        {icon("settings", 14)}
+                                        "打开设置"
+                                    </button>
+                                </div>
+                            }
+                                .into_any()
+                        } else if turns.get().is_empty() && answer.get().is_empty() && !streaming.get() {
+                            view! {
+                                <div class="empty-state">
+                                    {provider_tile(provider_preset.get(), 40)}
+                                    <h3>"从这页开始问"</h3>
+                                    <p>"选中文字或框选页面加入引用，再问任何问题。"</p>
+                                    <div class="empty-suggestions">
+                                        <button
+                                            on:click=move |_| {
+                                                let _ = composer("setPlainText", &[JsValue::from_str("总结当前页的要点")]);
+                                                let _ = composer("focus", &[]);
+                                            }
+                                        >
+                                            "总结本页"
+                                        </button>
+                                        <button
+                                            on:click=move |_| {
+                                                let _ = composer("setPlainText", &[JsValue::from_str("解释我选中的段落")]);
+                                                let _ = composer("focus", &[]);
+                                            }
+                                        >
+                                            "解释选中段落"
+                                        </button>
+                                        <button
+                                            on:click=move |_| {
+                                                let _ = composer("setPlainText", &[JsValue::from_str("对比上一轮回答和当前页")]);
+                                                let _ = composer("focus", &[]);
+                                            }
+                                        >
+                                            "和上一轮对比"
+                                        </button>
+                                    </div>
+                                </div>
+                            }
+                                .into_any()
+                        } else {
+                            view! {
+                                <div
+                                    id="transcript"
+                                    class="transcript"
+                                    on:click=move |event: web_sys::MouseEvent| {
+                                        let Some(target) = event
+                                            .target()
+                                            .and_then(|target| target.dyn_into::<web_sys::Element>().ok())
+                                        else {
+                                            return;
+                                        };
+                                        if let Some(url) = target.get_attribute("data-url") {
+                                            event.prevent_default();
+                                            let _ = crate::call("openUrl", &[JsValue::from_str(&url)]);
+                                            return;
+                                        }
+                                        if let Some(number) = target
+                                            .get_attribute("data-page")
+                                            .and_then(|value| value.parse::<u32>().ok())
+                                        {
+                                            event.prevent_default();
+                                            jump(number);
+                                        }
+                                    }
+                                >
+                                    {move || {
+                                        if !(failed.get() && !streaming.get()) {
+                                            return ().into_any();
+                                        }
+                                        view! {
+                                            <div class="error-card" role="alert">
+                                                <span class="error-icon">{icon("alert", 18)}</span>
+                                                <div class="error-copy">
+                                                    <strong>"这次没有成功"</strong>
+                                                    <span>{status.get()}</span>
+                                                </div>
+                                                <div class="error-actions">
+                                                    {icon_action(
+                                                        "retry",
+                                                        "重试",
+                                                        move |_event: web_sys::MouseEvent| {
+                                                            if let Some(index) = turns.get().len().checked_sub(1) {
+                                                                regenerate_at.run(index);
+                                                            }
+                                                        },
+                                                    )}
+                                                    {icon_action(
+                                                        "settings",
+                                                        "打开设置",
+                                                        move |_event: web_sys::MouseEvent| open.set(true),
+                                                    )}
+                                                </div>
+                                            </div>
+                                        }
+                                            .into_any()
+                                    }}
+
+                                    {move || {
+                                        let all = turns.get();
+                                        let last = all.len().saturating_sub(1);
+                                        all
+                                            .into_iter()
+                                            .enumerate()
+                                            .map(|(index, turn)| {
+                                                let detail = if turn.reasoning.is_empty() {
+                                                    ().into_any()
+                                                } else {
+                                                    view! {
+                                                        <details class="think-pill">
+                                                            <summary>
+                                                                {icon("brain", 14)}
+                                                                <span>{format!("思考 {:.1} 秒", turn.seconds.max(0.1))}</span>
+                                                                <span class="think-chevron">{icon("chevron-down", 12)}</span>
+                                                            </summary>
+                                                            <pre class="think-text">{turn.reasoning.clone()}</pre>
+                                                        </details>
+                                                    }
+                                                        .into_any()
+                                                };
+
+                                                let body = if turn.answer.trim().is_empty() {
+                                                    view! {
+                                                        <p class="turn-empty">
+                                                            "模型只返回了思考过程，没有正文。"
+                                                        </p>
+                                                    }
+                                                        .into_any()
+                                                } else {
+                                                    view! {
+                                                        <div
+                                                            id=format!("answer-{index}")
+                                                            class="answer-text markdown"
+                                                            inner_html=link_source_markers(
+                                                                &pdfscope_core::to_html(&turn.answer),
+                                                                &turn
+                                                                    .sources
+                                                                    .iter()
+                                                                    .map(|source| (source.title.clone(), source.url.clone()))
+                                                                    .collect::<Vec<_>>(),
+                                                            )
+                                                        ></div>
+                                                    }
+                                                        .into_any()
+                                                };
+
+                                                let copied = turn.answer.clone();
+                                                let locate = segments(&turn.answer)
+                                                    .into_iter()
+                                                    .find_map(|segment| match segment {
+                                                        Segment::Citation(target) => Some(target),
+                                                        Segment::Text(_) => None,
+                                                    });
+                                                let located = locate.map(|target| {
+                                                    icon_action(
+                                                        "page",
+                                                        "定位到引用页",
+                                                        move |_event: web_sys::MouseEvent| jump(target),
+                                                    )
+                                                });
+                                                let regenerate = icon_action(
+                                                    "retry",
+                                                    "重新生成这条回答",
+                                                    move |_event: web_sys::MouseEvent| {
+                                                        regenerate_at.run(index)
+                                                    },
+                                                );
+                                                let continued = (index == last && turn.interrupted).then(|| {
+                                                    icon_action(
+                                                        "send",
+                                                        "继续生成",
+                                                        move |_event: web_sys::MouseEvent| continue_last(),
+                                                    )
+                                                });
+
+                                                let edit_text = turn
+                                                    .question
+                                                    .split("\n\n[引用的先前回答]")
+                                                    .next()
+                                                    .unwrap_or_default()
+                                                    .to_owned();
+                                                let branch_nav = move || {
+                                                    branch_at(index).map(|(position, total)| {
+                                                        view! {
+                                                            <div class="branch-nav" title="切换这个问题的其他版本">
+                                                                <button
+                                                                    class="branch-step"
+                                                                    aria-label="上一个版本"
+                                                                    on:click=move |_| shift_branch_at.run((index, -1))
+                                                                >
+                                                                    {icon("chevron-left", 15)}
+                                                                </button>
+                                                                <span class="branch-count">
+                                                                    {format!("{position} / {total}")}
+                                                                </span>
+                                                                <button
+                                                                    class="branch-step"
+                                                                    aria-label="下一个版本"
+                                                                    on:click=move |_| shift_branch_at.run((index, 1))
+                                                                >
+                                                                    {icon("chevron-right", 15)}
+                                                                </button>
+                                                            </div>
+                                                        }
+                                                    })
+                                                };
+                                                let edit = icon_action(
+                                                    "edit",
+                                                    "编辑这个问题并重发",
+                                                    move |_event: web_sys::MouseEvent| {
+                                                        if streaming.get() {
+                                                            return;
+                                                        }
+                                                        editing.set(Some(index));
+                                                        let _ = composer(
+                                                            "setPlainText",
+                                                            &[JsValue::from_str(&edit_text)],
+                                                        );
+                                                        let _ = composer("focus", &[]);
+                                                    },
+                                                );
+                                                let answer_sources = (!turn.sources.is_empty()).then(|| {
+                                                    let sources = turn.sources.clone();
+                                                    view! {
+                                                        <div class="answer-sources">
+                                                            {sources
+                                                                .into_iter()
+                                                                .enumerate()
+                                                                .map(|(index, source)| {
+                                                                    let url = source.url.clone();
+                                                                    view! {
+                                                                        <button
+                                                                            class="source-chip"
+                                                                            title=source.url.clone()
+                                                                            on:click=move |_| {
+                                                                                let _ = crate::call(
+                                                                                    "openUrl",
+                                                                                    &[JsValue::from_str(&url)],
+                                                                                );
+                                                                            }
+                                                                        >
+                                                                            <span class="source-index">{index + 1}</span>
+                                                                            <span class="source-title">{source.title.clone()}</span>
+                                                                        </button>
+                                                                    }
+                                                                })
+                                                                .collect_view()}
                                                         </div>
                                                     }
-                                                })
-                                            };
-                                            let edit = icon_action(
-                                                "edit",
-                                                "编辑这个问题并重发",
-                                                move |_event: web_sys::MouseEvent| {
-                                                    if streaming.get() {
-                                                        return;
-                                                    }
-                                                    editing.set(Some(index));
-                                                    let _ = composer(
-                                                        "setPlainText",
-                                                        &[JsValue::from_str(&edit_text)],
-                                                    );
-                                                    let _ = composer("focus", &[]);
-                                                },
-                                            );
-                                            let branch = icon_action(
-                                                "branch",
-                                                "从这里开始一条新对话",
-                                                move |_event: web_sys::MouseEvent| {
-                                                    branch_conversation(index)
-                                                },
-                                            );
+                                                });
 
-                                            let answer_sources = (!turn.sources.is_empty()).then(|| {
-                                                let sources = turn.sources.clone();
-                                                view! {
-                                                    <div class="answer-sources">
-                                                        {sources
-                                                            .into_iter()
-                                                            .enumerate()
-                                                            .map(|(index, source)| {
-                                                                let url = source.url.clone();
-                                                                view! {
-                                                                    <button
-                                                                        class="source-chip"
-                                                                        title=source.url.clone()
-                                                                        on:click=move |_| {
-                                                                            let _ = crate::call(
-                                                                                "openUrl",
-                                                                                &[JsValue::from_str(&url)],
-                                                                            );
-                                                                        }
-                                                                    >
-                                                                        <span class="source-index">{index + 1}</span>
-                                                                        <span class="source-title">{source.title.clone()}</span>
-                                                                    </button>
-                                                                }
-                                                            })
-                                                            .collect_view()}
-                                                    </div>
-                                                }
-                                            });
-
-                                            let answer_for_copy_cite = turn.answer.clone();
-                                            let copy_with_citations = icon_action(
-                                                "link",
-                                                "复制回答并附上引用页码",
-                                                move |_event: web_sys::MouseEvent| {
-                                                        let mut pages: Vec<u32> = segments(&answer_for_copy_cite)
-                                                            .into_iter()
-                                                            .filter_map(|segment| match segment {
-                                                                Segment::Citation(page) => Some(page),
-                                                                Segment::Text(_) => None,
-                                                            })
-                                                            .collect();
-                                                        pages.sort_unstable();
-                                                        pages.dedup();
-                                                        let mut text = answer_for_copy_cite.clone();
-                                                        if !pages.is_empty() {
-                                                            text.push_str("\n\n参考：");
-                                                            text.push_str(
-                                                                &pages
-                                                                    .iter()
-                                                                    .map(|page| format!("p.{page}"))
-                                                                    .collect::<Vec<_>>()
-                                                                    .join("、"),
-                                                            );
+                                                let answer_for_cite = turn.answer.clone();
+                                                let cite = icon_action(
+                                                    "quote",
+                                                    "引用此回答",
+                                                    move |_event: web_sys::MouseEvent| {
+                                                        if answer_for_cite.trim().is_empty() {
+                                                            return;
                                                         }
-                                                        copy_to_clipboard(&text);
-                                                        notify.run("已复制（含页码）".to_owned());
-                                                    },
-                                            );
-
-                                            let answer_for_cite = turn.answer.clone();
-                                            let cite = icon_action(
-                                                "quote",
-                                                "引用此回答",
-                                                move |_event: web_sys::MouseEvent| {
-                                                    if answer_for_cite.trim().is_empty() {
-                                                        return;
-                                                    }
-                                                    undo_push.run(());
-                                                    let id = next_answer.get() + 1;
-                                                    next_answer.set(id);
-                                                    answers.update(|list| {
-                                                        list.push(crate::AnswerRef {
-                                                            id,
-                                                            label: format!("回答 {id}"),
-                                                            quote: answer_for_cite.clone(),
+                                                        undo_push.run(());
+                                                        let id = next_answer.get() + 1;
+                                                        next_answer.set(id);
+                                                        answers.update(|list| {
+                                                            list.push(crate::AnswerRef {
+                                                                id,
+                                                                label: format!("回答 {id}"),
+                                                                quote: answer_for_cite.clone(),
+                                                            });
                                                         });
-                                                    });
-                                                    notify.run("已引用这条回答".to_owned());
-                                                },
-                                            );
+                                                        notify.run("已引用这条回答".to_owned());
+                                                    },
+                                                );
 
-                                            let identity_model = turn
-                                                .model
-                                                .clone()
-                                                .unwrap_or_else(|| model.get());
-                                            view! {
-                                                <div class="turn">
-                                                    <div class="question-row">
-                                                        <div class="question-stack">
+                                                let identity_model = turn
+                                                    .model
+                                                    .clone()
+                                                    .unwrap_or_else(|| model.get());
+                                                view! {
+                                                    <div class="turn">
+                                                        <div class="question-row">
                                                             <p class="turn-question">{turn.question.clone()}</p>
+                                                        </div>
+                                                        <div class="answer-block">
+                                                        <div class="answer-head">
+                                                            <div class="answer-identity">
+                                                                {provider_tile(provider_preset.get(), 22)}
+                                                                <span class="answer-model">{identity_model}</span>
+                                                            </div>
                                                             <div class="question-actions">
                                                                 {move || branch_nav()}
                                                                 {edit}
                                                             </div>
                                                         </div>
+                                                        {detail}
+                                                        {body}
+                                                        {answer_sources}
+                                                        <div class="turn-actions">
+                                                            {located}
+                                                            {cite}
+                                                            {icon_action(
+                                                                "copy",
+                                                                "复制",
+                                                                move |_event: web_sys::MouseEvent| {
+                                                                    copy_to_clipboard(&copied);
+                                                                    notify.run("已复制".to_owned());
+                                                                },
+                                                            )}
+                                                            {regenerate}
+                                                            {continued}
+                                                        </div>
+                                                        </div>
                                                     </div>
-                                                    <div class="answer-block">
-                                                    <div class="answer-identity">
-                                                        {provider_tile(provider_preset.get(), 22)}
-                                                        <span class="answer-model">{identity_model}</span>
-                                                    </div>
-                                                    {detail}
-                                                    {body}
-                                                    {answer_sources}
-                                                    <div class="turn-actions">
-                                                        {located}
-                                                        {branch}
-                                                        {cite}
-                                                        {icon_action(
-                                                            "copy",
-                                                            "复制",
-                                                            move |_event: web_sys::MouseEvent| {
-                                                                copy_to_clipboard(&copied);
-                                                                notify.run("已复制".to_owned());
-                                                            },
-                                                        )}
-                                                        {copy_with_citations}
-                                                        {regenerate}
-                                                        {continued}
-                                                    </div>
-                                                    </div>
-                                                </div>
-                                            }
-                                        })
-                                        .collect_view()
-                                }}
+                                                }
+                                            })
+                                            .collect_view()
+                                    }}
 
-                                {move || {
-                                    if answer.get().is_empty() && !streaming.get() {
-                                        return ().into_any();
-                                    }
-                                    let streaming_now = streaming.get();
-                                    let detail = if reasoning.get().is_empty() {
-                                        ().into_any()
-                                    } else {
-                                        let label = if streaming_now && answer.get().trim().is_empty() {
-                                            "思考中…".to_owned()
-                                        } else {
-                                            format!("思考 {:.1} 秒", think_seconds.get())
-                                        };
-                                        if streaming_now {
-                                            view! {
-                                                <details
-                                                    class="think-pill is-live"
-                                                    open=move || reasoning_open.get()
-                                                    on:toggle=move |event: web_sys::Event| {
-                                                        if let Some(details) = event
-                                                            .target()
-                                                            .and_then(|target| target.dyn_into::<web_sys::HtmlDetailsElement>().ok())
-                                                        {
-                                                            reasoning_open.set(details.open());
-                                                        }
-                                                    }
-                                                >
-                                                    <summary>
-                                                        {icon("brain", 14)}
-                                                        <span>{label}</span>
-                                                        <span class="think-chevron">{icon("chevron-down", 12)}</span>
-                                                    </summary>
-                                                    <pre class="think-text">{reasoning.get()}</pre>
-                                                </details>
-                                            }
-                                                .into_any()
-                                        } else {
-                                            view! {
-                                                <details class="think-pill">
-                                                    <summary>
-                                                        {icon("brain", 14)}
-                                                        <span>{label}</span>
-                                                        <span class="think-chevron">{icon("chevron-down", 12)}</span>
-                                                    </summary>
-                                                    <pre class="think-text">{reasoning.get()}</pre>
-                                                </details>
-                                            }
-                                                .into_any()
+                                    {move || {
+                                        if answer.get().is_empty() && !streaming.get() {
+                                            return ().into_any();
                                         }
-                                    };
-                                    view! {
-                                        <div class="turn current" class:is-streaming=move || streaming.get()>
-                                            <div class="question-row">
-                                                <p class="turn-question">
-                                                    {move || {
-                                                        if continue_target.get().is_some() {
-                                                            "继续生成…".to_owned()
-                                                        } else {
-                                                            current_question.get()
+                                        let streaming_now = streaming.get();
+                                        let detail = if reasoning.get().is_empty() {
+                                            ().into_any()
+                                        } else {
+                                            let label = if streaming_now && answer.get().trim().is_empty() {
+                                                format!("思考中 · {:.1} 秒", think_seconds.get().max(0.1))
+                                            } else {
+                                                format!("思考 {:.1} 秒", think_seconds.get())
+                                            };
+                                            if streaming_now {
+                                                view! {
+                                                    <details
+                                                        class="think-pill is-live"
+                                                        open=move || reasoning_open.get()
+                                                        on:toggle=move |event: web_sys::Event| {
+                                                            if let Some(details) = event
+                                                                .target()
+                                                                .and_then(|target| target.dyn_into::<web_sys::HtmlDetailsElement>().ok())
+                                                            {
+                                                                reasoning_open.set(details.open());
+                                                            }
                                                         }
-                                                    }}
-                                                </p>
-                                            </div>
-                                            <div class="answer-block">
-                                            <div class="answer-identity">
-                                                {provider_tile(provider_preset.get(), 22)}
-                                                <span class="answer-model">
-                                                    {move || {
-                                                        session_model
-                                                            .get()
-                                                            .unwrap_or_else(|| model.get())
-                                                    }}
-                                                </span>
-
-                                            </div>
-                                            {detail}
-                                            <Show when=move || streaming.get() && answer.get().is_empty()>
-                                                <div class="answer-skeleton" aria-hidden="true">
-                                                    <span></span>
-                                                    <span></span>
-                                                    <span></span>
+                                                    >
+                                                        <summary>
+                                                            {icon("brain", 14)}
+                                                            <span>{label}</span>
+                                                            <span class="think-chevron">{icon("chevron-down", 12)}</span>
+                                                        </summary>
+                                                        <pre class="think-text">{reasoning.get()}</pre>
+                                                    </details>
+                                                }
+                                                    .into_any()
+                                            } else {
+                                                view! {
+                                                    <details class="think-pill">
+                                                        <summary>
+                                                            {icon("brain", 14)}
+                                                            <span>{label}</span>
+                                                            <span class="think-chevron">{icon("chevron-down", 12)}</span>
+                                                        </summary>
+                                                        <pre class="think-text">{reasoning.get()}</pre>
+                                                    </details>
+                                                }
+                                                    .into_any()
+                                            }
+                                        };
+                                        view! {
+                                            <div class="turn current" class:is-streaming=move || streaming.get()>
+                                                <div class="question-row">
+                                                    <p class="turn-question">
+                                                        {move || {
+                                                            if continue_target.get().is_some() {
+                                                                "继续生成…".to_owned()
+                                                            } else {
+                                                                current_question.get()
+                                                            }
+                                                        }}
+                                                    </p>
                                                 </div>
-                                            </Show>
+                                                <div class="answer-block">
+                                                <div class="answer-identity">
+                                                    {provider_tile(provider_preset.get(), 22)}
+                                                    <span class="answer-model">
+                                                        {move || {
+                                                            session_model
+                                                                .get()
+                                                                .unwrap_or_else(|| model.get())
+                                                        }}
+                                                    </span>
+
+                                                </div>
+                                                {detail}
+                                                <Show when=move || streaming.get() && answer.get().is_empty()>
+                                                    <div class="answer-skeleton" aria-hidden="true">
+                                                        <span></span>
+                                                        <span></span>
+                                                        <span></span>
+                                                    </div>
+                                                </Show>
+                                                <div
+                                                    class="answer-text markdown"
+                                                    aria-live="polite"
+                                                    inner_html=move || pdfscope_core::to_html(&answer.get())
+                                                ></div>
+                                                <div class="turn-actions">
+                                                    {icon_action(
+                                                        "copy",
+                                                        "复制",
+                                                        move |_event: web_sys::MouseEvent| {
+                                                            copy_to_clipboard(&answer.get());
+                                                            notify.run("已复制".to_owned());
+                                                        },
+                                                    )}
+                                                </div>
+                                                </div>
+                                            </div>
+                                        }
+                                            .into_any()
+                                    }}
+                                </div>
+                            }
+                                .into_any()
+                        }
+                    }}
+                </div>
+
+                <div class="composer">
+                    {move || {
+                        let all = history.get();
+                        if all.is_empty() {
+                            return ().into_any();
+                        }
+                        let start = if show_all.get() { 0 } else { all.len().saturating_sub(3) };
+                        let entries: Vec<(usize, Stored)> = all
+                            .iter()
+                            .cloned()
+                            .enumerate()
+                            .skip(start)
+                            .collect();
+                        view! {
+                            <div class="history">
+                                <div class="history-head">
+                                    <span>"历史引用"</span>
+                                    <button
+                                        class="link"
+                                        on:click=move |_| show_all.update(|open| *open = !*open)
+                                    >
+                                        {move || if show_all.get() { "收起" } else { "全部" }}
+                                    </button>
+                                </div>
+                                {entries
+                                    .into_iter()
+                                    .map(|(index, entry)| {
+                                        let (label, preview, page_number, rect) = match &entry {
+                                            Stored::Passage(passage) => (
+                                                format!("p.{} · {}", passage.page, truncate(&passage.quote, 14)),
+                                                passage.quote.clone(),
+                                                passage.page,
+                                                passage.rect,
+                                            ),
+                                            Stored::Region(region) => (
+                                                format!("p.{} · 截图", region.page),
+                                                "（截图）".to_owned(),
+                                                region.page,
+                                                region.rect,
+                                            ),
+                                        };
+                                        view! {
                                             <div
-                                                class="answer-text markdown"
-                                                aria-live="polite"
-                                                inner_html=move || pdfscope_core::to_html(&answer.get())
-                                            ></div>
-                                            <div class="turn-actions">
-                                                {icon_action(
-                                                    "copy",
-                                                    "复制",
-                                                    move |_event: web_sys::MouseEvent| {
-                                                        copy_to_clipboard(&answer.get());
-                                                        notify.run("已复制".to_owned());
-                                                    },
-                                                )}
+                                                class="history-row"
+                                                on:mouseenter=move |_| {
+                                                    hovered.set(Some((page_number, rect)));
+                                                }
+                                                on:mouseleave=move |_| hovered.set(None)
+                                                on:click=move |event: web_sys::MouseEvent| {
+                                                    if event.shift_key() {
+                                                        jump(page_number);
+                                                    } else {
+                                                        redeem(index);
+                                                    }
+                                                }
+                                            >
+                                                <span class="history-label">{label}</span>
+                                                <span class="history-preview">{preview}</span>
+                                                <span class="pill">{format!("p.{page_number} →")}</span>
                                             </div>
-                                            </div>
-                                        </div>
-                                    }
-                                        .into_any()
-                                }}
+                                        }
+                                    })
+                                    .collect_view()}
                             </div>
                         }
                             .into_any()
-                    }
-                }}
-            </div>
-
-            <div class="composer">
-                {move || {
-                    let all = history.get();
-                    if all.is_empty() {
-                        return ().into_any();
-                    }
-                    let start = if show_all.get() { 0 } else { all.len().saturating_sub(3) };
-                    let entries: Vec<(usize, Stored)> = all
-                        .iter()
-                        .cloned()
-                        .enumerate()
-                        .skip(start)
-                        .collect();
-                    view! {
-                        <div class="history">
-                            <div class="history-head">
-                                <span>"历史引用"</span>
-                                <button
-                                    class="link"
-                                    on:click=move |_| show_all.update(|open| *open = !*open)
-                                >
-                                    {move || if show_all.get() { "收起" } else { "全部" }}
-                                </button>
-                            </div>
-                            {entries
-                                .into_iter()
-                                .map(|(index, entry)| {
-                                    let (label, preview, page_number, rect) = match &entry {
-                                        Stored::Passage(passage) => (
-                                            format!("p.{} · {}", passage.page, truncate(&passage.quote, 14)),
-                                            passage.quote.clone(),
-                                            passage.page,
-                                            passage.rect,
-                                        ),
-                                        Stored::Region(region) => (
-                                            format!("p.{} · 截图", region.page),
-                                            "（截图）".to_owned(),
-                                            region.page,
-                                            region.rect,
-                                        ),
-                                    };
-                                    view! {
-                                        <div
-                                            class="history-row"
-                                            on:mouseenter=move |_| {
-                                                hovered.set(Some((page_number, rect)));
-                                            }
-                                            on:mouseleave=move |_| hovered.set(None)
-                                            on:click=move |event: web_sys::MouseEvent| {
-                                                if event.shift_key() {
-                                                    jump(page_number);
-                                                } else {
-                                                    redeem(index);
-                                                }
-                                            }
-                                        >
-                                            <span class="history-label">{label}</span>
-                                            <span class="history-preview">{preview}</span>
-                                            <span class="pill">{format!("p.{page_number} →")}</span>
-                                        </div>
-                                    }
-                                })
-                                .collect_view()}
-                        </div>
-                    }
-                        .into_any()
-                }}
-                {move || {
-                    let quotes = passages.get();
-                    let shots = regions.get();
-                    let pages_selected = page_set.get();
-                    let cited = answers.get();
-                    let pictures = images.get();
-                    let documents = files.get();
-                    let citations = sources.get();
-                    if quotes.is_empty()
-                        && shots.is_empty()
-                        && pictures.is_empty()
-                        && documents.is_empty()
-                        && citations.is_empty()
-                        && pages_selected.is_empty()
-                        && cited.is_empty()
-                    {
-                        return ().into_any();
-                    }
-
-                    let total = quotes.len()
-                        + shots.len()
-                        + pictures.len()
-                        + documents.len()
-                        + citations.len()
-                        + pages_selected.len()
-                        + cited.len();
-
-                    let quote_row = (!quotes.is_empty()).then(|| {
-                        view! {
-                            <div class="shelf-row">
-                                <span class="shelf-label">{icon("quote", 12)}<span>文字</span></span>
-                                <div class="shelf-track">
-                                    {quotes
-                                        .into_iter()
-                                        .map(|passage| {
-                                            let page_number = passage.page;
-                                            let id = passage.id;
-                                            view! {
-                                                <div
-                                                    class="attach-chip"
-                                                    draggable="true"
-                                                    title=passage.quote.clone()
-                                                    on:click=move |_| jump(page_number)
-                                                    on:dragstart=move |event: web_sys::DragEvent| {
-                                                        if let Some(data) = event.data_transfer() {
-                                                            let _ = data.set_data(
-                                                                "text/plain",
-                                                                &format!("p:{}\np.{}", id, page_number),
-                                                            );
-                                                            data.set_effect_allowed("copy");
-                                                        }
-                                                    }
-                                                >
-                                                    <span class="chip-kind">"文"</span>
-                                                    <span class="chip-text">{truncate(&passage.quote, 36)}</span>
-                                                    <span class="chip-page">{format!("p.{page_number}")}</span>
-                                                    <span
-                                                        class="chip-x"
-                                                        title="移除"
-                                                        on:click=move |event: web_sys::MouseEvent| {
-                                                            event.stop_propagation();
-                                                            remove_passage(id);
-                                                        }
-                                                    >
-                                                        {icon("close", 12)}
-                                                    </span>
-                                                </div>
-                                            }
-                                        })
-                                        .collect_view()}
-                                </div>
-                            </div>
+                    }}
+                    {move || {
+                        let quotes = passages.get();
+                        let shots = regions.get();
+                        let pages_selected = page_set.get();
+                        let cited = answers.get();
+                        let pictures = images.get();
+                        let documents = files.get();
+                        let citations = sources.get();
+                        if quotes.is_empty()
+                            && shots.is_empty()
+                            && pictures.is_empty()
+                            && documents.is_empty()
+                            && citations.is_empty()
+                            && pages_selected.is_empty()
+                            && cited.is_empty()
+                        {
+                            return ().into_any();
                         }
-                    });
 
-                    let shot_row = (!shots.is_empty()).then(|| {
-                        view! {
-                            <div class="shelf-row">
-                                <span class="shelf-label">{icon("image", 12)}<span>截图</span></span>
-                                <div class="shelf-track">
-                                    {shots
-                                        .into_iter()
-                                        .map(|region| {
-                                            let page_number = region.page;
-                                            let id = region.id;
-                                            view! {
-                                                <div
-                                                    class="attach-thumb"
-                                                    draggable="true"
-                                                    title=format!("p.{} · 截图", region.page)
-                                                    on:click=move |_| jump(page_number)
-                                                    on:dragstart=move |event: web_sys::DragEvent| {
-                                                        if let Some(data) = event.data_transfer() {
-                                                            let _ = data.set_data(
-                                                                "text/plain",
-                                                                &format!("r:{}\n图 p.{}", id, page_number),
-                                                            );
-                                                            data.set_effect_allowed("copy");
-                                                        }
-                                                    }
-                                                >
-                                                    <img src=region.image.clone() alt="" />
-                                                    <span
-                                                        class="chip-x thumb-x"
-                                                        title="移除"
-                                                        on:click=move |event: web_sys::MouseEvent| {
-                                                            event.stop_propagation();
-                                                            remove_region(id);
-                                                        }
-                                                    >
-                                                        {icon("close", 12)}
-                                                    </span>
-                                                </div>
-                                            }
-                                        })
-                                        .collect_view()}
-                                </div>
-                            </div>
-                        }
-                    });
+                        let total = quotes.len()
+                            + shots.len()
+                            + pictures.len()
+                            + documents.len()
+                            + citations.len()
+                            + pages_selected.len()
+                            + cited.len();
 
-                    let image_row = (!pictures.is_empty()).then(|| {
-                        view! {
-                            <div class="shelf-row">
-                                <span class="shelf-label">{icon("image", 12)}<span>图片</span></span>
-                                <div class="shelf-track">
-                                    {pictures
-                                        .into_iter()
-                                        .map(|picture| {
-                                            let id = picture.id;
-                                            view! {
-                                                <div class="attach-thumb" title=picture.name.clone()>
-                                                    <img src=picture.image.clone() alt="" />
-                                                    <span
-                                                        class="chip-x thumb-x"
-                                                        title="移除"
-                                                        on:click=move |event: web_sys::MouseEvent| {
-                                                            event.stop_propagation();
-                                                            remove_image(id);
-                                                        }
-                                                    >
-                                                        {icon("close", 12)}
-                                                    </span>
-                                                </div>
-                                            }
-                                        })
-                                        .collect_view()}
-                                </div>
-                            </div>
-                        }
-                    });
-
-                    let file_row = (!documents.is_empty()).then(|| {
-                        view! {
-                            <div class="shelf-row">
-                                <span class="shelf-label">{icon("file", 12)}<span>文件</span></span>
-                                <div class="shelf-track">
-                                    {documents
-                                        .into_iter()
-                                        .map(|file| {
-                                            let id = file.id;
-                                            view! {
-                                                <div class="attach-chip" title=file.name.clone()>
-                                                    <span class="chip-kind">"件"</span>
-                                                    <span class="chip-text">{file.name.clone()}</span>
-                                                    <span class="chip-page">
-                                                        {format!("{} 字", file.text.chars().count())}
-                                                    </span>
-                                                    <span
-                                                        class="chip-x"
-                                                        title="移除"
-                                                        on:click=move |event: web_sys::MouseEvent| {
-                                                            event.stop_propagation();
-                                                            remove_file(id);
-                                                        }
-                                                    >
-                                                        {icon("close", 12)}
-                                                    </span>
-                                                </div>
-                                            }
-                                        })
-                                        .collect_view()}
-                                </div>
-                            </div>
-                        }
-                    });
-
-                    let ranges = page_ranges(&pages_selected);
-                    let page_row = (!ranges.is_empty()).then(|| {
-                        view! {
-                            <div class="shelf-row">
-                                <span class="shelf-label">{icon("pages", 12)}<span>"页面"</span></span>
-                                <div class="shelf-track">
-                                    {ranges
-                                        .into_iter()
-                                        .map(|(start, end)| {
-                                            let label = if start == end {
-                                                format!("p.{start}")
-                                            } else {
-                                                format!("p.{start}–{end}")
-                                            };
-                                            let drag_key = format!("page:{start}\np.{start}");
-                                            view! {
-                                                <div
-                                                    class="attach-chip"
-                                                    draggable="true"
-                                                    on:click=move |_| jump(start)
-                                                    on:dragstart=move |event: web_sys::DragEvent| {
-                                                        if let Some(data) = event.data_transfer() {
-                                                            let _ = data.set_data("text/plain", &drag_key);
-                                                            data.set_effect_allowed("copy");
-                                                        }
-                                                    }
-                                                >
-                                                    <span class="chip-kind">{icon("page", 12)}</span>
-                                                    <span class="chip-page">{label}</span>
-                                                    <span
-                                                        class="chip-x"
-                                                        title="移除"
-                                                        on:click=move |event: web_sys::MouseEvent| {
-                                                            event.stop_propagation();
-                                                            undo_push.run(());
-                                                            for page in start..=end {
-                                                                let _ = composer(
-                                                                    "removeToken",
-                                                                    &[JsValue::from_str(&format!("page:{page}"))],
+                        let quote_row = (!quotes.is_empty()).then(|| {
+                            view! {
+                                <div class="shelf-row">
+                                    <span class="shelf-label">{icon("quote", 12)}<span>文字</span></span>
+                                    <div class="shelf-track">
+                                        {quotes
+                                            .into_iter()
+                                            .map(|passage| {
+                                                let page_number = passage.page;
+                                                let id = passage.id;
+                                                view! {
+                                                    <div
+                                                        class="attach-chip"
+                                                        draggable="true"
+                                                        title=passage.quote.clone()
+                                                        on:click=move |_| jump(page_number)
+                                                        on:dragstart=move |event: web_sys::DragEvent| {
+                                                            if let Some(data) = event.data_transfer() {
+                                                                let _ = data.set_data(
+                                                                    "text/plain",
+                                                                    &format!("p:{}\np.{}", id, page_number),
                                                                 );
+                                                                data.set_effect_allowed("copy");
                                                             }
-                                                            page_set.update(|set| set.retain(|page| *page < start || *page > end));
                                                         }
                                                     >
-                                                        {icon("close", 11)}
-                                                    </span>
-                                                </div>
-                                            }
-                                        })
-                                        .collect_view()}
-                                </div>
-                            </div>
-                        }
-                    });
-
-                    let source_row = (!citations.is_empty()).then(|| {
-                        view! {
-                            <div class="shelf-row">
-                                <span class="shelf-label">{icon("link", 12)}<span>来源</span></span>
-                                <div class="shelf-track">
-                                    {citations
-                                        .into_iter()
-                                        .enumerate()
-                                        .map(|(index, source)| {
-                                            let url = source.url.clone();
-                                            view! {
-                                                <div
-                                                    class="attach-chip"
-                                                    title=source.url.clone()
-                                                    on:click=move |_| {
-                                                        let _ = crate::call(
-                                                            "openUrl",
-                                                            &[JsValue::from_str(&url)],
-                                                        );
-                                                    }
-                                                >
-                                                    <span class="chip-kind">{format!("{}", index + 1)}</span>
-                                                    <span class="chip-text">{source.title.clone()}</span>
-                                                </div>
-                                            }
-                                        })
-                                        .collect_view()}
-                                </div>
-                            </div>
-                        }
-                    });
-
-                    let answer_row = (!cited.is_empty()).then(|| {
-                        view! {
-                            <div class="shelf-row">
-                                <span class="shelf-label">{icon("sparkle", 12)}<span>回答</span></span>
-                                <div class="shelf-track">
-                                    {cited
-                                        .into_iter()
-                                        .map(|answer| {
-                                            let id = answer.id;
-                                            view! {
-                                                <div
-                                                    class="attach-chip"
-                                                    draggable="true"
-                                                    title=answer.quote.clone()
-                                                    on:dragstart=move |event: web_sys::DragEvent| {
-                                                        if let Some(data) = event.data_transfer() {
-                                                            let _ = data.set_data(
-                                                                "text/plain",
-                                                                &format!("a:{}\n{}", id, answer.label),
-                                                            );
-                                                            data.set_effect_allowed("copy");
-                                                        }
-                                                    }
-                                                >
-                                                    <span class="chip-kind">{icon("sparkle", 12)}</span>
-                                                    <span class="chip-text">{truncate(&answer.quote, 32)}</span>
-                                                    <span
-                                                        class="chip-x"
-                                                        title="移除"
-                                                        on:click=move |event: web_sys::MouseEvent| {
-                                                            event.stop_propagation();
-                                                            remove_answer(id);
-                                                        }
-                                                    >
-                                                        {icon("close", 12)}
-                                                    </span>
-                                                </div>
-                                            }
-                                        })
-                                        .collect_view()}
-                                </div>
-                            </div>
-                        }
-                    });
-
-                    view! {
-                        <div class="context-shelf">
-                            <div class="shelf-head">
-                                <span class="shelf-title">{format!("上下文 · {total} 项")}</span>
-                                <button
-                                    class="shelf-clear"
-                                    on:click=move |_| {
-                                        undo_push.run(());
-                                        passages.set(Vec::new());
-                                        regions.set(Vec::new());
-                                        images.set(Vec::new());
-                                        files.set(Vec::new());
-                                        sources.set(Vec::new());
-                                        answers.set(Vec::new());
-                                        page_set.update(|set| set.clear());
-                                        // The shelf is the source of truth; the editor must not keep
-                                        // pills whose attachment no longer exists.
-                                        let _ = composer("clearTokens", &[]);
-                                        notify.run("已清空上下文".to_owned());
-                                    }
-                                >
-                                    "清空"
-                                </button>
-                            </div>
-                            {quote_row}
-                            {shot_row}
-                            {image_row}
-                            {file_row}
-                            {source_row}
-                            {page_row}
-                            {answer_row}
-                        </div>
-                    }
-                        .into_any()
-                }}
-                {move || {
-                    notice
-                        .get()
-                        .map(|message| view! { <p class="range-summary range-error">{message}</p> })
-                }}
-                <Show when=move || editing.get().is_some()>
-                    <div class="editing-banner">
-                        <span>
-                            {move || {
-                                format!(
-                                    "正在编辑第 {} 条问题 · 发送后替换其后的回答",
-                                    editing.get().unwrap_or(0) + 1
-                                )
-                            }}
-                        </span>
-                        <button
-                            class="link"
-                            on:click=move |_| {
-                                editing.set(None);
-                                composer_clear();
-                            }
-                        >
-                            "取消"
-                        </button>
-                    </div>
-                </Show>
-                {move || {
-                    if !mention_open.get() {
-                        return ().into_any();
-                    }
-                    let mut items = Vec::new();
-                    for passage in passages.get() {
-                        let key = format!("p:{}", passage.id);
-                        let label = format!("p.{}", passage.page);
-                        items.push(view! {
-                            <button
-                                class="mention-item"
-                                on:click=move |_| {
-                                    let _ = composer(
-                                        "insertToken",
-                                        &[JsValue::from_str(&key), JsValue::from_str(&label)],
-                                    );
-                                    mention_open.set(false);
-                                }
-                            >
-                                <span class="mention-kind">"文"</span>
-                                <span class="mention-label">{format!("p.{} · {}", passage.page, truncate(&passage.quote, 30))}</span>
-                            </button>
-                        }.into_any());
-                    }
-                    for region in regions.get() {
-                        let key = format!("r:{}", region.id);
-                        let label = format!("图 p.{}", region.page);
-                        items.push(view! {
-                            <button
-                                class="mention-item"
-                                on:click=move |_| {
-                                    let _ = composer(
-                                        "insertToken",
-                                        &[JsValue::from_str(&key), JsValue::from_str(&label)],
-                                    );
-                                    mention_open.set(false);
-                                }
-                            >
-                                <span class="mention-kind">"图"</span>
-                                <span class="mention-label">{format!("p.{} · 截图", region.page)}</span>
-                            </button>
-                        }.into_any());
-                    }
-                    for page in page_set.get() {
-                        let key = format!("page:{page}");
-                        let label = format!("p.{page}");
-                        items.push(view! {
-                            <button
-                                class="mention-item"
-                                on:click=move |_| {
-                                    let _ = composer(
-                                        "insertToken",
-                                        &[JsValue::from_str(&key), JsValue::from_str(&label)],
-                                    );
-                                    mention_open.set(false);
-                                }
-                            >
-                                <span class="mention-kind">"页"</span>
-                                <span class="mention-label">{format!("p.{page}")}</span>
-                            </button>
-                        }.into_any());
-                    }
-                    for file in files.get() {
-                        let key = format!("file:{}", file.id);
-                        let label = truncate(&file.name, 14);
-                        items.push(view! {
-                            <button
-                                class="mention-item"
-                                on:click=move |_| {
-                                    let _ = composer(
-                                        "insertToken",
-                                        &[JsValue::from_str(&key), JsValue::from_str(&label)],
-                                    );
-                                    mention_open.set(false);
-                                }
-                            >
-                                <span class="mention-kind">"件"</span>
-                                <span class="mention-label">{file.name.clone()}</span>
-                            </button>
-                        }.into_any());
-                    }
-                    for picture in images.get() {
-                        let key = format!("img:{}", picture.id);
-                        let label = truncate(&picture.name, 14);
-                        items.push(view! {
-                            <button
-                                class="mention-item"
-                                on:click=move |_| {
-                                    let _ = composer(
-                                        "insertToken",
-                                        &[JsValue::from_str(&key), JsValue::from_str(&label)],
-                                    );
-                                    mention_open.set(false);
-                                }
-                            >
-                                <span class="mention-kind">"图"</span>
-                                <span class="mention-label">{format!("{} · 附件图片", picture.name)}</span>
-                            </button>
-                        }.into_any());
-                    }
-                    for answer in answers.get() {
-                        let key = format!("a:{}", answer.id);
-                        let label = answer.label.clone();
-                        items.push(view! {
-                            <button
-                                class="mention-item"
-                                on:click=move |_| {
-                                    let _ = composer(
-                                        "insertToken",
-                                        &[JsValue::from_str(&key), JsValue::from_str(&label)],
-                                    );
-                                    mention_open.set(false);
-                                }
-                            >
-                                <span class="mention-kind">{icon("sparkle", 12)}</span>
-                                <span class="mention-label">{format!("{} · {}", answer.label, truncate(&answer.quote, 28))}</span>
-                            </button>
-                        }.into_any());
-                    }
-                    let current_page = page.get();
-                    let already = page_set.get().contains(&current_page);
-                    items.push(view! {
-                        <button
-                            class="mention-item"
-                            on:click=move |_| {
-                                if !already {
-                                    undo_push.run(());
-                                    page_set.update(|set| pdfscope_core::add_range(set, current_page, current_page));
-                                    scope_mode.set(2);
-                                }
-                                let _ = composer(
-                                    "insertToken",
-                                    &[
-                                        JsValue::from_str(&format!("page:{current_page}")),
-                                        JsValue::from_str(&format!("p.{current_page}")),
-                                    ],
-                                );
-                                mention_open.set(false);
-                            }
-                        >
-                            <span class="mention-kind">"+"</span>
-                            <span class="mention-label">{format!("引用当前页 p.{current_page}")}</span>
-                        </button>
-                    }.into_any());
-
-                    view! {
-                        <div
-                            class="mention-picker"
-                            on:pointerdown=move |event: web_sys::PointerEvent| event.prevent_default()
-                        >
-                            <p class="mention-title">"插入引用"</p>
-                            {items.collect_view()}
-                        </div>
-                    }
-                        .into_any()
-                }}
-                <div class="composer-card">
-                <div
-                    node_ref=editor_ref
-                    id="ask-editor"
-                    class="ask editor"
-                    contenteditable="true"
-                    role="textbox"
-                    aria-label="问题"
-                    data-placeholder="问点什么…"
-                    on:dragover=move |event: web_sys::DragEvent| {
-                        event.prevent_default();
-                        if let Some(data) = event.data_transfer() {
-                            data.set_drop_effect("copy");
-                        }
-                    }
-                    on:drop=move |event: web_sys::DragEvent| {
-                        event.prevent_default();
-                        let Some(data) = event.data_transfer() else {
-                            return;
-                        };
-                        let Ok(payload) = data.get_data("text/plain") else {
-                            return;
-                        };
-                        let mut parts = payload.splitn(2, '\n');
-                        let Some(key) = parts.next() else {
-                            return;
-                        };
-                        let label = parts.next().unwrap_or(key);
-                        let _ = composer(
-                            "insertTokenAt",
-                            &[
-                                JsValue::from_f64(f64::from(event.client_x())),
-                                JsValue::from_f64(f64::from(event.client_y())),
-                                JsValue::from_str(key),
-                                JsValue::from_str(label),
-                            ],
-                        );
-                    }
-                    on:keydown=move |event: web_sys::KeyboardEvent| {
-                        if event.is_composing() {
-                            return;
-                        }
-                        if mention_open.get() {
-                            match event.key().as_str() {
-                                "ArrowDown" => {
-                                    event.prevent_default();
-                                    let _ = composer("mentionStep", &[JsValue::from_f64(1.0)]);
-                                    return;
-                                }
-                                "ArrowUp" => {
-                                    event.prevent_default();
-                                    let _ = composer("mentionStep", &[JsValue::from_f64(-1.0)]);
-                                    return;
-                                }
-                                "Enter" => {
-                                    event.prevent_default();
-                                    let _ = composer("mentionChoose", &[]);
-                                    return;
-                                }
-                                "Escape" => {
-                                    event.prevent_default();
-                                    mention_open.set(false);
-                                    return;
-                                }
-                                _ => {}
-                            }
-                        }
-                        if !mention_open.get() && !streaming.get() {
-                            let at_start = composer("isAtStart", &[])
-                                .and_then(|value| value.as_bool())
-                                .unwrap_or(false);
-                            let at_end = composer("isAtEnd", &[])
-                                .and_then(|value| value.as_bool())
-                                .unwrap_or(false);
-                            if event.key() == "ArrowUp" && at_start {
-                                let history = prompt_history.get();
-                                if !history.is_empty() {
-                                    event.prevent_default();
-                                    let next = history_cursor
-                                        .get()
-                                        .map(|cursor| cursor.saturating_sub(1))
-                                        .unwrap_or(history.len() - 1);
-                                    history_cursor.set(Some(next));
-                                    let _ = composer(
-                                        "setPlainText",
-                                        &[JsValue::from_str(&history[next])],
-                                    );
-                                    return;
-                                }
-                            }
-                            if event.key() == "ArrowDown" && at_end {
-                                if let Some(cursor) = history_cursor.get() {
-                                    let history = prompt_history.get();
-                                    event.prevent_default();
-                                    if cursor + 1 < history.len() {
-                                        history_cursor.set(Some(cursor + 1));
-                                        let _ = composer(
-                                            "setPlainText",
-                                            &[JsValue::from_str(&history[cursor + 1])],
-                                        );
-                                    } else {
-                                        history_cursor.set(None);
-                                        let _ = composer(
-                                            "setPlainText",
-                                            &[JsValue::from_str("")],
-                                        );
-                                    }
-                                    return;
-                                }
-                            }
-                        }
-                        let modified = event.meta_key()
-                            || event.ctrl_key()
-                            || event.alt_key()
-                            || event.shift_key();
-                        if event.key() == "Enter" && !modified {
-                            event.prevent_default();
-                            send(());
-                        } else if event.key() == "Enter" && event.shift_key() {
-                            event.prevent_default();
-                            let _ = composer("insertNewline", &[]);
-                        } else if event.key() == "Escape" {
-                            mention_open.set(false);
-                            if streaming.get() {
-                                let _ = bridge("stop", &[]);
-                            }
-                        }
-                    }
-                ></div>
-                <div class="composer-toolbar">
-                    <button
-                        class="icon-button"
-                        title="插入引用（输入 @）"
-                        on:click=move |_| {
-                            mention_open.set(true);
-                            let _ = composer("focus", &[]);
-                        }
-                    >
-                        {icon("at", 17)}
-                    </button>
-                    <button
-                        class="icon-button attach-button"
-                        class:active=move || web.get()
-                        title="联网搜索（需要 Tavily Key）"
-                        on:click=move |_| web.update(|on| *on = !*on)
-                    >
-                        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="12" cy="12" r="8.5" />
-                            <path d="M3.5 12h17M12 3.5c2.4 2.3 3.6 5.1 3.6 8.5s-1.2 6.2-3.6 8.5c-2.4-2.3-3.6-5.1-3.6-8.5S9.6 5.8 12 3.5z" />
-                        </svg>
-                    </button>
-                    <label class="icon-button attach-button" title="附加图片、PDF、Office 或文本/代码文件">
-                        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M20 11.5l-7.8 7.8a5 5 0 0 1-7.1-7.1l8.2-8.2a3.4 3.4 0 0 1 4.8 4.8l-8.2 8.2a1.8 1.8 0 0 1-2.5-2.5l7.4-7.4" />
-                        </svg>
-                        <input
-                            id="attach-input"
-                            class="file-input"
-                            type="file"
-                            accept="image/*,.pdf,.docx,.pptx,.xlsx,.txt,.md,.markdown,.csv,.tsv,.json,.jsonl,.log,.yaml,.yml,.html,.htm,.xml,.toml,.ini,.rs,.ts,.tsx,.js,.jsx,.py,.java,.kt,.c,.h,.cpp,.hpp,.cs,.go,.rb,.php,.swift,.sh,.sql,.css,.scss,.vue,.svelte,.lua"
-                            multiple
-                            on:change=move |_| {
-                                let Some(promise) = crate::call(
-                                    "readAttachments",
-                                    &[JsValue::from_str("attach-input")],
-                                ) else {
-                                    return;
-                                };
-                                spawn_local(async move {
-                                    let Ok(value) = JsFuture::from(js_sys::Promise::from(promise)).await
-                                    else {
-                                        return;
-                                    };
-                                    let Ok(list) = value.dyn_into::<js_sys::Array>() else {
-                                        return;
-                                    };
-                                    for entry in list.iter() {
-                                        let kind = crate::model::read_string(&entry, "kind")
-                                            .unwrap_or_default();
-                                        let name = crate::model::read_string(&entry, "name")
-                                            .unwrap_or_else(|| "附件".to_owned());
-                                        let data = crate::model::read_string(&entry, "data")
-                                            .unwrap_or_default();
-                                        match kind.as_str() {
-                                            "image" if data.starts_with("data:image/") => {
-                                                let id = next_image.get() + 1;
-                                                next_image.set(id);
-                                                images.update(|list| {
-                                                    list.push(UserImage { id, name, image: data })
-                                                });
-                                            }
-                                            "text" if !data.trim().is_empty() => {
-                                                let id = next_file.get() + 1;
-                                                next_file.set(id);
-                                                files.update(|list| {
-                                                    list.push(UserFile { id, name, text: data })
-                                                });
-                                            }
-                                            "error" => {
-                                                if let Some(message) = crate::model::read_string(
-                                                    &entry,
-                                                    "message",
-                                                ) {
-                                                    notify.run(message);
+                                                        <span class="chip-kind">"文"</span>
+                                                        <span class="chip-text">{truncate(&passage.quote, 36)}</span>
+                                                        <span class="chip-page">{format!("p.{page_number}")}</span>
+                                                        <span
+                                                            class="chip-x"
+                                                            title="移除"
+                                                            on:click=move |event: web_sys::MouseEvent| {
+                                                                event.stop_propagation();
+                                                                remove_passage(id);
+                                                            }
+                                                        >
+                                                            {icon("close", 12)}
+                                                        </span>
+                                                    </div>
                                                 }
-                                            }
-                                            _ => {}
+                                            })
+                                            .collect_view()}
+                                    </div>
+                                </div>
+                            }
+                        });
+
+                        let shot_row = (!shots.is_empty()).then(|| {
+                            view! {
+                                <div class="shelf-row">
+                                    <span class="shelf-label">{icon("image", 12)}<span>截图</span></span>
+                                    <div class="shelf-track">
+                                        {shots
+                                            .into_iter()
+                                            .map(|region| {
+                                                let page_number = region.page;
+                                                let id = region.id;
+                                                view! {
+                                                    <div
+                                                        class="attach-thumb"
+                                                        draggable="true"
+                                                        title=format!("p.{} · 截图", region.page)
+                                                        on:click=move |_| jump(page_number)
+                                                        on:dragstart=move |event: web_sys::DragEvent| {
+                                                            if let Some(data) = event.data_transfer() {
+                                                                let _ = data.set_data(
+                                                                    "text/plain",
+                                                                    &format!("r:{}\n图 p.{}", id, page_number),
+                                                                );
+                                                                data.set_effect_allowed("copy");
+                                                            }
+                                                        }
+                                                    >
+                                                        <img src=region.image.clone() alt="" />
+                                                        <span
+                                                            class="chip-x thumb-x"
+                                                            title="移除"
+                                                            on:click=move |event: web_sys::MouseEvent| {
+                                                                event.stop_propagation();
+                                                                remove_region(id);
+                                                            }
+                                                        >
+                                                            {icon("close", 12)}
+                                                        </span>
+                                                    </div>
+                                                }
+                                            })
+                                            .collect_view()}
+                                    </div>
+                                </div>
+                            }
+                        });
+
+                        let image_row = (!pictures.is_empty()).then(|| {
+                            view! {
+                                <div class="shelf-row">
+                                    <span class="shelf-label">{icon("image", 12)}<span>图片</span></span>
+                                    <div class="shelf-track">
+                                        {pictures
+                                            .into_iter()
+                                            .map(|picture| {
+                                                let id = picture.id;
+                                                view! {
+                                                    <div class="attach-thumb" title=picture.name.clone()>
+                                                        <img src=picture.image.clone() alt="" />
+                                                        <span
+                                                            class="chip-x thumb-x"
+                                                            title="移除"
+                                                            on:click=move |event: web_sys::MouseEvent| {
+                                                                event.stop_propagation();
+                                                                remove_image(id);
+                                                            }
+                                                        >
+                                                            {icon("close", 12)}
+                                                        </span>
+                                                    </div>
+                                                }
+                                            })
+                                            .collect_view()}
+                                    </div>
+                                </div>
+                            }
+                        });
+
+                        let file_row = (!documents.is_empty()).then(|| {
+                            view! {
+                                <div class="shelf-row">
+                                    <span class="shelf-label">{icon("file", 12)}<span>文件</span></span>
+                                    <div class="shelf-track">
+                                        {documents
+                                            .into_iter()
+                                            .map(|file| {
+                                                let id = file.id;
+                                                view! {
+                                                    <div class="attach-chip" title=file.name.clone()>
+                                                        <span class="chip-kind">"件"</span>
+                                                        <span class="chip-text">{file.name.clone()}</span>
+                                                        <span class="chip-page">
+                                                            {format!("{} 字", file.text.chars().count())}
+                                                        </span>
+                                                        <span
+                                                            class="chip-x"
+                                                            title="移除"
+                                                            on:click=move |event: web_sys::MouseEvent| {
+                                                                event.stop_propagation();
+                                                                remove_file(id);
+                                                            }
+                                                        >
+                                                            {icon("close", 12)}
+                                                        </span>
+                                                    </div>
+                                                }
+                                            })
+                                            .collect_view()}
+                                    </div>
+                                </div>
+                            }
+                        });
+
+                        let ranges = page_ranges(&pages_selected);
+                        let page_row = (!ranges.is_empty()).then(|| {
+                            view! {
+                                <div class="shelf-row">
+                                    <span class="shelf-label">{icon("pages", 12)}<span>"页面"</span></span>
+                                    <div class="shelf-track">
+                                        {ranges
+                                            .into_iter()
+                                            .map(|(start, end)| {
+                                                let label = if start == end {
+                                                    format!("p.{start}")
+                                                } else {
+                                                    format!("p.{start}–{end}")
+                                                };
+                                                let drag_key = format!("page:{start}\np.{start}");
+                                                view! {
+                                                    <div
+                                                        class="attach-chip"
+                                                        draggable="true"
+                                                        on:click=move |_| jump(start)
+                                                        on:dragstart=move |event: web_sys::DragEvent| {
+                                                            if let Some(data) = event.data_transfer() {
+                                                                let _ = data.set_data("text/plain", &drag_key);
+                                                                data.set_effect_allowed("copy");
+                                                            }
+                                                        }
+                                                    >
+                                                        <span class="chip-kind">{icon("page", 12)}</span>
+                                                        <span class="chip-page">{label}</span>
+                                                        <span
+                                                            class="chip-x"
+                                                            title="移除"
+                                                            on:click=move |event: web_sys::MouseEvent| {
+                                                                event.stop_propagation();
+                                                                undo_push.run(());
+                                                                for page in start..=end {
+                                                                    let _ = composer(
+                                                                        "removeToken",
+                                                                        &[JsValue::from_str(&format!("page:{page}"))],
+                                                                    );
+                                                                }
+                                                                page_set.update(|set| set.retain(|page| *page < start || *page > end));
+                                                            }
+                                                        >
+                                                            {icon("close", 11)}
+                                                        </span>
+                                                    </div>
+                                                }
+                                            })
+                                            .collect_view()}
+                                    </div>
+                                </div>
+                            }
+                        });
+
+                        let source_row = (!citations.is_empty()).then(|| {
+                            view! {
+                                <div class="shelf-row">
+                                    <span class="shelf-label">{icon("link", 12)}<span>来源</span></span>
+                                    <div class="shelf-track">
+                                        {citations
+                                            .into_iter()
+                                            .enumerate()
+                                            .map(|(index, source)| {
+                                                let url = source.url.clone();
+                                                view! {
+                                                    <div
+                                                        class="attach-chip"
+                                                        title=source.url.clone()
+                                                        on:click=move |_| {
+                                                            let _ = crate::call(
+                                                                "openUrl",
+                                                                &[JsValue::from_str(&url)],
+                                                            );
+                                                        }
+                                                    >
+                                                        <span class="chip-kind">{format!("{}", index + 1)}</span>
+                                                        <span class="chip-text">{source.title.clone()}</span>
+                                                    </div>
+                                                }
+                                            })
+                                            .collect_view()}
+                                    </div>
+                                </div>
+                            }
+                        });
+
+                        let answer_row = (!cited.is_empty()).then(|| {
+                            view! {
+                                <div class="shelf-row">
+                                    <span class="shelf-label">{icon("sparkle", 12)}<span>回答</span></span>
+                                    <div class="shelf-track">
+                                        {cited
+                                            .into_iter()
+                                            .map(|answer| {
+                                                let id = answer.id;
+                                                view! {
+                                                    <div
+                                                        class="attach-chip"
+                                                        draggable="true"
+                                                        title=answer.quote.clone()
+                                                        on:dragstart=move |event: web_sys::DragEvent| {
+                                                            if let Some(data) = event.data_transfer() {
+                                                                let _ = data.set_data(
+                                                                    "text/plain",
+                                                                    &format!("a:{}\n{}", id, answer.label),
+                                                                );
+                                                                data.set_effect_allowed("copy");
+                                                            }
+                                                        }
+                                                    >
+                                                        <span class="chip-kind">{icon("sparkle", 12)}</span>
+                                                        <span class="chip-text">{truncate(&answer.quote, 32)}</span>
+                                                        <span
+                                                            class="chip-x"
+                                                            title="移除"
+                                                            on:click=move |event: web_sys::MouseEvent| {
+                                                                event.stop_propagation();
+                                                                remove_answer(id);
+                                                            }
+                                                        >
+                                                            {icon("close", 12)}
+                                                        </span>
+                                                    </div>
+                                                }
+                                            })
+                                            .collect_view()}
+                                    </div>
+                                </div>
+                            }
+                        });
+
+                        view! {
+                            <div class="context-shelf">
+                                <div class="shelf-head">
+                                    <span class="shelf-title">{format!("上下文 · {total} 项")}</span>
+                                    <button
+                                        class="shelf-clear"
+                                        on:click=move |_| {
+                                            undo_push.run(());
+                                            passages.set(Vec::new());
+                                            regions.set(Vec::new());
+                                            images.set(Vec::new());
+                                            files.set(Vec::new());
+                                            sources.set(Vec::new());
+                                            answers.set(Vec::new());
+                                            page_set.update(|set| set.clear());
+                                            // The shelf is the source of truth; the editor must not keep
+                                            // pills whose attachment no longer exists.
+                                            let _ = composer("clearTokens", &[]);
+                                            notify.run("已清空上下文".to_owned());
                                         }
-                                    }
-                                });
-                            }
-                        />
-                    </label>
-                    <div class="scope-icons toolbar-scope" role="group" aria-label="提问范围">
-                        <button
-                            class="scope-icon"
-                            class:active=move || scope_mode.get() == 0
-                            title=move || format!("整份文档 · {} 页", pages.get())
-                            aria-label="整份文档"
-                            aria-pressed=move || (scope_mode.get() == 0).to_string()
-                            on:click=move |_| {
-                                undo_push.run(());
-                                scope_mode.set(0);
-                            }
-                        >
-                            {icon("pages", 17)}
-                        </button>
-                        <button
-                            class="scope-icon"
-                            class:active=move || scope_mode.get() == 1
-                            title=move || format!("仅当前页 · p.{}", page.get())
-                            aria-label="仅当前页"
-                            aria-pressed=move || (scope_mode.get() == 1).to_string()
-                            on:click=move |_| {
-                                undo_push.run(());
-                                scope_mode.set(1);
-                            }
-                        >
-                            {icon("page", 17)}
-                        </button>
-                        <button
-                            class="scope-icon"
-                            class:active=move || scope_mode.get() == 2
-                            title=move || format!("仅引用 · {} 项", reference_count())
-                            aria-label="仅引用"
-                            aria-pressed=move || (scope_mode.get() == 2).to_string()
-                            on:click=move |_| {
-                                undo_push.run(());
-                                scope_mode.set(2);
-                            }
-                        >
-                            {icon("highlight", 17)}
-                            <span class="scope-badge">
+                                    >
+                                        "清空"
+                                    </button>
+                                </div>
+                                {quote_row}
+                                {shot_row}
+                                {image_row}
+                                {file_row}
+                                {source_row}
+                                {page_row}
+                                {answer_row}
+                            </div>
+                        }
+                            .into_any()
+                    }}
+                    {move || {
+                        notice
+                            .get()
+                            .map(|message| view! { <p class="range-summary range-error">{message}</p> })
+                    }}
+                    <Show when=move || editing.get().is_some()>
+                        <div class="editing-banner">
+                            <span>
                                 {move || {
-                                    let count = reference_count();
-                                    if count == 0 { String::new() } else { count.to_string() }
+                                    format!(
+                                        "正在编辑第 {} 条问题 · 发送后替换其后的回答",
+                                        editing.get().unwrap_or(0) + 1
+                                    )
                                 }}
                             </span>
+                            <button
+                                class="link"
+                                on:click=move |_| {
+                                    editing.set(None);
+                                    composer_clear();
+                                }
+                            >
+                                "取消"
+                            </button>
+                        </div>
+                    </Show>
+                    {move || {
+                        if !mention_open.get() {
+                            return ().into_any();
+                        }
+                        let mut items = Vec::new();
+                        for passage in passages.get() {
+                            let key = format!("p:{}", passage.id);
+                            let label = format!("p.{}", passage.page);
+                            items.push(view! {
+                                <button
+                                    class="mention-item"
+                                    on:click=move |_| {
+                                        let _ = composer(
+                                            "insertToken",
+                                            &[JsValue::from_str(&key), JsValue::from_str(&label)],
+                                        );
+                                        mention_open.set(false);
+                                    }
+                                >
+                                    <span class="mention-kind">"文"</span>
+                                    <span class="mention-label">{format!("p.{} · {}", passage.page, truncate(&passage.quote, 30))}</span>
+                                </button>
+                            }.into_any());
+                        }
+                        for region in regions.get() {
+                            let key = format!("r:{}", region.id);
+                            let label = format!("图 p.{}", region.page);
+                            items.push(view! {
+                                <button
+                                    class="mention-item"
+                                    on:click=move |_| {
+                                        let _ = composer(
+                                            "insertToken",
+                                            &[JsValue::from_str(&key), JsValue::from_str(&label)],
+                                        );
+                                        mention_open.set(false);
+                                    }
+                                >
+                                    <span class="mention-kind">"图"</span>
+                                    <span class="mention-label">{format!("p.{} · 截图", region.page)}</span>
+                                </button>
+                            }.into_any());
+                        }
+                        for page in page_set.get() {
+                            let key = format!("page:{page}");
+                            let label = format!("p.{page}");
+                            items.push(view! {
+                                <button
+                                    class="mention-item"
+                                    on:click=move |_| {
+                                        let _ = composer(
+                                            "insertToken",
+                                            &[JsValue::from_str(&key), JsValue::from_str(&label)],
+                                        );
+                                        mention_open.set(false);
+                                    }
+                                >
+                                    <span class="mention-kind">"页"</span>
+                                    <span class="mention-label">{format!("p.{page}")}</span>
+                                </button>
+                            }.into_any());
+                        }
+                        for file in files.get() {
+                            let key = format!("file:{}", file.id);
+                            let label = truncate(&file.name, 14);
+                            items.push(view! {
+                                <button
+                                    class="mention-item"
+                                    on:click=move |_| {
+                                        let _ = composer(
+                                            "insertToken",
+                                            &[JsValue::from_str(&key), JsValue::from_str(&label)],
+                                        );
+                                        mention_open.set(false);
+                                    }
+                                >
+                                    <span class="mention-kind">"件"</span>
+                                    <span class="mention-label">{file.name.clone()}</span>
+                                </button>
+                            }.into_any());
+                        }
+                        for picture in images.get() {
+                            let key = format!("img:{}", picture.id);
+                            let label = truncate(&picture.name, 14);
+                            items.push(view! {
+                                <button
+                                    class="mention-item"
+                                    on:click=move |_| {
+                                        let _ = composer(
+                                            "insertToken",
+                                            &[JsValue::from_str(&key), JsValue::from_str(&label)],
+                                        );
+                                        mention_open.set(false);
+                                    }
+                                >
+                                    <span class="mention-kind">"图"</span>
+                                    <span class="mention-label">{format!("{} · 附件图片", picture.name)}</span>
+                                </button>
+                            }.into_any());
+                        }
+                        for answer in answers.get() {
+                            let key = format!("a:{}", answer.id);
+                            let label = answer.label.clone();
+                            items.push(view! {
+                                <button
+                                    class="mention-item"
+                                    on:click=move |_| {
+                                        let _ = composer(
+                                            "insertToken",
+                                            &[JsValue::from_str(&key), JsValue::from_str(&label)],
+                                        );
+                                        mention_open.set(false);
+                                    }
+                                >
+                                    <span class="mention-kind">{icon("sparkle", 12)}</span>
+                                    <span class="mention-label">{format!("{} · {}", answer.label, truncate(&answer.quote, 28))}</span>
+                                </button>
+                            }.into_any());
+                        }
+                        let current_page = page.get();
+                        let already = page_set.get().contains(&current_page);
+                        items.push(view! {
+                            <button
+                                class="mention-item"
+                                on:click=move |_| {
+                                    if !already {
+                                        undo_push.run(());
+                                        page_set.update(|set| pdfscope_core::add_range(set, current_page, current_page));
+                                        scope_mode.set(2);
+                                    }
+                                    let _ = composer(
+                                        "insertToken",
+                                        &[
+                                            JsValue::from_str(&format!("page:{current_page}")),
+                                            JsValue::from_str(&format!("p.{current_page}")),
+                                        ],
+                                    );
+                                    mention_open.set(false);
+                                }
+                            >
+                                <span class="mention-kind">"+"</span>
+                                <span class="mention-label">{format!("引用当前页 p.{current_page}")}</span>
+                            </button>
+                        }.into_any());
+
+                        view! {
+                            <div
+                                class="mention-picker"
+                                on:pointerdown=move |event: web_sys::PointerEvent| event.prevent_default()
+                            >
+                                <p class="mention-title">"插入引用"</p>
+                                {items.collect_view()}
+                            </div>
+                        }
+                            .into_any()
+                    }}
+                    <div class="composer-card">
+                    <div
+                        node_ref=editor_ref
+                        id="ask-editor"
+                        class="ask editor"
+                        contenteditable="true"
+                        role="textbox"
+                        aria-label="问题"
+                        data-placeholder="问点什么…"
+                        on:dragover=move |event: web_sys::DragEvent| {
+                            event.prevent_default();
+                            if let Some(data) = event.data_transfer() {
+                                data.set_drop_effect("copy");
+                            }
+                        }
+                        on:drop=move |event: web_sys::DragEvent| {
+                            event.prevent_default();
+                            let Some(data) = event.data_transfer() else {
+                                return;
+                            };
+                            let Ok(payload) = data.get_data("text/plain") else {
+                                return;
+                            };
+                            let mut parts = payload.splitn(2, '\n');
+                            let Some(key) = parts.next() else {
+                                return;
+                            };
+                            let label = parts.next().unwrap_or(key);
+                            let _ = composer(
+                                "insertTokenAt",
+                                &[
+                                    JsValue::from_f64(f64::from(event.client_x())),
+                                    JsValue::from_f64(f64::from(event.client_y())),
+                                    JsValue::from_str(key),
+                                    JsValue::from_str(label),
+                                ],
+                            );
+                        }
+                        on:keydown=move |event: web_sys::KeyboardEvent| {
+                            if event.is_composing() {
+                                return;
+                            }
+                            if mention_open.get() {
+                                match event.key().as_str() {
+                                    "ArrowDown" => {
+                                        event.prevent_default();
+                                        let _ = composer("mentionStep", &[JsValue::from_f64(1.0)]);
+                                        return;
+                                    }
+                                    "ArrowUp" => {
+                                        event.prevent_default();
+                                        let _ = composer("mentionStep", &[JsValue::from_f64(-1.0)]);
+                                        return;
+                                    }
+                                    "Enter" => {
+                                        event.prevent_default();
+                                        let _ = composer("mentionChoose", &[]);
+                                        return;
+                                    }
+                                    "Escape" => {
+                                        event.prevent_default();
+                                        mention_open.set(false);
+                                        return;
+                                    }
+                                    _ => {}
+                                }
+                            }
+                            if !mention_open.get() && !streaming.get() {
+                                let at_start = composer("isAtStart", &[])
+                                    .and_then(|value| value.as_bool())
+                                    .unwrap_or(false);
+                                let at_end = composer("isAtEnd", &[])
+                                    .and_then(|value| value.as_bool())
+                                    .unwrap_or(false);
+                                if event.key() == "ArrowUp" && at_start {
+                                    let history = prompt_history.get();
+                                    if !history.is_empty() {
+                                        event.prevent_default();
+                                        let next = history_cursor
+                                            .get()
+                                            .map(|cursor| cursor.saturating_sub(1))
+                                            .unwrap_or(history.len() - 1);
+                                        history_cursor.set(Some(next));
+                                        let _ = composer(
+                                            "setPlainText",
+                                            &[JsValue::from_str(&history[next])],
+                                        );
+                                        return;
+                                    }
+                                }
+                                if event.key() == "ArrowDown" && at_end {
+                                    if let Some(cursor) = history_cursor.get() {
+                                        let history = prompt_history.get();
+                                        event.prevent_default();
+                                        if cursor + 1 < history.len() {
+                                            history_cursor.set(Some(cursor + 1));
+                                            let _ = composer(
+                                                "setPlainText",
+                                                &[JsValue::from_str(&history[cursor + 1])],
+                                            );
+                                        } else {
+                                            history_cursor.set(None);
+                                            let _ = composer(
+                                                "setPlainText",
+                                                &[JsValue::from_str("")],
+                                            );
+                                        }
+                                        return;
+                                    }
+                                }
+                            }
+                            let modified = event.meta_key()
+                                || event.ctrl_key()
+                                || event.alt_key()
+                                || event.shift_key();
+                            if event.key() == "Enter" && !modified {
+                                event.prevent_default();
+                                send(());
+                            } else if event.key() == "Enter" && event.shift_key() {
+                                event.prevent_default();
+                                let _ = composer("insertNewline", &[]);
+                            } else if event.key() == "Escape" {
+                                mention_open.set(false);
+                                if streaming.get() {
+                                    let _ = bridge("stop", &[]);
+                                }
+                            }
+                        }
+                    ></div>
+                    <div class="composer-toolbar">
+                        <button
+                            class="icon-button"
+                            title="插入引用（输入 @）"
+                            on:click=move |_| {
+                                mention_open.set(true);
+                                let _ = composer("focus", &[]);
+                            }
+                        >
+                            {icon("at", 16)}
+                        </button>
+                        <button
+                            class="icon-button attach-button"
+                            class:active=move || web.get()
+                            title="联网搜索（需要 Tavily Key）"
+                            on:click=move |_| web.update(|on| *on = !*on)
+                        >
+                            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="8.5" />
+                                <path d="M3.5 12h17M12 3.5c2.4 2.3 3.6 5.1 3.6 8.5s-1.2 6.2-3.6 8.5c-2.4-2.3-3.6-5.1-3.6-8.5S9.6 5.8 12 3.5z" />
+                            </svg>
+                        </button>
+                        <label class="icon-button attach-button" title="附加图片、PDF、Office 或文本/代码文件">
+    {paperclip()}
+                            <input
+                                id="attach-input"
+                                class="file-input"
+                                type="file"
+                                accept="image/*,.pdf,.docx,.pptx,.xlsx,.txt,.md,.markdown,.csv,.tsv,.json,.jsonl,.log,.yaml,.yml,.html,.htm,.xml,.toml,.ini,.rs,.ts,.tsx,.js,.jsx,.py,.java,.kt,.c,.h,.cpp,.hpp,.cs,.go,.rb,.php,.swift,.sh,.sql,.css,.scss,.vue,.svelte,.lua"
+                                multiple
+                                on:change=move |_| {
+                                    let Some(promise) = crate::call(
+                                        "readAttachments",
+                                        &[JsValue::from_str("attach-input")],
+                                    ) else {
+                                        return;
+                                    };
+                                    spawn_local(async move {
+                                        let Ok(value) = JsFuture::from(js_sys::Promise::from(promise)).await
+                                        else {
+                                            return;
+                                        };
+                                        let Ok(list) = value.dyn_into::<js_sys::Array>() else {
+                                            return;
+                                        };
+                                        for entry in list.iter() {
+                                            let kind = crate::model::read_string(&entry, "kind")
+                                                .unwrap_or_default();
+                                            let name = crate::model::read_string(&entry, "name")
+                                                .unwrap_or_else(|| "附件".to_owned());
+                                            let data = crate::model::read_string(&entry, "data")
+                                                .unwrap_or_default();
+                                            match kind.as_str() {
+                                                "image" if data.starts_with("data:image/") => {
+                                                    let id = next_image.get() + 1;
+                                                    next_image.set(id);
+                                                    images.update(|list| {
+                                                        list.push(UserImage { id, name, image: data })
+                                                    });
+                                                }
+                                                "text" if !data.trim().is_empty() => {
+                                                    let id = next_file.get() + 1;
+                                                    next_file.set(id);
+                                                    files.update(|list| {
+                                                        list.push(UserFile { id, name, text: data })
+                                                    });
+                                                }
+                                                "error" => {
+                                                    if let Some(message) = crate::model::read_string(
+                                                        &entry,
+                                                        "message",
+                                                    ) {
+                                                        notify.run(message);
+                                                    }
+                                                }
+                                                _ => {}
+                                            }
+                                        }
+                                    });
+                                }
+                            />
+                        </label>
+                        <div class="scope-icons toolbar-scope" role="group" aria-label="提问范围">
+                            <button
+                                class="scope-icon"
+                                class:active=move || scope_mode.get() == 0
+                                title=move || format!("整份文档 · {} 页", pages.get())
+                                aria-label="整份文档"
+                                aria-pressed=move || (scope_mode.get() == 0).to_string()
+                                on:click=move |_| {
+                                    undo_push.run(());
+                                    scope_mode.set(0);
+                                }
+                            >
+                                {icon("pages", 17)}
+                            </button>
+                            <button
+                                class="scope-icon"
+                                class:active=move || scope_mode.get() == 1
+                                title=move || format!("仅当前页 · p.{}", page.get())
+                                aria-label="仅当前页"
+                                aria-pressed=move || (scope_mode.get() == 1).to_string()
+                                on:click=move |_| {
+                                    undo_push.run(());
+                                    scope_mode.set(1);
+                                }
+                            >
+                                {icon("page", 17)}
+                            </button>
+                            <button
+                                class="scope-icon"
+                                class:active=move || scope_mode.get() == 2
+                                title=move || format!("仅引用 · {} 项", reference_count())
+                                aria-label="仅引用"
+                                aria-pressed=move || (scope_mode.get() == 2).to_string()
+                                on:click=move |_| {
+                                    undo_push.run(());
+                                    scope_mode.set(2);
+                                }
+                            >
+                                {icon("highlight", 17)}
+                                <span class="scope-badge">
+                                    {move || {
+                                        let count = reference_count();
+                                        if count == 0 { String::new() } else { count.to_string() }
+                                    }}
+                                </span>
+                            </button>
+                        </div>
+                        <button
+                            class="icon-button"
+                            title="管理页面引用"
+                            on:click=move |_| manager_open.set(true)
+                        >
+                            {icon("book", 17)}
+                        </button>
+                        <span class="toolbar-grow"></span>
+                        <button
+                            class="send-button"
+                            class:is-stop=move || streaming.get()
+                            title=move || {
+                                if streaming.get() { "停止" } else if failed.get() { "重试" } else { "发送" }
+                            }
+                            disabled=move || !streaming.get() && question.get().trim().is_empty()
+                            on:click=move |_| {
+                                if streaming.get() {
+                                    let _ = bridge("stop", &[]);
+                                } else {
+                                    send(());
+                                }
+                            }
+                        >
+                            {move || {
+                                if streaming.get() {
+                                    icon("stop", 17)
+                                } else if failed.get() {
+                                    icon("retry", 17)
+                                } else {
+                                    icon("send", 17)
+                                }
+                            }}
                         </button>
                     </div>
-                    <button
-                        class="icon-button"
-                        title="管理页面引用"
-                        on:click=move |_| manager_open.set(true)
-                    >
-                        {icon("book", 17)}
-                    </button>
-                    <span class="toolbar-grow"></span>
-                    <button
-                        class="send-button"
-                        class:is-stop=move || streaming.get()
-                        title=move || {
-                            if streaming.get() { "停止" } else if failed.get() { "重试" } else { "发送" }
-                        }
-                        disabled=move || !streaming.get() && question.get().trim().is_empty()
-                        on:click=move |_| {
-                            if streaming.get() {
-                                let _ = bridge("stop", &[]);
-                            } else {
-                                send(());
-                            }
-                        }
-                    >
-                        {move || {
-                            if streaming.get() {
-                                icon("stop", 17)
-                            } else if failed.get() {
-                                icon("retry", 17)
-                            } else {
-                                icon("send", 17)
-                            }
-                        }}
-                    </button>
+                    </div>
                 </div>
-                </div>
-            </div>
 
-            <PageManager
-                open=manager_open
-                pages=pages
-                page=page
-                page_set=page_set
-                scope_mode=scope_mode
-                undo_push=undo_push
-            />
+                <PageManager
+                    open=manager_open
+                    pages=pages
+                    page=page
+                    page_set=page_set
+                    scope_mode=scope_mode
+                    undo_push=undo_push
+                />
 
-            <SettingsSheet
-                open=open
-                configured=configured
-                notify=notify
-                model=model
-                page_limit=page_limit
-                context_limit=context_limit
-                model_choices=model_choices
-                provider_preset=provider_preset
-            />
+                <SettingsSheet
+                    open=open
+                    configured=configured
+                    notify=notify
+                    model=model
+                    page_limit=page_limit
+                    context_limit=context_limit
+                    model_choices=model_choices
+                    provider_preset=provider_preset
+                />
 
-        </aside>
-    }
+            </aside>
+        }
 }

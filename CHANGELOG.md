@@ -130,7 +130,12 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
-- Thinking collapses as soon as the answer begins and can be collapsed manually while it streams.
+- The thinking header shows a live timer and a collapsed thinking pill is compact; collapsed live and
+  completed states match.
+- Every answer can regenerate; each user bubble carries a chrome-free branch switch and an icon-only
+  edit, with the caret at the end.
+- History gains a copy icon and a trash delete; the branch-to-new-chat and copy-with-citations actions
+  are removed. The attachment control uses the supplied 16 px SVG and the three tool icons align.
 - Editing/regenerating creates a sibling in a persisted conversation tree. Each user bubble has an
   icon-only edit and, when needed, a `< n / total >` switch for that node's alternatives; old branches
   remain reachable. Duplicated answer durations are gone.
