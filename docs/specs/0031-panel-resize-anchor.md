@@ -17,10 +17,17 @@ every release jumped once and repeated drags accumulated a vertical drift.
   No per-pointer-event reflow or Leptos render occurs.
 - Short columns stay vertically centred during the drag as well, using the same formula as
   `centerAtRest`, so a one-page/zoomed-out document does not jump when the pointer lifts.
-- On pointer-up, the reading-line anchor `{page, fraction}` is captured **before** anything else
-  changes. The fit-width base layout is then reflowed to the final stage width, the saved zoom is
-  restored, and `scrollToAnchor(anchor)` puts that same PDF point back on the reading line. The
-  release path no longer calls `runResizeCheck` (which would choose a new anchor).
+- The panel reflow also changes each page's base width. Mounted canvases used to keep the CSS width
+  and height of the old base viewport, so after the reflow they overflowed their page at the old
+  base size for one frame, until the async rerender replaced them. The canvas CSS box now fills its
+  `page-layer` (`width/height: 100%`) and has no inline base-size styles; the old bitmap is briefly
+  stretched into the new box until `rerenderCanvas` catches up.
+- On pointer-up, the final pointer coordinate is applied on the next animation frame. The anchor
+  `{page, fraction}` is captured while that frame's drag scale is still applied; the base layout is
+  reflowed and the saved zoom restored only on the following frame. This lets the last drag frame
+  reach the screen first: its visual page size already equals the post-reflow size, so no
+  different-scale frame is painted. The release path no longer calls `runResizeCheck` (which would
+  choose a new anchor).
 - The panel width is rounded only after the final frame; the ≤1 px difference is absorbed by the
   anchor restoration.
 
@@ -31,4 +38,6 @@ every release jumped once and repeated drags accumulated a vertical drift.
   (measured ≤1 px in the browser probe).
 - Repeated push/pull cycles do not accumulate vertical movement.
 - A short (vertically centred) document does not jump at release.
+- A mounted canvas never exceeds its page layer during the reflow; only its backing store is
+  replaced asynchronously.
 - `just check` green.

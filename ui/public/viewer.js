@@ -975,8 +975,9 @@ function prepareCanvas(page, baseViewport, baseScale, scale) {
   canvas.className = "page-canvas";
   canvas.width = Math.max(1, Math.floor(widthPixels * factor));
   canvas.height = Math.max(1, Math.floor(heightPixels * factor));
-  canvas.style.width = `${baseViewport.width}px`;
-  canvas.style.height = `${baseViewport.height}px`;
+  // The CSS box follows the page layer (and therefore the base layout). During a panel reflow the
+  // old bitmap is briefly stretched into the new box instead of overflowing at its old base size;
+  // rerenderCanvas replaces the backing store on the next frame.
 
   return {
     canvas,
@@ -2200,13 +2201,38 @@ function applyPanelResize() {
   }
 }
 
-function finishPanelResize() {
+function finishPanelResize(event) {
+  if (!panelDrag || panelDrag.releasing) return 0;
+  panelDrag.releasing = true;
+
+  // Stop responding to further pointer moves, but keep the drag styling until the final frame has
+  // been painted. Take the pointer-up coordinate so the divider lands where the pointer was.
+  window.removeEventListener("pointermove", onPanelResizeMove, true);
+  if (event && Number.isFinite(event.clientX)) {
+    panelDrag.clientX = event.clientX;
+  }
+
+  if (!panelDragFrame) {
+    panelDragFrame = requestAnimationFrame(applyPanelResize);
+  }
+
+  // Let the pending drag frame apply the final width and scale and reach the screen, then commit
+  // the base-layout reflow on the following frame. Both frames now have the same visual size; the
+  // old code committed in the same frame as the pending pointer move, which flashed.
+  requestAnimationFrame(() => {
+    requestAnimationFrame(commitPanelResize);
+  });
+  return 0;
+}
+
+function commitPanelResize() {
   if (!panelDrag) return 0;
   if (panelDragFrame) {
     cancelAnimationFrame(panelDragFrame);
     panelDragFrame = 0;
   }
-  if (panelDrag.clientX > 0) applyPanelResize();
+  // Use the last width that was actually applied and painted. Applying a still-pending pointer
+  // position here would make the divider (and the PDF) take one unpainted step on pointer-up.
 
   // Capture the reading-line anchor while the drag scale is still applied. Reflowing the base
   // layout first and resetting the visual scale second would make the two frames disagree and
