@@ -40,6 +40,24 @@ window.Bridge = {
     return api.core.invoke("test_settings", { settings });
   },
 
+  async pickPdf() {
+    if (!available) return null;
+    return api.core.invoke("pick_pdf");
+  },
+
+  async readPdf(path) {
+    if (!available) throw new Error("文件读取只在桌面版可用");
+    const data = await api.core.invoke("read_pdf", { path });
+    if (data instanceof ArrayBuffer) return new Uint8Array(data);
+    if (ArrayBuffer.isView(data)) return new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+    return new Uint8Array(data);
+  },
+
+  async scanRecommended(recentDirs) {
+    if (!available) return [];
+    return api.core.invoke("scan_recommended", { recentDirs, limit: 8 });
+  },
+
   async ask(question, references, regions, context, history, model, onEvent) {
     if (!available) {
       onEvent({ kind: "error", message: "提问只在桌面版可用" });

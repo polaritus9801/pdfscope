@@ -29,8 +29,44 @@ use model::{parse_page_sizes, parse_rects, parse_selection, read_flag, read_numb
 struct RecentDoc {
     id: String,
     name: String,
+    path: String,
     size: f64,
     updated: f64,
+}
+
+#[derive(Clone, PartialEq)]
+struct RecommendedDoc {
+    name: String,
+    path: String,
+    size: f64,
+    modified: f64,
+}
+
+fn parse_recommended(value: &JsValue) -> Vec<RecommendedDoc> {
+    if !value.is_array() {
+        return Vec::new();
+    }
+    js_sys::Array::from(value)
+        .iter()
+        .filter_map(|entry| {
+            let path = read_string(&entry, "path")?;
+            let name = read_string(&entry, "name")?;
+            if path.is_empty() || name.trim().is_empty() {
+                return None;
+            }
+            Some(RecommendedDoc {
+                name,
+                path,
+                size: read_number(&entry, "size").unwrap_or(0.0).max(0.0),
+                modified: read_number(&entry, "modified").unwrap_or(0.0),
+            })
+        })
+        .collect()
+}
+
+fn parent_directory(path: &str) -> Option<String> {
+    let (parent, _) = path.rsplit_once(['/', '\\'])?;
+    (!parent.is_empty()).then(|| parent.to_owned())
 }
 
 fn parse_recents(value: &JsValue) -> Vec<RecentDoc> {
@@ -48,6 +84,7 @@ fn parse_recents(value: &JsValue) -> Vec<RecentDoc> {
             Some(RecentDoc {
                 id,
                 name,
+                path: read_string(&entry, "path").unwrap_or_default(),
                 size: read_number(&entry, "size").unwrap_or(0.0).max(0.0),
                 updated: read_number(&entry, "updated").unwrap_or(0.0),
             })
@@ -117,6 +154,8 @@ fn App() -> impl IntoView {
     let error = RwSignal::new(Option::<String>::None);
     let recents = RwSignal::new(Vec::<RecentDoc>::new());
     let recents_ready = RwSignal::new(false);
+    let recommended = RwSignal::new(Vec::<RecommendedDoc>::new());
+    let recommended_ready = RwSignal::new(false);
     let settings_open = RwSignal::new(false);
     let reading = RwSignal::new(false);
     // 0 pointer, 1 text, 2 box, 3 pages: the rail's active tool.
@@ -348,107 +387,149 @@ fn App() -> impl IntoView {
     // Load the recent shelf once the renderer is available.
     Effect::new(move |_| refresh_recents.run(()));
 
-    let load_document = Callback::new(move |(name, bytes): (String, js_sys::Uint8Array)| {
-        file_name.set(name.clone());
-        error.set(None);
-        pages.set(0);
-        page_sizes.set(Vec::new());
-        zoom.set(100);
-        ready.set(false);
-        passages.set(Vec::new());
-        regions.set(Vec::new());
-        answers.set(Vec::new());
-        next_answer.set(0);
-        selection.set(None);
-        // A new document owns a new history and scope; nothing from the old one may be undone into it.
-        history.set(pdfscope_core::history::History::new(50));
-        next_ref.set(0);
-        page_set.set(Vec::new());
-        scope_mode.set(0);
-        anchor.set(None);
-        hover_page.set(None);
-        active_ref.set(None);
-        focused_ref.set(None);
-
-        spawn_local(async move {
-            // PDF.js may transfer the input buffer to its worker. Keep a private copy for the recent
-            // store; saving the original after `load` would serialize a detached view.
-            let recent_bytes = js_sys::Uint8Array::new_with_length(bytes.length());
-            recent_bytes.set(&bytes, 0);
-            let Some(handle) = call("load", &[bytes.clone().into(), JsValue::from_str(&name)])
-            else {
-                error.set(Some("阅读器还没准备好，请重试。".to_owned()));
-                return;
-            };
-
-            match settle(handle).await {
-                Ok(count) => {
-                    let count = count.as_f64().unwrap_or(0.0).max(0.0) as u32;
-                    pages.set(count);
-                    outline.set(Vec::new());
-                    outline_open.set(false);
-
-                    if let Some(handle) = call("outline", &[]) {
-                        spawn_local(async move {
-                            if let Ok(value) = settle(handle).await {
-                                let entries = js_sys::Array::from(&value);
-                                let mut list = Vec::new();
-                                for entry in entries.iter() {
-                                    let title =
-                                        js_sys::Reflect::get(&entry, &JsValue::from_str("title"))
-                                            .ok()
-                                            .and_then(|value| value.as_string())
-                                            .unwrap_or_default();
-                                    let target =
-                                        js_sys::Reflect::get(&entry, &JsValue::from_str("page"))
-                                            .ok()
-                                            .and_then(|value| value.as_f64())
-                                            .unwrap_or(0.0)
-                                            as u32;
-                                    let depth =
-                                        js_sys::Reflect::get(&entry, &JsValue::from_str("depth"))
-                                            .ok()
-                                            .and_then(|value| value.as_f64())
-                                            .unwrap_or(0.0)
-                                            as u8;
-                                    list.push((title, target, depth));
-                                }
-                                outline.set(list);
-                            }
-                        });
-                    }
-
-                    let mut sizes = Vec::new();
-                    if count > 0 {
-                        if let Some(value) = call("pageSizes", &[]) {
-                            sizes = parse_page_sizes(&value);
-                        }
-                    }
-                    sizes.truncate(count as usize);
-                    let fallback = sizes.last().copied().unwrap_or(PageSize {
-                        width: 612.0,
-                        height: 792.0,
-                    });
-                    sizes.resize(count as usize, fallback);
-                    page_sizes.set(sizes);
-
-                    page.set(1);
-                    ready.set(true);
-
-                    if let Some(handle) = call(
-                        "recentsSave",
-                        &[JsValue::from_str(&name), recent_bytes.into()],
-                    ) {
-                        spawn_local(async move {
-                            let _ = settle(handle).await;
-                            refresh_recents.run(());
-                        });
-                    }
+    let scan_recommended = Callback::new(move |_: ()| {
+        let dirs = js_sys::Array::new();
+        let mut seen = Vec::<String>::new();
+        for recent in recents.get_untracked() {
+            if let Some(directory) = parent_directory(&recent.path) {
+                if !seen.contains(&directory) {
+                    seen.push(directory.clone());
+                    dirs.push(&JsValue::from_str(&directory));
                 }
-                Err(_) => error.set(Some("这个 PDF 打不开，可能已损坏或被加密。".to_owned())),
             }
+        }
+        let Some(handle) = call("scanRecommended", &[dirs.into()]) else {
+            recommended_ready.set(true);
+            return;
+        };
+        spawn_local(async move {
+            if let Ok(value) = settle(handle).await {
+                recommended.set(parse_recommended(&value));
+            }
+            recommended_ready.set(true);
         });
     });
+
+    Effect::new(move |_| {
+        let _ = recents.get();
+        if recents_ready.get() {
+            scan_recommended.run(());
+        }
+    });
+
+    let load_document = Callback::new(
+        move |(name, bytes, path): (String, js_sys::Uint8Array, String)| {
+            file_name.set(name.clone());
+            error.set(None);
+            pages.set(0);
+            page_sizes.set(Vec::new());
+            zoom.set(100);
+            ready.set(false);
+            passages.set(Vec::new());
+            regions.set(Vec::new());
+            answers.set(Vec::new());
+            next_answer.set(0);
+            selection.set(None);
+            // A new document owns a new history and scope; nothing from the old one may be undone into it.
+            history.set(pdfscope_core::history::History::new(50));
+            next_ref.set(0);
+            page_set.set(Vec::new());
+            scope_mode.set(0);
+            anchor.set(None);
+            hover_page.set(None);
+            active_ref.set(None);
+            focused_ref.set(None);
+
+            spawn_local(async move {
+                // PDF.js may transfer the input buffer to its worker. Keep a private copy for the recent
+                // store; saving the original after `load` would serialize a detached view.
+                let recent_bytes = js_sys::Uint8Array::new_with_length(bytes.length());
+                recent_bytes.set(&bytes, 0);
+                let Some(handle) = call("load", &[bytes.clone().into(), JsValue::from_str(&name)])
+                else {
+                    error.set(Some("阅读器还没准备好，请重试。".to_owned()));
+                    return;
+                };
+
+                match settle(handle).await {
+                    Ok(count) => {
+                        let count = count.as_f64().unwrap_or(0.0).max(0.0) as u32;
+                        pages.set(count);
+                        outline.set(Vec::new());
+                        outline_open.set(false);
+
+                        if let Some(handle) = call("outline", &[]) {
+                            spawn_local(async move {
+                                if let Ok(value) = settle(handle).await {
+                                    let entries = js_sys::Array::from(&value);
+                                    let mut list = Vec::new();
+                                    for entry in entries.iter() {
+                                        let title = js_sys::Reflect::get(
+                                            &entry,
+                                            &JsValue::from_str("title"),
+                                        )
+                                        .ok()
+                                        .and_then(|value| value.as_string())
+                                        .unwrap_or_default();
+                                        let target = js_sys::Reflect::get(
+                                            &entry,
+                                            &JsValue::from_str("page"),
+                                        )
+                                        .ok()
+                                        .and_then(|value| value.as_f64())
+                                        .unwrap_or(0.0)
+                                            as u32;
+                                        let depth = js_sys::Reflect::get(
+                                            &entry,
+                                            &JsValue::from_str("depth"),
+                                        )
+                                        .ok()
+                                        .and_then(|value| value.as_f64())
+                                        .unwrap_or(0.0)
+                                            as u8;
+                                        list.push((title, target, depth));
+                                    }
+                                    outline.set(list);
+                                }
+                            });
+                        }
+
+                        let mut sizes = Vec::new();
+                        if count > 0 {
+                            if let Some(value) = call("pageSizes", &[]) {
+                                sizes = parse_page_sizes(&value);
+                            }
+                        }
+                        sizes.truncate(count as usize);
+                        let fallback = sizes.last().copied().unwrap_or(PageSize {
+                            width: 612.0,
+                            height: 792.0,
+                        });
+                        sizes.resize(count as usize, fallback);
+                        page_sizes.set(sizes);
+
+                        page.set(1);
+                        ready.set(true);
+
+                        if let Some(handle) = call(
+                            "recentsSave",
+                            &[
+                                JsValue::from_str(&name),
+                                recent_bytes.into(),
+                                JsValue::from_str(&path),
+                            ],
+                        ) {
+                            spawn_local(async move {
+                                let _ = settle(handle).await;
+                                refresh_recents.run(());
+                            });
+                        }
+                    }
+                    Err(_) => error.set(Some("这个 PDF 打不开，可能已损坏或被加密。".to_owned())),
+                }
+            });
+        },
+    );
 
     let open = move |event: web_sys::Event| {
         let Some(input) = event
@@ -466,11 +547,11 @@ fn App() -> impl IntoView {
                 error.set(Some("这个文件读不出来。".to_owned()));
                 return;
             };
-            load_document.run((name, js_sys::Uint8Array::new(&buffer)));
+            load_document.run((name, js_sys::Uint8Array::new(&buffer), String::new()));
         });
     };
 
-    let open_recent = Callback::new(move |(id, name): (String, String)| {
+    let open_recent = Callback::new(move |(id, name, path): (String, String, String)| {
         let Some(handle) = call("recentsLoad", &[JsValue::from_str(&id)]) else {
             error.set(Some("最近记录暂时不可用。".to_owned()));
             return;
@@ -485,7 +566,7 @@ fn App() -> impl IntoView {
                         .ok()
                         .and_then(|value| value.dyn_into::<js_sys::Uint8Array>().ok());
                     if let Some(bytes) = bytes {
-                        load_document.run((loaded_name, bytes));
+                        load_document.run((loaded_name, bytes, path));
                     } else {
                         error.set(Some("这个最近文件已无法读取。".to_owned()));
                     }
@@ -494,6 +575,68 @@ fn App() -> impl IntoView {
             }
         });
     });
+
+    let open_path = Callback::new(move |path: String| {
+        let Some(handle) = call("readPdf", &[JsValue::from_str(&path)]) else {
+            error.set(Some("这个 PDF 无法读取。".to_owned()));
+            return;
+        };
+        spawn_local(async move {
+            match settle(handle).await {
+                Ok(value) => {
+                    let bytes = value
+                        .dyn_into::<js_sys::Uint8Array>()
+                        .unwrap_or_else(|value| js_sys::Uint8Array::new(&value));
+                    let name = path
+                        .rsplit(['/', '\\'])
+                        .next()
+                        .filter(|name| !name.is_empty())
+                        .unwrap_or("文档.pdf")
+                        .to_owned();
+                    load_document.run((name, bytes, path));
+                }
+                Err(_) => error.set(Some("这个文件已经被移动或删除。".to_owned())),
+            }
+        });
+    });
+
+    let open_native = move || {
+        let Some(handle) = call("pickPdf", &[]) else {
+            error.set(Some("原生文件选择器不可用。".to_owned()));
+            return;
+        };
+        spawn_local(async move {
+            match settle(handle).await {
+                Ok(value) => {
+                    if let Some(path) = value.as_string() {
+                        open_path.run(path);
+                    }
+                }
+                Err(_) => error.set(Some("无法打开文件选择器。".to_owned())),
+            }
+        });
+    };
+
+    let open_file_input = move || {
+        if let Some(input) = web_sys::window()
+            .and_then(|window| window.document())
+            .and_then(|document| document.get_element_by_id("file-input"))
+            .and_then(|element| element.dyn_into::<HtmlInputElement>().ok())
+        {
+            input.click();
+        }
+    };
+
+    let request_open = move || {
+        if call("nativeOpenAvailable", &[])
+            .and_then(|value| value.as_bool())
+            .unwrap_or(false)
+        {
+            open_native();
+        } else {
+            open_file_input();
+        }
+    };
 
     let jump = move |event: web_sys::Event| {
         let Some(input) = event
@@ -618,13 +761,7 @@ fn App() -> impl IntoView {
         }
 
         if (event.meta_key() || event.ctrl_key()) && event.key().eq_ignore_ascii_case("o") {
-            if let Some(input) = web_sys::window()
-                .and_then(|window| window.document())
-                .and_then(|document| document.get_element_by_id("file-input"))
-                .and_then(|element| element.dyn_into::<HtmlInputElement>().ok())
-            {
-                input.click();
-            }
+            request_open();
             event.prevent_default();
             return;
         }
@@ -994,7 +1131,18 @@ fn App() -> impl IntoView {
             <header class="bar">
                 <div class="bar-left">
                     <span class="brand">"PDFScope"</span>
-                    <label class="button button-primary">
+                    <label
+                        class="button button-primary"
+                        on:click=move |event: web_sys::MouseEvent| {
+                            if call("nativeOpenAvailable", &[])
+                                .and_then(|value| value.as_bool())
+                                .unwrap_or(false)
+                            {
+                                event.prevent_default();
+                                open_native();
+                            }
+                        }
+                    >
                         "打开 PDF"
                         <input
                             id="file-input"
@@ -1348,13 +1496,7 @@ fn App() -> impl IntoView {
                     if pages.get() > 0 {
                         return;
                     }
-                    if let Some(input) = web_sys::window()
-                        .and_then(|window| window.document())
-                        .and_then(|document| document.get_element_by_id("file-input"))
-                        .and_then(|element| element.dyn_into::<HtmlInputElement>().ok())
-                    {
-                        input.click();
-                    }
+                    request_open();
                 }
             >
 
@@ -1442,90 +1584,188 @@ fn App() -> impl IntoView {
                                 </button>
                                 <button
                                     class="button button-primary welcome-action"
-                                    on:click=move |_| {
-                                        if let Some(input) = web_sys::window()
-                                            .and_then(|window| window.document())
-                                            .and_then(|document| document.get_element_by_id("file-input"))
-                                            .and_then(|element| element.dyn_into::<HtmlInputElement>().ok())
-                                        {
-                                            input.click();
-                                        }
-                                    }
+                                    on:click=move |_| request_open()
                                 >
                                     "打开 PDF"
                                 </button>
                             </div>
                         </div>
 
-                        <aside class="recent" aria-label="最近打开">
-                            <div class="recent-head">
-                                <div>
-                                    <h2 class="recent-title">"最近打开"</h2>
-                                    <p class="recent-sub">"从上次停下的地方继续"</p>
+                        <div class="oobe-divider"></div>
+
+                        <aside class="oobe-side" aria-label="打开文档">
+                            <section class="oobe-section" aria-label="最近打开">
+                                <div class="recent-head">
+                                    <div>
+                                        <h2 class="recent-title">"最近打开"</h2>
+                                        <p class="recent-sub">"从上次停下的地方继续"</p>
+                                    </div>
+                                    <span class="recent-count">
+                                        {move || {
+                                            let count = recents.get().len().min(5);
+                                            if count > 0 { count.to_string() } else { String::new() }
+                                        }}
+                                    </span>
                                 </div>
-                                <span class="recent-count">
+                                <div class="file-list">
                                     {move || {
-                                        let count = recents.get().len();
-                                        if count > 0 { count.to_string() } else { String::new() }
-                                    }}
-                                </span>
-                            </div>
-                            <div class="recent-list">
-                                {move || {
-                                    if !recents_ready.get() {
-                                        return view! {
-                                            <p class="recent-loading">"正在读取最近打开…"</p>
-                                        }
-                                            .into_any();
-                                    }
-                                    let all = recents.get();
-                                    if all.is_empty() {
-                                        return view! {
-                                            <div class="recent-empty">
-                                                <span class="recent-empty-icon">
-                                                    {icons::icon("file", 18)}
-                                                </span>
-                                                <p>"还没有打开过文档"</p>
-                                                <small>"打开一本 PDF，下次它会出现在这里。"</small>
-                                            </div>
-                                        }
-                                            .into_any();
-                                    }
-                                    all.into_iter()
-                                        .map(|recent| {
-                                            let id = recent.id;
-                                            let name = recent.name;
-                                            let meta = format!(
-                                                "{} · {}",
-                                                recent_size(recent.size),
-                                                recent_age(recent.updated),
-                                            );
-                                            let open_name = name.clone();
-                                            view! {
-                                                <button
-                                                    class="recent-item"
-                                                    title=name.clone()
-                                                    on:click=move |_| {
-                                                        open_recent.run((id.clone(), open_name.clone()));
-                                                    }
-                                                >
-                                                    <span class="recent-icon">
-                                                        {icons::icon("file", 15)}
-                                                    </span>
-                                                    <span class="recent-copy">
-                                                        <span class="recent-name">{name.clone()}</span>
-                                                        <span class="recent-meta">{meta}</span>
-                                                    </span>
-                                                    <span class="recent-arrow">
-                                                        {icons::icon("chevron-right", 12)}
-                                                    </span>
-                                                </button>
+                                        if !recents_ready.get() {
+                                            return view! {
+                                                <p class="recent-loading">"正在读取最近打开…"</p>
                                             }
-                                        })
-                                        .collect_view()
-                                        .into_any()
-                                }}
-                            </div>
+                                                .into_any();
+                                        }
+                                        let all = recents.get();
+                                        if all.is_empty() {
+                                            return view! {
+                                                <div class="recent-empty">
+                                                    <span class="recent-empty-icon">
+                                                        {icons::pdf_file(24)}
+                                                    </span>
+                                                    <p>"还没有打开过文档"</p>
+                                                    <small>"打开一本 PDF，下次它会出现在这里。"</small>
+                                                </div>
+                                            }
+                                                .into_any();
+                                        }
+                                        all.into_iter()
+                                            .take(5)
+                                            .map(|recent| {
+                                                let id = recent.id;
+                                                let name = recent.name;
+                                                let path = recent.path;
+                                                let meta = format!(
+                                                    "{} · {}",
+                                                    recent_size(recent.size),
+                                                    recent_age(recent.updated),
+                                                );
+                                                let open_name = name.clone();
+                                                view! {
+                                                    <button
+                                                        class="file-row"
+                                                        title=name.clone()
+                                                        on:click=move |_| {
+                                                            open_recent.run((
+                                                                id.clone(),
+                                                                open_name.clone(),
+                                                                path.clone(),
+                                                            ));
+                                                        }
+                                                    >
+                                                        <span class="file-icon">
+                                                            {icons::pdf_file(18)}
+                                                        </span>
+                                                        <span class="file-copy">
+                                                            <span class="file-name">{name.clone()}</span>
+                                                            <span class="file-meta">{meta}</span>
+                                                        </span>
+                                                        <span class="file-arrow">
+                                                            {icons::icon("chevron-right", 12)}
+                                                        </span>
+                                                    </button>
+                                                }
+                                            })
+                                            .collect_view()
+                                            .into_any()
+                                    }}
+                                </div>
+                            </section>
+
+                            <section class="oobe-section" aria-label="推荐打开">
+                                <div class="recent-head">
+                                    <div>
+                                        <h2 class="recent-title">"推荐打开"</h2>
+                                        <p class="recent-sub">"下载、桌面和文稿里的新 PDF"</p>
+                                    </div>
+                                    <span class="recent-count">
+                                        {move || {
+                                            let recent_paths: Vec<String> = recents
+                                                .get()
+                                                .into_iter()
+                                                .map(|recent| recent.path)
+                                                .filter(|path| !path.is_empty())
+                                                .collect();
+                                            let count = recommended
+                                                .get()
+                                                .into_iter()
+                                                .filter(|item| !recent_paths.contains(&item.path))
+                                                .take(5)
+                                                .count();
+                                            if count > 0 { count.to_string() } else { String::new() }
+                                        }}
+                                    </span>
+                                </div>
+                                <div class="file-list">
+                                    {move || {
+                                        if !recommended_ready.get() {
+                                            return view! {
+                                                <p class="recent-loading">"正在整理推荐…"</p>
+                                            }
+                                                .into_any();
+                                        }
+                                        let recent_paths: Vec<String> = recents
+                                            .get()
+                                            .into_iter()
+                                            .map(|recent| recent.path)
+                                            .filter(|path| !path.is_empty())
+                                            .collect();
+                                        let all: Vec<RecommendedDoc> = recommended
+                                            .get()
+                                            .into_iter()
+                                            .filter(|item| !recent_paths.contains(&item.path))
+                                            .take(5)
+                                            .collect();
+                                        if all.is_empty() {
+                                            return view! {
+                                                <div class="recent-empty compact">
+                                                    <span class="recent-empty-icon">
+                                                        {icons::pdf_file(24)}
+                                                    </span>
+                                                    <p>"还没有可推荐的 PDF"</p>
+                                                    <small>"把文件放进下载、桌面或文稿目录，这里会自动出现。"</small>
+                                                </div>
+                                            }
+                                                .into_any();
+                                        }
+                                        all.into_iter()
+                                            .map(|item| {
+                                                let path = item.path;
+                                                let name = item.name;
+                                                let meta = format!(
+                                                    "{} · {}",
+                                                    recent_size(item.size),
+                                                    recent_age(item.modified),
+                                                );
+                                                let open_path_value = path.clone();
+                                                view! {
+                                                    <button
+                                                        class="file-row"
+                                                        title=name.clone()
+                                                        on:click=move |_| {
+                                                            recommended.update(|list| {
+                                                                list.retain(|entry| entry.path != path);
+                                                            });
+                                                            open_path.run(open_path_value.clone());
+                                                        }
+                                                    >
+                                                        <span class="file-icon">
+                                                            {icons::pdf_file(18)}
+                                                        </span>
+                                                        <span class="file-copy">
+                                                            <span class="file-name">{name.clone()}</span>
+                                                            <span class="file-meta">{meta}</span>
+                                                        </span>
+                                                        <span class="file-arrow">
+                                                            {icons::icon("chevron-right", 12)}
+                                                        </span>
+                                                    </button>
+                                                }
+                                            })
+                                            .collect_view()
+                                            .into_any()
+                                    }}
+                                </div>
+                            </section>
                         </aside>
                     </div>
                 </div>

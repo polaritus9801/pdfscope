@@ -2620,12 +2620,28 @@ window.PDFScope = {
     return window.Recents ? window.Recents.list() : Promise.resolve([]);
   },
 
-  recentsSave(name, bytes) {
-    return window.Recents ? window.Recents.save(name, bytes) : Promise.resolve(false);
+  recentsSave(name, bytes, path = "") {
+    return window.Recents ? window.Recents.save(name, bytes, path) : Promise.resolve(false);
   },
 
   recentsLoad(id) {
     return window.Recents ? window.Recents.load(id) : Promise.resolve(null);
+  },
+
+  nativeOpenAvailable() {
+    return Boolean(window.Bridge?.available);
+  },
+
+  pickPdf() {
+    return window.Bridge?.pickPdf?.() ?? Promise.resolve(null);
+  },
+
+  readPdf(path) {
+    return window.Bridge?.readPdf?.(path) ?? Promise.reject(new Error("桌面版不可用"));
+  },
+
+  scanRecommended(recentDirs) {
+    return window.Bridge?.scanRecommended?.(recentDirs) ?? Promise.resolve([]);
   },
 
   /// The reader's preferred panel width, remembered between launches.

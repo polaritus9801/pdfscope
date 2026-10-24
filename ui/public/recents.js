@@ -42,8 +42,8 @@
       request.onsuccess = () => {
         const cursor = request.result;
         if (!cursor || result.length >= limit) return;
-        const { id, name, size, updated } = cursor.value;
-        result.push({ id, name, size, updated });
+        const { id, name, path, size, updated } = cursor.value;
+        result.push({ id, name, path: path || "", size, updated });
         cursor.continue();
       };
       transaction.oncomplete = () => resolve(result);
@@ -71,15 +71,16 @@
       }
     },
 
-    async save(name, bytes) {
+    async save(name, bytes, path = "") {
       try {
         const data = bytes instanceof Uint8Array ? bytes.slice() : new Uint8Array(bytes);
-        const id = `${name}::${data.byteLength}`;
+        const id = `${path || name}::${data.byteLength}`;
         const db = await openDb();
         const transaction = db.transaction(STORE, "readwrite");
         transaction.objectStore(STORE).put({
           id,
           name,
+          path,
           size: data.byteLength,
           updated: Date.now(),
           bytes: data,

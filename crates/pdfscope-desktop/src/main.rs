@@ -8,6 +8,7 @@
 
 mod ask;
 mod export;
+mod library;
 mod settings;
 
 use anyhow::Context;
@@ -60,7 +61,10 @@ fn main() -> anyhow::Result<()> {
             settings::web_search,
             export::save_export,
             ask::ask,
-            ask::stop_ask
+            ask::stop_ask,
+            library::pick_pdf,
+            library::read_pdf,
+            library::scan_recommended
         ])
         .run(tauri::generate_context!())
         .context("the desktop shell stopped unexpectedly")?;

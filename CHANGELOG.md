@@ -130,9 +130,11 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
-- The empty reader is now a left/right OOBE: the existing guide on the left (with a gap between its
-  two actions) and an IndexedDB-backed “最近打开” shelf on the right. Recents keep the document bytes,
-  show size/relative age, reopen through the normal load path, and persist across restarts.
+- The empty reader is one panel with an inset vertical rule: a compressed guide on the left and a
+  right library split into “最近打开” and “推荐打开”. Both sections show five compact rows with the
+  supplied PDF type mark; recents keep bytes and paths in IndexedDB, while the desktop shell scans
+  Downloads, Desktop, Documents and the five recent directories for direct PDF children, newest
+  first. Native file picking/opening, missing-file handling and a browser fallback are included.
 
 ### Added
 
