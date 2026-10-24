@@ -2240,17 +2240,15 @@ mark.find-hit {
 
 .scope-icons {
   display: flex;
-  align-items: center;
-  gap: 0;
+  gap: 2px;  /* size */
   padding: 3px;  /* size */
-  background: transparent;
-  border: 1px solid var(--border-strong);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
   border-radius: 10px;  /* size */
 }
 
 .scope-icon {
   position: relative;
-  z-index: 2;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2260,7 +2258,7 @@ mark.find-hit {
   color: var(--ink-muted);
   background: transparent;
   border: none;
-  border-radius: 999px;  /* size */
+  border-radius: 7px;  /* size */
   cursor: pointer;
   transition:
     color var(--duration) var(--ease),
@@ -2269,53 +2267,26 @@ mark.find-hit {
 
 .scope-icon:hover {
   color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
 }
 
-/* A selected mode is a lavender capsule. It bleeds four pixels over each side so it covers the
-   neighbouring needle dividers, and the outer trough border at the first/last position. */
 .scope-icon.active {
-  z-index: 4;
   color: var(--accent);
-  background: transparent;
-  box-shadow: none;
-}
-
-.scope-icon.active::before {
-  position: absolute;
-  inset: 0 -4px;  /* size */
-  z-index: 0;
-  content: "";
-  background: color-mix(in srgb, var(--accent) 18%, var(--surface));
-  border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--border));
-  border-radius: 999px;  /* size */
-  box-shadow: 0 1px 4px rgb(24 18 36 / 12%);  /* size */
-}
-
-/* Needle dividers: fourteen pixels tall, pointed at both ends, never touching top or bottom. */
-.scope-divider {
-  position: relative;
-  z-index: 1;
-  flex: none;
-  width: 2px;  /* size */
-  height: 14px;  /* size */
-  margin: 0 -1px;  /* size */
-  background: color-mix(in srgb, var(--border-strong) 72%, var(--ink-muted) 28%);
-  clip-path: polygon(50% 0, 100% 18%, 100% 82%, 50% 100%, 0 82%, 0 18%);
-}
-
-.scope-art {
-  position: relative;
-  z-index: 2;
-  display: block;
-  width: auto;
-  height: 18px;  /* size */
-  filter: drop-shadow(0 0 0.7px rgb(30 24 40 / 65%)) drop-shadow(0 1px 2px rgb(30 24 40 / 24%));  /* size */
+  background: var(--surface);
+  box-shadow:
+    0 1px 2px rgb(24 18 36 / 8%),  /* size */
+    inset 0 0 0 1px color-mix(in srgb, var(--accent) 16%, var(--border));
 }
 
 .scope-icon:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;  /* size */
+}
+
+.scope-art {
+  display: block;
+  width: auto;
+  height: 18px;  /* size */
 }
 
 .scope-badge {

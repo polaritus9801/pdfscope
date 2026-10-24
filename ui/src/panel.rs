@@ -3736,7 +3736,6 @@ pub fn AiPanel(
                             >
                                 <img class="scope-art" src="/scope-icons/document.svg" alt="" draggable="false" />
                             </button>
-                            <span class="scope-divider" aria-hidden="true"></span>
                             <button
                                 class="scope-icon"
                                 class:active=move || scope_mode.get() == 1
@@ -3750,7 +3749,6 @@ pub fn AiPanel(
                             >
                                 <img class="scope-art" src="/scope-icons/page.svg" alt="" draggable="false" />
                             </button>
-                            <span class="scope-divider" aria-hidden="true"></span>
                             <button
                                 class="scope-icon"
                                 class:active=move || scope_mode.get() == 2

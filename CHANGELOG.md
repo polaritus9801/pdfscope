@@ -130,10 +130,8 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
-- The page-scope segment uses the reader's three vector drawings (PDF, page, references). The trough
-  now has a transparent fill and a slightly darker outline; icons sit closer with pointed needle
-  dividers and stronger edge shadows, and the selected mode is a lavender capsule that covers the
-  adjacent dividers and outer edge.
+- The page-scope segment is back to its pre-tile appearance (pale lilac trough, white active tile) and uses the newly redrawn PDF/page/reference artwork; the icons keep native proportions.
+
 
 ### Added
 
