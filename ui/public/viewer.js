@@ -2337,6 +2337,9 @@ function beginPanelResize() {
     stage,
     anchorX: stage.scrollLeft + stage.clientWidth / 2,
     anchorY: stage.scrollTop + stage.clientHeight / 2,
+    // A fixed PDF anchor for the whole drag. Recomputing the on-screen point every frame lets
+    // sub-pixel scroll corrections be rounded away, so a slow 1px/frame drag accumulates drift.
+    pdfAnchor: readAnchor(),
     clientX: 0,
     width: panel.getBoundingClientRect().width,
     baseScale: displayScale,
@@ -2355,6 +2358,21 @@ function onPanelResizeMove(event) {
   panelDrag.clientX = event.clientX;
   if (panelDragFrame) return;
   panelDragFrame = requestAnimationFrame(applyPanelResize);
+}
+
+/// Re-applies the drag's fixed base-layout anchor to the reading line. The correction is absolute
+/// to that anchor, not to the current (possibly already rounded) scroll position, so error cannot
+/// accumulate across slow frames.
+function restorePdfDragAnchor(anchor) {
+  if (!anchor || !panelDrag) return;
+  const stage = panelDrag.stage;
+  const page = pageElement(anchor.page);
+  if (!stage || !page) return;
+  const stageRect = stage.getBoundingClientRect();
+  const pageRect = page.getBoundingClientRect();
+  const target = stageRect.top + readingOffset();
+  const current = pageRect.top + anchor.fraction * pageRect.height;
+  stage.scrollTop += current - target;
 }
 
 function applyPanelResize() {
@@ -2384,6 +2402,7 @@ function applyPanelResize() {
       x: stageBox.left + stage.clientWidth / 2,
       y: stageBox.top + readingOffset(),
     });
+    restorePdfDragAnchor(panelDrag.pdfAnchor);
   } else {
     stage.scrollLeft = Math.max(0, panelDrag.anchorX - stage.clientWidth / 2);
   }
@@ -2425,7 +2444,7 @@ function commitPanelResize() {
   // Capture the reading-line anchor while the drag scale is still applied. Reflowing the base
   // layout first and resetting the visual scale second would make the two frames disagree and
   // produce the old release jump.
-  const anchor = readAnchor();
+  const anchor = panelDrag.pdfAnchor ?? readAnchor();
   const panelAnchor = capturePanelAnchor();
   const width = Math.round(panelDrag.width);
   const finalScale = panelDrag.baseScale;

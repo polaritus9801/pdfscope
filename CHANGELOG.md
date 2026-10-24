@@ -137,9 +137,9 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Fixed
 
-- Dragging the AI panel now keeps the reading-line anchor through both the drag and the final base
-  reflow; releasing the pointer no longer jumps, flashes a different scale, or drifts vertically
-  across repeated drags. The final drag frame is painted before the base-layout commit, page canvases
+- Dragging the AI panel now keeps a fixed page/fraction reading-line anchor through the drag and the
+  final base reflow; releasing the pointer no longer jumps, flashes a different scale, or drifts
+  vertically across repeated drags (including slow 1 px/frame drags). The final drag frame is painted before the base-layout commit, page canvases
   fill their page layer, and page gaps follow the page width instead of snapping back to a fixed
   value.
 

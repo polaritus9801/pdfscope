@@ -10,8 +10,12 @@ every release jumped once and repeated drags accumulated a vertical drift.
 ## Algorithm
 
 - During the drag, the PDF is anchored at the **reading line**, the same point used by the release
-  path. The point under `stage.top + readingOffset()` stays stationary while the panel width and the
-  fit scale change.
+  path. The anchor is a fixed `{page, fraction}` captured at pointer-down, not a point recomputed from
+  the current scroll. Each frame restores that absolute page point to the line; sub-pixel scroll
+  rounding therefore cannot feed back into the next frame. A 1 px/frame drag used to accumulate ~60 px
+  of downward drift over 300 px; the fixed anchor keeps the error under 1 px.
+- The release commit reuses this same page/fraction, so it does not adopt the small residual rounding
+  error from the last drag frame.
 - Panel width changes are coalesced into one requestAnimationFrame; each frame changes the stage
   width, derives the fit scale and adjusts `scrollTop`/`scrollLeft` from measured page rectangles.
   No per-pointer-event reflow or Leptos render occurs.
@@ -43,7 +47,8 @@ every release jumped once and repeated drags accumulated a vertical drift.
 - Dragging the divider scales the PDF continuously; the point at the reading line does not drift.
 - Releasing the pointer moves the page by no more than the sub-pixel rounding of the final width
   (measured ≤1 px in the browser probe).
-- Repeated push/pull cycles do not accumulate vertical movement.
+- Repeated push/pull cycles do not accumulate vertical movement, including a slow 1 px/frame drag.
+- The fixed page/fraction is reused at release; residual movement is ≤1 px.
 - A short (vertically centred) document does not jump at release.
 - Page gaps during the drag and after release match within 0.02 px; the zoomed gap scales with the
   page column rather than snapping to a fixed screen size.
