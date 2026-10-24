@@ -130,6 +130,11 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- The page-scope segment uses the reader's three vector drawings (PDF, page, references), cropped from
+  the supplied sheet and optically aligned in the 28 px buttons.
+
+### Added
+
 - The thinking header shows a live timer and a collapsed thinking pill is compact; collapsed live and
   completed states match.
 - Every answer can regenerate; each user bubble carries a chrome-free branch switch and an icon-only

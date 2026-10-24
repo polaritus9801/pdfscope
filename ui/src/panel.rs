@@ -3734,7 +3734,7 @@ pub fn AiPanel(
                                     scope_mode.set(0);
                                 }
                             >
-                                {icon("pages", 17)}
+                                <img class="scope-art" src="/scope-icons/document.svg" width="18" height="18" alt="" draggable="false" />
                             </button>
                             <button
                                 class="scope-icon"
@@ -3747,7 +3747,7 @@ pub fn AiPanel(
                                     scope_mode.set(1);
                                 }
                             >
-                                {icon("page", 17)}
+                                <img class="scope-art" src="/scope-icons/page.svg" width="18" height="18" alt="" draggable="false" />
                             </button>
                             <button
                                 class="scope-icon"
@@ -3760,7 +3760,7 @@ pub fn AiPanel(
                                     scope_mode.set(2);
                                 }
                             >
-                                {icon("highlight", 17)}
+                                <img class="scope-art" src="/scope-icons/references.svg" width="18" height="18" alt="" draggable="false" />
                                 <span class="scope-badge">
                                     {move || {
                                         let count = reference_count();

@@ -4037,3 +4037,11 @@ body.panel-dragging .panel-resize::after {
 .panel * {
   scrollbar-width: thin;
 }
+
+/* User-drawn scope icons: same optical height, centred in the twenty-eight-pixel segment buttons. */
+.scope-art {
+  display: block;
+  width: 18px;  /* size */
+  height: 18px;  /* size */
+  object-fit: contain;
+}
