@@ -21,12 +21,15 @@ full 201 px height, so their rendered top and bottom edges match.
 
 - Trunk copies `public/scope-icons` into the bundle.
 - Each `.scope-icon` button is 34 × 28 and flex-centred.
-- The `<img>` is 18 × 18 with `object-fit: contain`, so all three share the same optical box and centre.
+- The `<img>` has `height: 18px; width: auto`; each drawing keeps its native aspect ratio (the PDF
+  is slightly wider), while the common 18 px height and flex centre align all three top, bottom and
+  centre. Nothing is stretched horizontally.
 - The existing active segment and reference-count badge remain unchanged.
 
 ## Acceptance
 
 - The three scope modes show the supplied artwork, not the old line icons.
-- The icons share top/bottom edges and the buttons remain vertically centred.
+- The icons share top/bottom edges and centres without horizontal stretching; the drawings keep their
+  native proportions.
 - Active/hover surfaces and the badge still work.
 - `just check` green.
