@@ -261,6 +261,116 @@ struct Conversation {
     #[serde(default)]
     model: Option<String>,
     turns: Vec<Turn>,
+    /// Conversation tree. Older files have no tree and are converted from `turns`.
+    #[serde(default)]
+    tree: ConversationTree,
+}
+
+/// One node in a conversation tree: a question and its answer.
+#[derive(Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+struct TurnNode {
+    id: u64,
+    parent: Option<u64>,
+    #[serde(default)]
+    active_child: Option<u64>,
+    turn: Turn,
+}
+
+#[derive(Clone, PartialEq, serde::Serialize, serde::Deserialize, Default)]
+struct ConversationTree {
+    #[serde(default)]
+    nodes: Vec<TurnNode>,
+    #[serde(default)]
+    active_path: Vec<u64>,
+    #[serde(default)]
+    next_id: u64,
+}
+
+fn tree_from_turns(turns: &[Turn]) -> ConversationTree {
+    let mut tree = ConversationTree {
+        nodes: Vec::new(),
+        active_path: Vec::new(),
+        next_id: 1,
+    };
+    let mut parent = None;
+    for turn in turns {
+        let id = tree.next_id.max(1);
+        tree.next_id = id + 1;
+        tree.nodes.push(TurnNode {
+            id,
+            parent,
+            active_child: None,
+            turn: turn.clone(),
+        });
+        if let Some(parent) = parent {
+            if let Some(node) = tree.nodes.iter_mut().find(|node| node.id == parent) {
+                node.active_child = Some(id);
+            }
+        }
+        tree.active_path.push(id);
+        parent = Some(id);
+    }
+    tree
+}
+
+fn tree_path_to(tree: &ConversationTree, id: u64) -> Vec<u64> {
+    let mut path = Vec::new();
+    let mut current = Some(id);
+    while let Some(node_id) = current {
+        let Some(node) = tree.nodes.iter().find(|node| node.id == node_id) else {
+            break;
+        };
+        path.push(node.id);
+        current = node.parent;
+    }
+    path.reverse();
+    path
+}
+
+fn tree_follow(tree: &ConversationTree, id: u64) -> Vec<u64> {
+    let mut path = tree_path_to(tree, id);
+    while let Some(node) = path
+        .last()
+        .and_then(|id| tree.nodes.iter().find(|node| node.id == *id))
+    {
+        let Some(child) = node.active_child else {
+            break;
+        };
+        path.push(child);
+    }
+    path
+}
+
+fn tree_turns(tree: &ConversationTree) -> Vec<Turn> {
+    tree.active_path
+        .iter()
+        .filter_map(|id| tree.nodes.iter().find(|node| node.id == *id))
+        .map(|node| node.turn.clone())
+        .collect()
+}
+
+fn ensure_tree(conversation: &mut Conversation) {
+    if conversation.tree.nodes.is_empty() && !conversation.turns.is_empty() {
+        conversation.tree = tree_from_turns(&conversation.turns);
+    }
+    if conversation.tree.nodes.is_empty() {
+        conversation.tree.next_id = conversation.tree.next_id.max(1);
+        conversation.turns = Vec::new();
+        return;
+    }
+    if conversation.tree.active_path.is_empty() {
+        let root = conversation
+            .tree
+            .nodes
+            .iter()
+            .find(|node| node.parent.is_none())
+            .map(|node| node.id)
+            .or_else(|| conversation.tree.nodes.first().map(|node| node.id));
+        if let Some(root) = root {
+            conversation.tree.active_path = tree_follow(&conversation.tree, root);
+        }
+    }
+    conversation.turns = tree_turns(&conversation.tree);
 }
 
 /// A text file the reader attached to a question.
@@ -312,10 +422,14 @@ pub fn AiPanel(
     let model = RwSignal::new("未配置".to_owned());
     let answer = RwSignal::new(String::new());
     let turns = RwSignal::new(Vec::<Turn>::new());
+    let tree = RwSignal::new(ConversationTree::default());
+    let pending_branch = RwSignal::new(Option::<Option<u64>>::None);
     let current_question = RwSignal::new(String::new());
     let interrupted = RwSignal::new(false);
     let continue_target = RwSignal::new(None::<usize>);
     let reasoning = RwSignal::new(String::new());
+    let reasoning_open = RwSignal::new(true);
+    let reasoning_auto_collapsed = RwSignal::new(false);
     let think_started = RwSignal::new(0.0_f64);
     let think_seconds = RwSignal::new(0.0_f64);
     let status = RwSignal::new(String::new());
@@ -440,6 +554,15 @@ pub fn AiPanel(
                     turn.interrupted = cut;
                 }
             });
+            if let Some(turn) = turns.get_untracked().get(index).cloned() {
+                let mut tree_now = tree.get_untracked();
+                if let Some(id) = tree_now.active_path.get(index).copied() {
+                    if let Some(node) = tree_now.nodes.iter_mut().find(|node| node.id == id) {
+                        node.turn = turn;
+                    }
+                }
+                tree.set(tree_now);
+            }
             continue_target.set(None);
             current_question.set(String::new());
             answer.set(String::new());
@@ -456,7 +579,32 @@ pub fn AiPanel(
             sources: sources.get(),
             model: session_model.get(),
         };
-        turns.update(|list| list.push(finished));
+        let mut tree_now = tree.get_untracked();
+        let id = tree_now.next_id.max(1);
+        tree_now.next_id = id + 1;
+        let parent = match pending_branch.get_untracked() {
+            Some(parent) => parent,
+            None => tree_now.active_path.last().copied(),
+        };
+        tree_now.nodes.push(TurnNode {
+            id,
+            parent,
+            active_child: None,
+            turn: finished,
+        });
+        if let Some(parent) = parent {
+            if let Some(node) = tree_now.nodes.iter_mut().find(|node| node.id == parent) {
+                node.active_child = Some(id);
+            }
+        }
+        let mut path = parent
+            .map(|parent| tree_path_to(&tree_now, parent))
+            .unwrap_or_default();
+        path.push(id);
+        tree_now.active_path = path;
+        turns.set(tree_turns(&tree_now));
+        tree.set(tree_now);
+        pending_branch.set(None);
         // The answer keeps its own copy now; the shelf row is only for the live turn.
         sources.set(Vec::new());
         current_question.set(String::new());
@@ -853,11 +1001,15 @@ pub fn AiPanel(
                 pinned: false,
                 model: None,
                 turns: legacy,
+                tree: ConversationTree::default(),
             });
         }
 
         // Older builds stored empty conversations; they are not history.
         list.retain(|conversation| !conversation.turns.is_empty());
+        for conversation in &mut list {
+            ensure_tree(conversation);
+        }
         if list.is_empty() {
             let id = new_conversation_id();
             list.push(Conversation {
@@ -867,6 +1019,7 @@ pub fn AiPanel(
                 pinned: false,
                 model: None,
                 turns: Vec::new(),
+                tree: ConversationTree::default(),
             });
         }
 
@@ -881,11 +1034,15 @@ pub fn AiPanel(
 
         let first = list[0].id.clone();
         let first_turns = list[0].turns.clone();
+        let first_tree = list[0].tree.clone();
         let first_model = list[0].model.clone();
         conversations.set(list);
         active.set(first.clone());
+        tree.set(first_tree);
         turns.set(first_turns);
         session_model.set(first_model);
+        pending_branch.set(None);
+        editing.set(None);
         restore_draft(&first);
         restore_partial(&first);
         show_all.set(false);
@@ -899,18 +1056,20 @@ pub fn AiPanel(
             return;
         }
         let current_turns = turns.get();
+        let current_tree = tree.get();
         let id = active.get();
         if id.is_empty() || temporary.get().is_some() {
             return;
         }
         conversations.update(|list| {
             if let Some(conversation) = list.iter_mut().find(|entry| entry.id == id) {
-                if conversation.turns != current_turns {
+                if conversation.turns != current_turns || conversation.tree != current_tree {
                     conversation.updated = js_sys::Date::now();
                     if conversation.title.trim().is_empty() || conversation.title == "新对话" {
                         conversation.title = conversation_title(&current_turns);
                     }
                     conversation.turns = current_turns.clone();
+                    conversation.tree = current_tree.clone();
                 }
             }
         });
@@ -935,6 +1094,8 @@ pub fn AiPanel(
         current_question.set(asked.clone());
         answer.set(String::new());
         reasoning.set(String::new());
+        reasoning_open.set(true);
+        reasoning_auto_collapsed.set(false);
         think_started.set(js_sys::Date::now());
         think_seconds.set(0.0);
         streaming.set(true);
@@ -1192,6 +1353,11 @@ pub fn AiPanel(
                     pending.set(String::new());
                     if !text.is_empty() {
                         answer.update(|buffer| buffer.push_str(&text));
+                        // Thinking is done once answer tokens arrive; the reader may still reopen it.
+                        if !reasoning_auto_collapsed.get() && !answer.get().trim().is_empty() {
+                            reasoning_open.set(false);
+                            reasoning_auto_collapsed.set(true);
+                        }
                     }
                     save_partial_now();
                 };
@@ -1437,18 +1603,131 @@ pub fn AiPanel(
         if text.trim().is_empty() {
             return;
         }
-        if let Some(index) = editing.get() {
-            turns.update(|list| list.truncate(index));
+        let edit_index = editing.get();
+        if let Some(index) = edit_index {
+            let tree_now = tree.get_untracked();
+            let parent = tree_now
+                .active_path
+                .get(index)
+                .and_then(|id| tree_now.nodes.iter().find(|node| node.id == *id))
+                .and_then(|node| node.parent);
+            pending_branch.set(Some(parent));
             editing.set(None);
+        } else {
+            pending_branch.set(None);
         }
         last_asked.set(text.clone());
         send_text(text);
         // Only a request that really started should clear the field; an early return (not
         // configured, empty question) must leave the draft alone.
         if streaming.get() {
+            if let Some(index) = edit_index {
+                turns.update(|list| list.truncate(index));
+            }
             pending_clear.set(true);
+        } else {
+            pending_branch.set(None);
         }
     };
+
+    let regenerate_last = move || {
+        if streaming.get() {
+            return;
+        }
+        if !configured.get() {
+            open.set(true);
+            return;
+        }
+        let all = turns.get();
+        let Some(index) = all.len().checked_sub(1) else {
+            return;
+        };
+        let Some(turn) = all.get(index).cloned() else {
+            return;
+        };
+        let tree_now = tree.get_untracked();
+        let parent = tree_now
+            .active_path
+            .get(index)
+            .and_then(|id| tree_now.nodes.iter().find(|node| node.id == *id))
+            .and_then(|node| node.parent);
+        pending_branch.set(Some(parent));
+        editing.set(None);
+        send_text(turn.question);
+        if streaming.get() {
+            turns.update(|list| list.truncate(index));
+        } else {
+            pending_branch.set(None);
+        }
+    };
+
+    // The deepest node on the active path that has siblings. Keeping the navigator here means a
+    // branch stays reachable after the reader continues past the edited turn.
+    let branch_state = move || -> Option<(u64, usize, usize)> {
+        let tree_now = tree.get();
+        let mut deepest = None;
+        for id in &tree_now.active_path {
+            let Some(node) = tree_now.nodes.iter().find(|node| node.id == *id) else {
+                continue;
+            };
+            let mut siblings: Vec<u64> = tree_now
+                .nodes
+                .iter()
+                .filter(|entry| entry.parent == node.parent)
+                .map(|entry| entry.id)
+                .collect();
+            siblings.sort_unstable();
+            if siblings.len() > 1 {
+                if let Some(position) = siblings.iter().position(|entry| *entry == *id) {
+                    deepest = Some((*id, position + 1, siblings.len()));
+                }
+            }
+        }
+        deepest
+    };
+
+    let branch_position = move || branch_state().map(|(_, position, total)| (position, total));
+
+    let shift_branch = Callback::new(move |delta: i64| {
+        if streaming.get() {
+            return;
+        }
+        let Some((branch_node, _, _)) = branch_state() else {
+            return;
+        };
+        let mut tree_now = tree.get_untracked();
+        let Some(node) = tree_now.nodes.iter().find(|node| node.id == branch_node) else {
+            return;
+        };
+        let parent = node.parent;
+        let mut siblings: Vec<u64> = tree_now
+            .nodes
+            .iter()
+            .filter(|entry| entry.parent == parent)
+            .map(|entry| entry.id)
+            .collect();
+        siblings.sort_unstable();
+        if siblings.len() < 2 {
+            return;
+        }
+        let Some(position) = siblings.iter().position(|id| *id == branch_node) else {
+            return;
+        };
+        let next = (position as i64 + delta).rem_euclid(siblings.len() as i64) as usize;
+        let target = siblings[next];
+        if let Some(parent) = parent {
+            if let Some(parent_node) = tree_now.nodes.iter_mut().find(|node| node.id == parent) {
+                parent_node.active_child = Some(target);
+            }
+        }
+        tree_now.active_path = tree_follow(&tree_now, target);
+        let new_turns = tree_turns(&tree_now);
+        session_model.set(new_turns.last().and_then(|turn| turn.model.clone()));
+        tree.set(tree_now);
+        turns.set(new_turns);
+        pending_branch.set(None);
+        editing.set(None);
+    });
 
     let continue_last = move || {
         let all = turns.get();
@@ -1487,10 +1766,7 @@ pub fn AiPanel(
                         event.prevent_default();
                     }
                     "r" => {
-                        let Some(last) = turns.get().last().cloned() else {
-                            return;
-                        };
-                        send_text(last.question);
+                        regenerate_last();
                         event.prevent_default();
                     }
                     "g" => {
@@ -1584,7 +1860,9 @@ pub fn AiPanel(
         conversations.update(|list| list.retain(|entry| !entry.turns.is_empty() || entry.id == id));
         active.set(id.clone());
         session_model.set(conversation.model.clone());
+        tree.set(conversation.tree.clone());
         turns.set(conversation.turns);
+        pending_branch.set(None);
         temporary.set(None);
         reset_transient();
         restore_draft(&id);
@@ -1607,11 +1885,14 @@ pub fn AiPanel(
                 pinned: false,
                 model: None,
                 turns: Vec::new(),
+                tree: ConversationTree::default(),
             });
         });
         active.set(id.clone());
         session_model.set(None);
+        tree.set(ConversationTree::default());
         turns.set(Vec::new());
+        pending_branch.set(None);
         temporary.set(None);
         reset_transient();
         restore_draft(&id);
@@ -1646,7 +1927,9 @@ pub fn AiPanel(
             if let Some(next) = remaining.into_iter().next() {
                 active.set(next.id.clone());
                 session_model.set(next.model.clone());
+                tree.set(next.tree.clone());
                 turns.set(next.turns);
+                pending_branch.set(None);
                 reset_transient();
                 restore_draft(&next.id);
             } else {
@@ -1664,7 +1947,9 @@ pub fn AiPanel(
         temporary.set(Some(id.clone()));
         active.set(id);
         session_model.set(None);
+        tree.set(ConversationTree::default());
         turns.set(Vec::new());
+        pending_branch.set(None);
         reset_transient();
         history_open.set(false);
     };
@@ -1693,6 +1978,7 @@ pub fn AiPanel(
                 pinned: false,
                 model: session_model.get(),
                 turns: prefix.clone(),
+                tree: tree_from_turns(&prefix),
             });
         });
         temporary.set(None);
@@ -2265,9 +2551,7 @@ pub fn AiPanel(
                                                     "retry",
                                                     "重试",
                                                     move |_event: web_sys::MouseEvent| {
-                                                        if let Some(last) = turns.get().last().cloned() {
-                                                            send_text(last.question);
-                                                        }
+                                                        regenerate_last();
                                                     },
                                                 )}
                                                 {icon_action(
@@ -2330,7 +2614,6 @@ pub fn AiPanel(
                                             };
 
                                             let copied = turn.answer.clone();
-                                            let retry = turn.question.clone();
                                             let locate = segments(&turn.answer)
                                                 .into_iter()
                                                 .find_map(|segment| match segment {
@@ -2349,7 +2632,7 @@ pub fn AiPanel(
                                                     "retry",
                                                     "重新生成",
                                                     move |_event: web_sys::MouseEvent| {
-                                                        send_text(retry.clone())
+                                                        regenerate_last()
                                                     },
                                                 )
                                             });
@@ -2361,26 +2644,6 @@ pub fn AiPanel(
                                                 )
                                             });
 
-                                            let edit_text = turn
-                                                .question
-                                                .split("\n\n[引用的先前回答]")
-                                                .next()
-                                                .unwrap_or_default()
-                                                .to_owned();
-                                            let edit = icon_action(
-                                                "edit",
-                                                "编辑并重发",
-                                                move |_event: web_sys::MouseEvent| {
-                                                    if streaming.get() {
-                                                        return;
-                                                    }
-                                                    editing.set(Some(index));
-                                                    let _ = composer(
-                                                        "setPlainText",
-                                                        &[JsValue::from_str(&edit_text)],
-                                                    );
-                                                },
-                                            );
                                             let branch = icon_action(
                                                 "branch",
                                                 "从这里开始一条新对话",
@@ -2475,11 +2738,6 @@ pub fn AiPanel(
                                                 .model
                                                 .clone()
                                                 .unwrap_or_else(|| model.get());
-                                            let meta = if turn.interrupted {
-                                                "已打断".to_owned()
-                                            } else {
-                                                format!("{:.1} 秒", turn.seconds.max(0.1))
-                                            };
                                             view! {
                                                 <div class="turn">
                                                     <div class="question-row">
@@ -2489,14 +2747,12 @@ pub fn AiPanel(
                                                     <div class="answer-identity">
                                                         {provider_tile(provider_preset.get(), 22)}
                                                         <span class="answer-model">{identity_model}</span>
-                                                        <span class="answer-meta">{meta}</span>
                                                     </div>
                                                     {detail}
                                                     {body}
                                                     {answer_sources}
                                                     <div class="turn-actions">
                                                         {located}
-                                                        {edit}
                                                         {branch}
                                                         {cite}
                                                         {icon_action(
@@ -2526,20 +2782,32 @@ pub fn AiPanel(
                                     let detail = if reasoning.get().is_empty() {
                                         ().into_any()
                                     } else {
-                                        let label = if streaming_now {
+                                        let label = if streaming_now && answer.get().trim().is_empty() {
                                             "思考中…".to_owned()
                                         } else {
                                             format!("思考 {:.1} 秒", think_seconds.get())
                                         };
                                         if streaming_now {
                                             view! {
-                                                <div class="think-pill is-live">
-                                                    <div class="think-head">
+                                                <details
+                                                    class="think-pill is-live"
+                                                    open=move || reasoning_open.get()
+                                                    on:toggle=move |event: web_sys::Event| {
+                                                        if let Some(details) = event
+                                                            .target()
+                                                            .and_then(|target| target.dyn_into::<web_sys::HtmlDetailsElement>().ok())
+                                                        {
+                                                            reasoning_open.set(details.open());
+                                                        }
+                                                    }
+                                                >
+                                                    <summary>
                                                         {icon("brain", 14)}
                                                         <span>{label}</span>
-                                                    </div>
+                                                        <span class="think-chevron">{icon("chevron-down", 12)}</span>
+                                                    </summary>
                                                     <pre class="think-text">{reasoning.get()}</pre>
-                                                </div>
+                                                </details>
                                             }
                                                 .into_any()
                                         } else {
@@ -2579,15 +2847,7 @@ pub fn AiPanel(
                                                             .unwrap_or_else(|| model.get())
                                                     }}
                                                 </span>
-                                                <span class="answer-meta">
-                                                    {move || {
-                                                        if streaming.get() {
-                                                            "生成中…".to_owned()
-                                                        } else {
-                                                            format!("{:.1} 秒", think_seconds.get().max(0.1))
-                                                        }
-                                                    }}
-                                                </span>
+
                                             </div>
                                             {detail}
                                             <Show when=move || streaming.get() && answer.get().is_empty()>
@@ -3521,6 +3781,66 @@ pub fn AiPanel(
                         }}
                     </button>
                 </div>
+                </div>
+                <div class="composer-actions">
+                    {move || {
+                        branch_position().map(|(position, total)| {
+                            view! {
+                                <div class="branch-nav" title="切换这一条回答的其他版本">
+                                    <button
+                                        class="branch-step"
+                                        aria-label="上一个版本"
+                                        on:click=move |_| shift_branch.run(-1)
+                                    >
+                                        {icon("chevron-left", 12)}
+                                    </button>
+                                    <span class="branch-count">
+                                        {format!("{position} / {total}")}
+                                    </span>
+                                    <button
+                                        class="branch-step"
+                                        aria-label="下一个版本"
+                                        on:click=move |_| shift_branch.run(1)
+                                    >
+                                        {icon("chevron-right", 12)}
+                                    </button>
+                                </div>
+                            }
+                        })
+                    }}
+                    <Show when=move || !turns.get().is_empty() && !streaming.get()>
+                        <button
+                            class="composer-edit"
+                            title="编辑最后一条问题并重发"
+                            on:click=move |_| {
+                                if streaming.get() {
+                                    return;
+                                }
+                                let all = turns.get();
+                                let Some(index) = all.len().checked_sub(1) else {
+                                    return;
+                                };
+                                let Some(turn) = all.get(index) else {
+                                    return;
+                                };
+                                let edit_text = turn
+                                    .question
+                                    .split("\n\n[引用的先前回答]")
+                                    .next()
+                                    .unwrap_or_default()
+                                    .to_owned();
+                                editing.set(Some(index));
+                                let _ = composer(
+                                    "setPlainText",
+                                    &[JsValue::from_str(&edit_text)],
+                                );
+                                let _ = composer("focus", &[]);
+                            }
+                        >
+                            {icon("edit", 14)}
+                            "编辑"
+                        </button>
+                    </Show>
                 </div>
             </div>
 

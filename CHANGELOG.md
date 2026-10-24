@@ -130,6 +130,12 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Thinking collapses as soon as the answer begins and can be collapsed manually while it streams.
+- Editing/regenerating creates a sibling in a persisted conversation tree; a `< n / total >` switch
+  under the composer preserves and restores old branches. The edit action moves under the composer
+  and duplicated answer durations are gone.
+
+
 - A cream accent for the model's reasoning surface and for a mode borrowed with a modifier; the
   pointer tool remains lilac. The reasoning header row stays white and a rule separates it from the
   cream body, in both live and completed states.
