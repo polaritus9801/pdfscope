@@ -2156,6 +2156,7 @@ function panelBodyElement() {
 
 const PANEL_BOTTOM_SLOP = 12;
 const PANEL_FOLLOW_SLOP = 8;
+const PANEL_ANCHOR_RATIO = 0.5;
 const PANEL_ANCHOR_BLOCKS =
   "p, li, pre, blockquote, h1, h2, h3, h4, h5, h6, .turn-question, .answer-text, .think-pill, .turn, .empty-state, .error-card";
 
@@ -2167,7 +2168,6 @@ let panelBodyBound = null;
 let panelMutation = null;
 let panelTranscriptObserver = null;
 let panelObservedTranscript = null;
-let panelEndFrame = 0;
 let panelLastScrollTop = 0;
 
 function panelDistanceFromEnd(body) {
@@ -2179,16 +2179,12 @@ function scrollPanelTo(body, top) {
   panelLastScrollTop = body.scrollTop;
 }
 
-function schedulePanelEnd() {
-  if (panelEndFrame) return;
-  panelEndFrame = requestAnimationFrame(() => {
-    panelEndFrame = 0;
-    if (!panelFollowing) return;
-    const body = panelBodyElement();
-    if (body && panelDistanceFromEnd(body) > 0.5) {
-      scrollPanelTo(body, body.scrollHeight);
-    }
-  });
+function keepPanelAtEnd() {
+  if (!panelFollowing) return;
+  const body = panelBodyElement();
+  if (body && panelDistanceFromEnd(body) > 0.5) {
+    scrollPanelTo(body, body.scrollHeight);
+  }
 }
 
 function refreshPanelTranscriptObserver() {
@@ -2198,7 +2194,7 @@ function refreshPanelTranscriptObserver() {
   panelObservedTranscript = transcript;
   if (!transcript || typeof ResizeObserver !== "function") return;
   panelTranscriptObserver = new ResizeObserver(() => {
-    if (panelFollowing) schedulePanelEnd();
+    if (panelFollowing) keepPanelAtEnd();
   });
   panelTranscriptObserver.observe(transcript);
 }
@@ -2206,6 +2202,12 @@ function refreshPanelTranscriptObserver() {
 function onPanelScroll() {
   const body = panelBodyBound;
   if (!body) return;
+  // Width reflow and auto-scroll both dispatch scroll events. During a panel drag the mode chosen
+  // on pointer-down owns the transcript; a transient scroll must not toggle FOLLOW-END/centre midway.
+  if (document.body.classList.contains("panel-dragging")) {
+    panelLastScrollTop = body.scrollTop;
+    return;
+  }
   const top = body.scrollTop;
   const distance = panelDistanceFromEnd(body);
   // Only an upward scroll is a detach gesture. Auto-follow moves down; content growth does not move
@@ -2215,7 +2217,7 @@ function onPanelScroll() {
     panelFollowing = false;
   } else if (distance <= PANEL_FOLLOW_SLOP) {
     panelFollowing = true;
-    if (distance > 0.5) schedulePanelEnd();
+    if (distance > 0.5) keepPanelAtEnd();
   }
   panelLastScrollTop = top;
 }
@@ -2236,7 +2238,7 @@ function bindPanelScroll() {
   panelMutation?.disconnect();
   panelMutation = new MutationObserver(() => {
     refreshPanelTranscriptObserver();
-    if (panelFollowing) schedulePanelEnd();
+    if (panelFollowing) keepPanelAtEnd();
   });
   panelMutation.observe(body, { childList: true, subtree: true, characterData: true });
   refreshPanelTranscriptObserver();
@@ -2248,7 +2250,7 @@ function bindPanelScroll() {
 function armPanelFollow() {
   bindPanelScroll();
   panelFollowing = true;
-  schedulePanelEnd();
+  keepPanelAtEnd();
 }
 
 /// A vertical reading anchor for the transcript: the smallest block under the centre plus the
@@ -2260,7 +2262,7 @@ function capturePanelAnchor() {
   if (!body) return null;
   const box = body.getBoundingClientRect();
   const x = box.left + body.clientWidth / 2;
-  const y = box.top + body.clientHeight / 2;
+  const y = box.top + body.clientHeight * PANEL_ANCHOR_RATIO;
   const hit = document.elementFromPoint(x, y);
   let element = hit && body.contains(hit) ? hit.closest?.(PANEL_ANCHOR_BLOCKS) : null;
   if (element === body) element = null;
@@ -2299,7 +2301,7 @@ function restorePanelAnchor(anchor) {
   if (anchor.element?.isConnected) {
     const rect = anchor.element.getBoundingClientRect();
     if (rect.height > 0) {
-      const centre = body.getBoundingClientRect().top + body.clientHeight / 2;
+      const centre = body.getBoundingClientRect().top + body.clientHeight * PANEL_ANCHOR_RATIO;
       top = body.scrollTop + rect.top + anchor.ratio * rect.height - centre;
     }
   }
@@ -2325,6 +2327,10 @@ function beginPanelResize() {
   // A pending window-resize check must not re-anchor the page in the middle of this drag.
   clearTimeout(resizeTimer);
   bindPanelScroll();
+  const body = panelBodyElement();
+  if (body && panelDistanceFromEnd(body) <= PANEL_FOLLOW_SLOP) {
+    panelFollowing = true;
+  }
   panelDrag = {
     panel,
     stage,
@@ -2358,7 +2364,7 @@ function applyPanelResize() {
   panelDrag.width = width;
   panelDrag.panel.style.width = `${width}px`;
   if (panelFollowing) {
-    schedulePanelEnd();
+    keepPanelAtEnd();
   } else {
     restorePanelAnchor(panelAnchor);
   }
@@ -2424,7 +2430,7 @@ function commitPanelResize() {
   const finalScale = panelDrag.baseScale;
   panelDrag.panel.style.width = `${width}px`;
   if (panelFollowing) {
-    schedulePanelEnd();
+    keepPanelAtEnd();
   } else {
     restorePanelAnchor(panelAnchor);
   }

@@ -44,9 +44,16 @@ A send always re-arms, even if the reader was away; this is the explicit request
 The reverse is never automatic: new tokens never pull a reader who moved up back down. Returning to
 the bottom is the only passive re-arm.
 
-Observers: a `MutationObserver` on `.panel-body` and a `ResizeObserver` on `#transcript`; both feed the
-same rAF scheduler. Scroll handling is direction-aware (`scrollTop` decreased) so a late scroll event
-from an auto-follow cannot disarm because the transcript grew after the scroll landed.
+Observers: a `MutationObserver` on `.panel-body` and a `ResizeObserver` on `#transcript`. While
+FOLLOW-END is on they scroll synchronously inside the observer callback, before the frame paints; a
+deferred rAF left a one-frame gap that looked like a bottom-drag fight. Scroll handling is
+direction-aware (`scrollTop` decreased), so a late event from an auto-follow cannot disarm because the
+transcript grew after the scroll landed.
+
+A panel drag is a **single-mode operation**: the mode is chosen at pointer-down (FOLLOW-END if the
+transcript is at/near the end, otherwise the centre anchor) and scroll events caused by reflow cannot
+toggle it midway. Width changes at the bottom therefore stay pinned to the end instead of alternating
+between the two algorithms.
 
 ## 4. Interaction
 
@@ -65,4 +72,5 @@ from an auto-follow cannot disarm because the transcript grew after the scroll l
   panel.
 - Scrolling back within 8 px of the end re-arms and snaps to the end; subsequent growth follows.
 - Repeated panel drags with FOLLOW-END off do not accumulate drift.
+- Dragging while at the end stays within 1 px of the end on every frame; no END/centre oscillation.
 - `just check` green.
