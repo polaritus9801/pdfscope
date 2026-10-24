@@ -12,6 +12,12 @@
   --lilac-800: #5f4697;
   --lilac-900: #3c2c5e;
 
+  /* Cream is a second, deliberately small accent: reasoning surfaces and borrowed tools only. */
+  --cream-50: #fffaf0;
+  --cream-100: #fdf3d9;
+  --cream-200: #f3e3bd;
+  --cream-700: #7a5a17;
+
   --surface: #ffffff;
   --surface-muted: var(--lilac-50);
   --surface-sunken: var(--lilac-100);
@@ -75,6 +81,10 @@
   --accent-hover: var(--lilac-300);
   --accent-ink: #14101a;
   --danger: #e4778b;
+  --cream-50: #2b2416;
+  --cream-100: #352b18;
+  --cream-200: #4d3f23;
+  --cream-700: #f1d69a;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -93,6 +103,10 @@
     --accent-hover: var(--lilac-300);
     --accent-ink: #14101a;
     --danger: #e4778b;
+    --cream-50: #2b2416;
+    --cream-100: #352b18;
+    --cream-200: #4d3f23;
+    --cream-700: #f1d69a;
   }
 }
 
@@ -954,6 +968,12 @@ body {
   color: var(--accent);
 }
 
+/* A mode borrowed by holding a modifier: the pointer stays lilac and only this tool turns cream. */
+.rail-tool.borrowed {
+  background: var(--cream-100);
+  color: var(--cream-700);
+}
+
 
 
 
@@ -1168,8 +1188,8 @@ body {
   font-family: inherit;
   font-size: var(--text-sm);
   line-height: 1.6;
-  color: var(--ink-muted);
-  background: var(--surface-sunken);
+  color: var(--cream-700);
+  background: var(--cream-50);
   border-radius: var(--radius-sm);
 }
 
@@ -3314,9 +3334,22 @@ body.selection-quiet .textLayer :is(span, br)::selection {
   transition: border-color 120ms ease;
 }
 
-.think-pill[open] {
+.think-pill[open],
+.think-pill.is-live {
   width: 100%;
+  background: var(--cream-50);
+  border-color: var(--cream-200);
   border-radius: var(--radius-md);
+}
+
+.think-pill[open] summary,
+.think-pill.is-live .think-head {
+  color: var(--cream-700);
+}
+
+.think-pill[open] .think-text,
+.think-pill.is-live .think-text {
+  background: transparent;
 }
 
 .think-pill summary,
@@ -3351,7 +3384,7 @@ body.selection-quiet .textLayer :is(span, br)::selection {
 .think-pill .think-text {
   margin: 0;
   padding: 0 var(--space-3) var(--space-2);
-  color: var(--ink-muted);
+  color: var(--cream-700);
   font-family: inherit;
   font-size: var(--text-xs);
   line-height: 1.6;

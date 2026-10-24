@@ -1,7 +1,7 @@
 # Design tokens
 
-The default theme is **white, lilac, black**. One accent, used sparingly; ink dark enough to read for
-hours; a page that stays white.
+The default theme is **white, lilac, black**, with one small cream accent reserved for reasoning and
+borrowed tools. Purple remains the single primary accent; cream never competes with it.
 
 Two rules:
 
@@ -28,6 +28,18 @@ A single hue, ten steps. Everything purple in the product is one of these; nothi
 
 `#CBB8EC` and `#E8E0F7` are the two the theme is built around: the first is how a location announces
 itself without shouting, the second is how an attachment sits in the composer.
+
+## The cream accent
+
+A second, deliberately narrow ramp. It appears in exactly two places: the model's reasoning surface,
+and the rail icon of a mode borrowed by holding a modifier. Everything else stays lilac.
+
+| Step | Light | Dark | Used for |
+|---|---|---|---|
+| `--cream-50` | `#FFFAF0` | `#2B2416` | reasoning surface |
+| `--cream-100` | `#FDF3D9` | `#352B18` | borrowed rail icon |
+| `--cream-200` | `#F3E3BD` | `#4D3F23` | reasoning border |
+| `--cream-700` | `#7A5A17` | `#F1D69A` | reasoning text, borrowed icon ink |
 
 ## Colour
 

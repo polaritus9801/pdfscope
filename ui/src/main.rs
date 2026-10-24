@@ -1181,7 +1181,8 @@ fn App() -> impl IntoView {
                     <div class="rail-capsule">
                         <button
                             class="rail-tool"
-                            class:active=move || tool.get() == 1 || borrowed_tool.get() == Some(1)
+                            class:active=move || tool.get() == 1
+                            class:borrowed=move || tool.get() != 1 && borrowed_tool.get() == Some(1)
                             title="文字：划选即加入引用（T · ⇧ 临时）"
                             prop:disabled=move || !ready.get()
                             on:click=move |_| choose_tool(1)
@@ -1192,7 +1193,8 @@ fn App() -> impl IntoView {
                         </button>
                         <button
                             class="rail-tool"
-                            class:active=move || tool.get() == 2 || borrowed_tool.get() == Some(2)
+                            class:active=move || tool.get() == 2
+                            class:borrowed=move || tool.get() != 2 && borrowed_tool.get() == Some(2)
                             title="框选：拖出矩形（B · ⌥ 临时）"
                             prop:disabled=move || !ready.get()
                             on:click=move |_| choose_tool(2)
@@ -1203,7 +1205,8 @@ fn App() -> impl IntoView {
                         </button>
                         <button
                             class="rail-tool"
-                            class:active=move || tool.get() == 3 || borrowed_tool.get() == Some(3)
+                            class:active=move || tool.get() == 3
+                            class:borrowed=move || tool.get() != 3 && borrowed_tool.get() == Some(3)
                             title="页面：点击或拖动选择页面（D · ⌘ 临时）"
                             prop:disabled=move || !ready.get()
                             on:click=move |_| choose_tool(3)

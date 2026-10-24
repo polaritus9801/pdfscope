@@ -130,6 +130,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- A cream accent for the model's reasoning surface and for a mode borrowed with a modifier; the
+  pointer tool remains lilac.
+
+
 - The six-pixel purple band was the page-position rail; it is now a 4 px divider that darkens to
   `#7F5CBF` on hover and stays dark for the whole drag through `.resizing`, then returns to native
   `:hover`. It has an invisible 12 px drag hit area and is disabled while collapsed. The stage
