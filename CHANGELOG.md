@@ -131,7 +131,9 @@ minor releases may contain breaking changes; they are always called out.
 ### Added
 
 - The page-scope segment uses the reader's three vector drawings (PDF, page, references), cropped from
-  the supplied sheet, height-aligned in the 28 px buttons and never stretched horizontally.
+  the supplied sheet, height-aligned in the 28 px buttons and never stretched horizontally. Each icon
+  sits on a small white plate with an edge shadow so its light paper tone separates from the lilac
+  track.
 
 ### Added
 
