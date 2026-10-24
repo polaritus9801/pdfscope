@@ -2240,15 +2240,17 @@ mark.find-hit {
 
 .scope-icons {
   display: flex;
-  gap: 2px;  /* size */
+  align-items: center;
+  gap: 0;
   padding: 3px;  /* size */
-  background: var(--surface-sunken);
-  border: 1px solid var(--border);
+  background: transparent;
+  border: 1px solid var(--border-strong);
   border-radius: 10px;  /* size */
 }
 
 .scope-icon {
   position: relative;
+  z-index: 2;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2258,51 +2260,62 @@ mark.find-hit {
   color: var(--ink-muted);
   background: transparent;
   border: none;
-  border-radius: 7px;  /* size */
+  border-radius: 999px;  /* size */
   cursor: pointer;
   transition:
     color var(--duration) var(--ease),
     background var(--duration) var(--ease);
 }
 
-.scope-icon::before {
-  position: absolute;
-  inset: 2px;  /* size */
-  z-index: 0;
-  content: "";
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 7px;  /* size */
-  box-shadow: 0 1px 2px rgb(24 18 36 / 6%);  /* size */
-}
-
 .scope-icon:hover {
   color: var(--accent);
-  background: transparent;
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
 }
 
-.scope-icon:hover::before {
-  border-color: var(--border-strong);
-}
-
+/* A selected mode is a lavender capsule. It bleeds four pixels over each side so it covers the
+   neighbouring needle dividers, and the outer trough border at the first/last position. */
 .scope-icon.active {
+  z-index: 4;
   color: var(--accent);
-  background: var(--surface);
-  box-shadow:
-    0 1px 2px rgb(24 18 36 / 8%),  /* size */
-    inset 0 0 0 1px color-mix(in srgb, var(--accent) 28%, var(--border));
+  background: transparent;
+  box-shadow: none;
 }
 
-/* The active segment is already a white plate; remove the inner plate's chrome. */
 .scope-icon.active::before {
-  background: transparent;
-  border-color: transparent;
-  box-shadow: none;
+  position: absolute;
+  inset: 0 -4px;  /* size */
+  z-index: 0;
+  content: "";
+  background: color-mix(in srgb, var(--accent) 18%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--border));
+  border-radius: 999px;  /* size */
+  box-shadow: 0 1px 4px rgb(24 18 36 / 12%);  /* size */
+}
+
+/* Needle dividers: fourteen pixels tall, pointed at both ends, never touching top or bottom. */
+.scope-divider {
+  position: relative;
+  z-index: 1;
+  flex: none;
+  width: 2px;  /* size */
+  height: 14px;  /* size */
+  margin: 0 -1px;  /* size */
+  background: color-mix(in srgb, var(--border-strong) 72%, var(--ink-muted) 28%);
+  clip-path: polygon(50% 0, 100% 18%, 100% 82%, 50% 100%, 0 82%, 0 18%);
+}
+
+.scope-art {
+  position: relative;
+  z-index: 2;
+  display: block;
+  width: auto;
+  height: 18px;  /* size */
+  filter: drop-shadow(0 0 0.7px rgb(30 24 40 / 65%)) drop-shadow(0 1px 2px rgb(30 24 40 / 24%));  /* size */
 }
 
 .scope-icon:focus-visible {
   outline: 2px solid var(--accent);
-  outline-offset: 1px;  /* size */  /* size */
+  outline-offset: 1px;  /* size */
 }
 
 .scope-badge {
@@ -4060,20 +4073,3 @@ body.panel-dragging .panel-resize::after {
   scrollbar-width: thin;
 }
 
-/* User-drawn scope icons: same optical height, centred in the twenty-eight-pixel segment buttons. */
-.scope-art {
-  position: relative;
-  z-index: 1;
-  display: block;
-  width: auto;
-  height: 18px;  /* size */
-  filter: drop-shadow(0 0 0.5px rgb(30 24 40 / 55%)) drop-shadow(0 1px 1px rgb(30 24 40 / 16%));  /* size */
-}
-
-.scope-icon.active .scope-art {
-  filter: none;
-}
-
-.scope-badge {
-  z-index: 2;
-}

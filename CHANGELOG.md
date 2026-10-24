@@ -130,10 +130,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
-- The page-scope segment uses the reader's three vector drawings (PDF, page, references), cropped from
-  the supplied sheet, height-aligned in the 28 px buttons and never stretched horizontally. Each icon
-  sits on a small white plate with an edge shadow so its light paper tone separates from the lilac
-  track.
+- The page-scope segment uses the reader's three vector drawings (PDF, page, references). The trough
+  now has a transparent fill and a slightly darker outline; icons sit closer with pointed needle
+  dividers and stronger edge shadows, and the selected mode is a lavender capsule that covers the
+  adjacent dividers and outer edge.
 
 ### Added
 
