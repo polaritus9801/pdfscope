@@ -131,9 +131,9 @@ minor releases may contain breaking changes; they are always called out.
 ### Added
 
 - Thinking collapses as soon as the answer begins and can be collapsed manually while it streams.
-- Editing/regenerating creates a sibling in a persisted conversation tree; a `< n / total >` switch
-  under the composer preserves and restores old branches. The edit action moves under the composer
-  and duplicated answer durations are gone.
+- Editing/regenerating creates a sibling in a persisted conversation tree. Each user bubble has an
+  icon-only edit and, when needed, a `< n / total >` switch for that node's alternatives; old branches
+  remain reachable. Duplicated answer durations are gone.
 
 
 - A cream accent for the model's reasoning surface and for a mode borrowed with a modifier; the

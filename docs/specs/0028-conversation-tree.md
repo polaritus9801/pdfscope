@@ -15,9 +15,9 @@
 
 ## Editing and branches
 
-The editor's “编辑” lives under the composer, right-aligned. The per-answer edit action is removed;
-editing always edits the last turn on the active path. Sending it no longer truncates history: it
-creates a **sibling node**, and the old path remains reachable.
+Every user question bubble has a small icon-only edit control at its lower right. It edits exactly
+that turn; there is no edit action under the composer and no text label. Sending it no longer
+truncates history: it creates a **sibling node**, and the old path remains reachable.
 
 ### Model
 
@@ -40,17 +40,18 @@ ConversationTree { nodes, active_path, next_id }
 
 ### Navigation
 
-Under the composer, left of “编辑”, a `< n / total >` control appears when the active path contains a
-node with siblings. It targets the **deepest such node**, so the control remains available after the
-reader continues past the edited turn. Arrows cycle siblings and are disabled while a turn streams.
-The control is hidden when no branch exists.
+Under the same question bubble, immediately left of its edit icon, a `< n / total >` control appears
+when that node has siblings. It switches the versions of that specific question, follows the chosen
+sibling's active continuation and therefore keeps the old branch reachable. It is per node, hidden
+when the node has no alternative and while a turn streams.
 
 ## Acceptance
 
 - During reasoning: the block can be collapsed manually; the first answer token collapses it.
 - Completed thinking shows one duration only, in its white header.
-- Edit is under the composer; no edit icon remains on answers.
-- Editing or regenerating creates a sibling, old turns remain in the tree, and `< n / total >` cycles
-  them.
+- Each question bubble carries an icon-only edit at its lower right; no edit icon remains on answers
+  and nothing edit-related sits under the composer.
+- Editing or regenerating creates a sibling; the bubble's `< n / total >` (left of its edit icon)
+  cycles that node's alternatives and the old continuation remains in the tree.
 - Switch branch, reload: the selected branch is restored.
 - `just check` green.

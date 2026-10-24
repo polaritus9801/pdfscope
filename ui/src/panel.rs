@@ -1661,42 +1661,37 @@ pub fn AiPanel(
         }
     };
 
-    // The deepest node on the active path that has siblings. Keeping the navigator here means a
-    // branch stays reachable after the reader continues past the edited turn.
-    let branch_state = move || -> Option<(u64, usize, usize)> {
-        let tree_now = tree.get();
-        let mut deepest = None;
-        for id in &tree_now.active_path {
-            let Some(node) = tree_now.nodes.iter().find(|node| node.id == *id) else {
-                continue;
-            };
-            let mut siblings: Vec<u64> = tree_now
-                .nodes
-                .iter()
-                .filter(|entry| entry.parent == node.parent)
-                .map(|entry| entry.id)
-                .collect();
-            siblings.sort_unstable();
-            if siblings.len() > 1 {
-                if let Some(position) = siblings.iter().position(|entry| *entry == *id) {
-                    deepest = Some((*id, position + 1, siblings.len()));
-                }
-            }
+    // Branch info for one node on the active path: exactly the versions of this question.
+    let branch_at = move |index: usize| -> Option<(usize, usize)> {
+        if streaming.get() {
+            return None;
         }
-        deepest
+        let tree_now = tree.get();
+        let id = *tree_now.active_path.get(index)?;
+        let node = tree_now.nodes.iter().find(|node| node.id == id)?;
+        let mut siblings: Vec<u64> = tree_now
+            .nodes
+            .iter()
+            .filter(|entry| entry.parent == node.parent)
+            .map(|entry| entry.id)
+            .collect();
+        siblings.sort_unstable();
+        if siblings.len() < 2 {
+            return None;
+        }
+        let position = siblings.iter().position(|entry| *entry == id)?;
+        Some((position + 1, siblings.len()))
     };
 
-    let branch_position = move || branch_state().map(|(_, position, total)| (position, total));
-
-    let shift_branch = Callback::new(move |delta: i64| {
+    let shift_branch_at = Callback::new(move |(index, delta): (usize, i64)| {
         if streaming.get() {
             return;
         }
-        let Some((branch_node, _, _)) = branch_state() else {
+        let mut tree_now = tree.get_untracked();
+        let Some(id) = tree_now.active_path.get(index).copied() else {
             return;
         };
-        let mut tree_now = tree.get_untracked();
-        let Some(node) = tree_now.nodes.iter().find(|node| node.id == branch_node) else {
+        let Some(node) = tree_now.nodes.iter().find(|node| node.id == id) else {
             return;
         };
         let parent = node.parent;
@@ -1710,7 +1705,7 @@ pub fn AiPanel(
         if siblings.len() < 2 {
             return;
         }
-        let Some(position) = siblings.iter().position(|id| *id == branch_node) else {
+        let Some(position) = siblings.iter().position(|entry| *entry == id) else {
             return;
         };
         let next = (position as i64 + delta).rem_euclid(siblings.len() as i64) as usize;
@@ -2644,6 +2639,52 @@ pub fn AiPanel(
                                                 )
                                             });
 
+                                            let edit_text = turn
+                                                .question
+                                                .split("\n\n[引用的先前回答]")
+                                                .next()
+                                                .unwrap_or_default()
+                                                .to_owned();
+                                            let branch_nav = move || {
+                                                branch_at(index).map(|(position, total)| {
+                                                    view! {
+                                                        <div class="branch-nav" title="切换这个问题的其他版本">
+                                                            <button
+                                                                class="branch-step"
+                                                                aria-label="上一个版本"
+                                                                on:click=move |_| shift_branch_at.run((index, -1))
+                                                            >
+                                                                {icon("chevron-left", 12)}
+                                                            </button>
+                                                            <span class="branch-count">
+                                                                {format!("{position} / {total}")}
+                                                            </span>
+                                                            <button
+                                                                class="branch-step"
+                                                                aria-label="下一个版本"
+                                                                on:click=move |_| shift_branch_at.run((index, 1))
+                                                            >
+                                                                {icon("chevron-right", 12)}
+                                                            </button>
+                                                        </div>
+                                                    }
+                                                })
+                                            };
+                                            let edit = icon_action(
+                                                "edit",
+                                                "编辑这个问题并重发",
+                                                move |_event: web_sys::MouseEvent| {
+                                                    if streaming.get() {
+                                                        return;
+                                                    }
+                                                    editing.set(Some(index));
+                                                    let _ = composer(
+                                                        "setPlainText",
+                                                        &[JsValue::from_str(&edit_text)],
+                                                    );
+                                                    let _ = composer("focus", &[]);
+                                                },
+                                            );
                                             let branch = icon_action(
                                                 "branch",
                                                 "从这里开始一条新对话",
@@ -2741,7 +2782,13 @@ pub fn AiPanel(
                                             view! {
                                                 <div class="turn">
                                                     <div class="question-row">
-                                                        <p class="turn-question">{turn.question.clone()}</p>
+                                                        <div class="question-stack">
+                                                            <p class="turn-question">{turn.question.clone()}</p>
+                                                            <div class="question-actions">
+                                                                {move || branch_nav()}
+                                                                {edit}
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                     <div class="answer-block">
                                                     <div class="answer-identity">
@@ -3781,66 +3828,6 @@ pub fn AiPanel(
                         }}
                     </button>
                 </div>
-                </div>
-                <div class="composer-actions">
-                    {move || {
-                        branch_position().map(|(position, total)| {
-                            view! {
-                                <div class="branch-nav" title="切换这一条回答的其他版本">
-                                    <button
-                                        class="branch-step"
-                                        aria-label="上一个版本"
-                                        on:click=move |_| shift_branch.run(-1)
-                                    >
-                                        {icon("chevron-left", 12)}
-                                    </button>
-                                    <span class="branch-count">
-                                        {format!("{position} / {total}")}
-                                    </span>
-                                    <button
-                                        class="branch-step"
-                                        aria-label="下一个版本"
-                                        on:click=move |_| shift_branch.run(1)
-                                    >
-                                        {icon("chevron-right", 12)}
-                                    </button>
-                                </div>
-                            }
-                        })
-                    }}
-                    <Show when=move || !turns.get().is_empty() && !streaming.get()>
-                        <button
-                            class="composer-edit"
-                            title="编辑最后一条问题并重发"
-                            on:click=move |_| {
-                                if streaming.get() {
-                                    return;
-                                }
-                                let all = turns.get();
-                                let Some(index) = all.len().checked_sub(1) else {
-                                    return;
-                                };
-                                let Some(turn) = all.get(index) else {
-                                    return;
-                                };
-                                let edit_text = turn
-                                    .question
-                                    .split("\n\n[引用的先前回答]")
-                                    .next()
-                                    .unwrap_or_default()
-                                    .to_owned();
-                                editing.set(Some(index));
-                                let _ = composer(
-                                    "setPlainText",
-                                    &[JsValue::from_str(&edit_text)],
-                                );
-                                let _ = composer("focus", &[]);
-                            }
-                        >
-                            {icon("edit", 14)}
-                            "编辑"
-                        </button>
-                    </Show>
                 </div>
             </div>
 
