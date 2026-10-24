@@ -24,10 +24,12 @@ Cream is not used for buttons, references, citations, selection, or status. Purp
 
 ### Reasoning
 
-- `.think-text` uses the cream surface and ink.
-- An expanded `.think-pill` and the live streaming block are cream, with a cream border; the text is
-  transparent inside so there is one surface, not a card-in-card.
-- A closed “思考 N 秒” pill keeps the normal surface; only the revealed content is cream.
+- The pill/card itself stays on the normal white surface.
+- The header row (“思考 N 秒” or “思考中…”) is white.
+- The body below it is cream with cream ink, separated from the header by a 1 px `--cream-200` rule;
+  this is identical for an expanded completed block and the live streaming block, so opening does not
+  change the shape.
+- A closed “思考 N 秒” pill shows only its white header; no cream is visible.
 
 ### Borrowed modes
 

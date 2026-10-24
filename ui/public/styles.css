@@ -3328,6 +3328,7 @@ body.selection-quiet .textLayer :is(span, br)::selection {
 .think-pill {
   align-self: flex-start;
   max-width: 100%;
+  overflow: hidden;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 999px;  /* size */
@@ -3337,19 +3338,15 @@ body.selection-quiet .textLayer :is(span, br)::selection {
 .think-pill[open],
 .think-pill.is-live {
   width: 100%;
-  background: var(--cream-50);
-  border-color: var(--cream-200);
   border-radius: var(--radius-md);
 }
 
-.think-pill[open] summary,
-.think-pill.is-live .think-head {
-  color: var(--cream-700);
-}
-
-.think-pill[open] .think-text,
-.think-pill.is-live .think-text {
-  background: transparent;
+/* The header stays on the normal surface; only the body below the rule is cream. This holds for
+   both the live stream and the completed details element, so opening does not change the shape. */
+.think-pill summary,
+.think-pill .think-head {
+  background: var(--surface);
+  color: var(--ink-muted);
 }
 
 .think-pill summary,
@@ -3383,12 +3380,14 @@ body.selection-quiet .textLayer :is(span, br)::selection {
 
 .think-pill .think-text {
   margin: 0;
-  padding: 0 var(--space-3) var(--space-2);
+  padding: var(--space-2) var(--space-3);
   color: var(--cream-700);
   font-family: inherit;
   font-size: var(--text-xs);
   line-height: 1.6;
   white-space: pre-wrap;
+  background: var(--cream-50);
+  border-top: 1px solid var(--cream-200);
 }
 
 .turn-actions {

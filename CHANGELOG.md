@@ -131,7 +131,8 @@ minor releases may contain breaking changes; they are always called out.
 ### Added
 
 - A cream accent for the model's reasoning surface and for a mode borrowed with a modifier; the
-  pointer tool remains lilac.
+  pointer tool remains lilac. The reasoning header row stays white and a rule separates it from the
+  cream body, in both live and completed states.
 
 
 - The six-pixel purple band was the page-position rail; it is now a 4 px divider that darkens to
