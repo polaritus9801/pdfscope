@@ -27,13 +27,21 @@ fn format_moment(timestamp: f64) -> String {
     {
         format!("{:02}:{:02}", date.get_hours(), date.get_minutes())
     } else if date.get_full_year() == now.get_full_year() {
-        format!("{:02}-{:02}", date.get_month() + 1, date.get_date())
+        format!(
+            "{:02}-{:02} {:02}:{:02}",
+            date.get_month() + 1,
+            date.get_date(),
+            date.get_hours(),
+            date.get_minutes()
+        )
     } else {
         format!(
-            "{}-{:02}-{:02}",
+            "{}-{:02}-{:02} {:02}:{:02}",
             date.get_full_year(),
             date.get_month() + 1,
-            date.get_date()
+            date.get_date(),
+            date.get_hours(),
+            date.get_minutes()
         )
     }
 }
@@ -51,6 +59,17 @@ fn format_moment_full(timestamp: f64) -> String {
         date.get_hours(),
         date.get_minutes()
     )
+}
+
+/// Reading preference: open a document on its pinned group first, or strictly newest first.
+pub(crate) const RESUME_PREFERENCE_KEY: &str = "pdfscope.resume-pinned";
+
+fn resume_prefers_pinned() -> bool {
+    web_sys::window()
+        .and_then(|window| window.local_storage().ok().flatten())
+        .and_then(|storage| storage.get_item(RESUME_PREFERENCE_KEY).ok().flatten())
+        .as_deref()
+        == Some("pinned")
 }
 
 /// Consecutive page numbers collapsed into inclusive ranges.
@@ -855,11 +874,12 @@ pub fn AiPanel(
     };
 
     let activate_passage = Callback::new(move |passage: Passage| {
-        if !passages
-            .get_untracked()
-            .iter()
-            .any(|item| item.id == passage.id)
-        {
+        let duplicate = passages.get_untracked().iter().any(|item| {
+            item.page == passage.page && item.quote == passage.quote && item.rect == passage.rect
+        });
+        if duplicate {
+            notice.set(Some("这个引用已经在上下文里了".to_owned()));
+        } else {
             undo_push.run(());
             next_ref.update(|next| *next = (*next).max(passage.id + 1));
             passages.update(|list| list.push(passage.clone()));
@@ -867,11 +887,13 @@ pub fn AiPanel(
         jump(passage.page);
     });
     let activate_region = Callback::new(move |region: Region| {
-        if !regions
+        let duplicate = regions
             .get_untracked()
             .iter()
-            .any(|item| item.id == region.id)
-        {
+            .any(|item| item.page == region.page && item.image == region.image);
+        if duplicate {
+            notice.set(Some("这个引用已经在上下文里了".to_owned()));
+        } else {
             undo_push.run(());
             next_ref.update(|next| *next = (*next).max(region.id + 1));
             regions.update(|list| list.push(region.clone()));
@@ -879,7 +901,9 @@ pub fn AiPanel(
         jump(region.page);
     });
     let activate_page = Callback::new(move |page_number: u32| {
-        if !page_set.get_untracked().contains(&page_number) {
+        if page_set.get_untracked().contains(&page_number) {
+            notice.set(Some("这个页面引用已经在上下文里了".to_owned()));
+        } else {
             undo_push.run(());
             page_set.update(|set| {
                 set.push(page_number);
@@ -890,60 +914,73 @@ pub fn AiPanel(
         jump(page_number);
     });
     let activate_answer = Callback::new(move |answer: crate::AnswerRef| {
-        if !answers
+        let duplicate = answers
             .get_untracked()
             .iter()
-            .any(|item| item.id == answer.id)
-        {
-            undo_push.run(());
-            let id = next_answer.get_untracked() + 1;
-            next_answer.set(id);
-            answers.update(|list| {
-                list.push(crate::AnswerRef {
-                    id,
-                    label: answer.label.clone(),
-                    quote: answer.quote.clone(),
-                });
-            });
+            .any(|item| item.label == answer.label && item.quote == answer.quote);
+        if duplicate {
+            notice.set(Some("这条回答引用已经在上下文里了".to_owned()));
+            return;
         }
+        undo_push.run(());
+        let id = next_answer.get_untracked() + 1;
+        next_answer.set(id);
+        answers.update(|list| {
+            list.push(crate::AnswerRef {
+                id,
+                label: answer.label.clone(),
+                quote: answer.quote.clone(),
+            });
+        });
     });
     let activate_image = Callback::new(move |image: UserImage| {
-        if !images
+        let duplicate = images
             .get_untracked()
             .iter()
-            .any(|item| item.id == image.id)
-        {
-            undo_push.run(());
-            let id = next_image.get_untracked() + 1;
-            next_image.set(id);
-            images.update(|list| {
-                list.push(UserImage {
-                    id,
-                    name: image.name.clone(),
-                    image: image.image.clone(),
-                });
-            });
+            .any(|item| item.name == image.name && item.image == image.image);
+        if duplicate {
+            notice.set(Some("这张图片已经在上下文里了".to_owned()));
+            return;
         }
+        undo_push.run(());
+        let id = next_image.get_untracked() + 1;
+        next_image.set(id);
+        images.update(|list| {
+            list.push(UserImage {
+                id,
+                name: image.name.clone(),
+                image: image.image.clone(),
+            });
+        });
     });
     let activate_file = Callback::new(move |file: UserFile| {
-        if !files
+        let duplicate = files
             .get_untracked()
             .iter()
-            .any(|item| item.name == file.name && item.text == file.text)
-        {
-            undo_push.run(());
-            let id = next_file.get_untracked() + 1;
-            next_file.set(id);
-            files.update(|list| {
-                list.push(UserFile {
-                    id,
-                    name: file.name.clone(),
-                    text: file.text.clone(),
-                });
+            .any(|item| item.name == file.name && item.text == file.text);
+        if duplicate {
+            notice.set(Some("这个文件已经在上下文里了".to_owned()));
+            return;
+        }
+        undo_push.run(());
+        let id = next_file.get_untracked() + 1;
+        next_file.set(id);
+        files.update(|list| {
+            list.push(UserFile {
+                id,
+                name: file.name.clone(),
+                text: file.text.clone(),
             });
+        });
+    });
+    let activate_web = Callback::new(move |_: ()| {
+        if web.get_untracked() {
+            notice.set(Some("联网搜索已经开启".to_owned()));
+        } else {
+            web.set(true);
         }
     });
-    let activate_web = Callback::new(move |_: ()| web.set(true));
+
     let reference_actions = ReferenceActions {
         passage: activate_passage,
         region: activate_region,
@@ -1532,13 +1569,21 @@ pub fn AiPanel(
             });
         }
 
-        // Opening a document resumes its newest conversation, not an older pinned one. Pinning
-        // still controls the drawer's ordering.
+        // The reading preference chooses whether pinned conversations lead the initial selection;
+        // within either group, the newest conversation wins.
+        let prefer_pinned = resume_prefers_pinned();
         list.sort_by(|left, right| {
-            right
-                .updated
-                .partial_cmp(&left.updated)
-                .unwrap_or(std::cmp::Ordering::Equal)
+            let pinned = if prefer_pinned {
+                right.pinned.cmp(&left.pinned)
+            } else {
+                std::cmp::Ordering::Equal
+            };
+            pinned.then_with(|| {
+                right
+                    .updated
+                    .partial_cmp(&left.updated)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
         });
 
         let first = list[0].id.clone();
@@ -2461,6 +2506,7 @@ pub fn AiPanel(
         restore_partial(&id);
         history_open.set(false);
         save_conversations();
+        let _ = composer("focusEnd", &[]);
     };
 
     let delete_conversation = move |id: String| {

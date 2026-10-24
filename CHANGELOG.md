@@ -141,6 +141,14 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Changed
 
+- Settings → 阅读 now chooses whether a document resumes with the newest conversation or a pinned
+  conversation first; both groups are newest-first.
+- The reference popover is 300px, right-aligned to its capsule and kept inside the AI panel.
+- Older timestamps include the time (`MM-DD HH:MM`, `YYYY-MM-DD HH:MM`).
+- Toasts are content-width and centered; a short copy confirmation no longer matches a longer one.
+- New conversations focus the composer automatically.
+- Duplicate reference activations add nothing and show a red “已经在上下文里了” notice.
+- Dragging files dims/blurs the app behind a centered upload card with destination-specific copy.
 - All three scope modes carry the active references, including page references. The modes only choose
   extra page bulk (all pages / current page / no extras).
 - Opening a document resumes its newest conversation; pinning only affects drawer ordering.

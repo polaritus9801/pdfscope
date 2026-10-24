@@ -59,6 +59,8 @@ with the bubble:
 
 - Clicking the capsule opens one popover below it; clicking again, clicking outside (scrim), or Esc
   closes it. It stays open after a reference row is clicked, so several can be added.
+- The popover is 300px wide and right-aligned to the capsule, so it opens leftward and stays inside
+  the AI panel even when the question bubble is at the right edge.
 - The popover lists every stored reference with a kind icon, label and page/kind metadata.
 - Hovering a passage, region or page sets the shared `hovered` highlight; the reader does **not**
   scroll. If that page is outside the viewport, a small page image appears beside the popover instead.
@@ -66,6 +68,8 @@ with the bubble:
 - Clicking a row calls the same activation callbacks as clicking an active input reference: it adds
   the item to the current context shelf if absent, then jumps/flashes the page for page-bearing items.
   It never edits the historical turn.
+- A duplicate is never added. The same red notice used by the composer (`range-error`) says the
+  reference is already in the context; page-bearing duplicates still jump to the page.
 - The old "历史引用" list, `Stored`, `redeem` and its send-time bookkeeping were removed. Conversation
   history and prompt history are unaffected.
 

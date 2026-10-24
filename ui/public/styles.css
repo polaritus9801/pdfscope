@@ -2014,12 +2014,16 @@ mark.find-hit {
   z-index: 50;
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: var(--space-2);
   pointer-events: none;
 }
 
 .toast {
+  width: max-content;
+  max-width: calc(100vw - 32px);  /* size */
   padding: var(--space-2) var(--space-4);
+  text-align: center;
   font-size: var(--text-sm);
   color: var(--surface);
   background: #241b34;
@@ -4386,11 +4390,12 @@ body.panel-dragging .panel-resize::after {
 .question-refs-popover {
   position: absolute;
   top: calc(100% + 6px);  /* size */
-  left: 0;
+  right: 4px;  /* size */
+  left: auto;
   z-index: 31;
   display: flex;
   flex-direction: column;
-  width: min(320px, calc(100vw - 40px));  /* size */
+  width: min(300px, calc(100vw - 40px));  /* size */
   max-height: 300px;  /* size */
   overflow: hidden;
   background: var(--surface);
@@ -4583,4 +4588,54 @@ body.panel-dragging .panel-resize::after {
   width: 180px;  /* size */
   height: auto;
   border-radius: 2px;  /* size */
+}
+
+/* Finder dragging: dim and blur the whole app so the drop destination is unmistakable. */
+.file-drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgb(24 20 32 / 34%);
+  backdrop-filter: blur(3px);  /* size */
+  pointer-events: none;
+}
+
+.file-drop-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;  /* size */
+  min-width: 280px;  /* size */
+  padding: 24px 32px;  /* size */
+  color: var(--ink);
+  text-align: center;
+  background: var(--surface);
+  border: 1px dashed var(--accent-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-3);
+}
+
+.file-drop-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;  /* size */
+  height: 52px;  /* size */
+  margin-bottom: 2px;  /* size */
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: var(--radius-full);
+}
+
+.file-drop-card strong {
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+
+.file-drop-card span {
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
 }

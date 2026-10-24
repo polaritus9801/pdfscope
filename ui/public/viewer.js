@@ -2566,6 +2566,50 @@ function openDroppedPdf(file) {
   return true;
 }
 
+let dropOverlay = null;
+
+function ensureDropOverlay() {
+  if (dropOverlay?.isConnected) return dropOverlay;
+  const overlay = document.createElement("div");
+  overlay.className = "file-drop-overlay";
+  overlay.innerHTML = `
+    <div class="file-drop-card">
+      <div class="file-drop-icon">
+        <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor"
+          stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 16V4M6 10l6-6 6 6"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/>
+        </svg>
+      </div>
+      <strong></strong>
+      <span></span>
+    </div>`;
+  document.body.append(overlay);
+  dropOverlay = overlay;
+  return overlay;
+}
+
+function updateDropOverlay(zone) {
+  const overlay = ensureDropOverlay();
+  const title = overlay.querySelector("strong");
+  const hint = overlay.querySelector("span");
+  overlay.dataset.zone = zone;
+  if (zone === "panel") {
+    title.textContent = "松开以添加到输入框";
+    hint.textContent = "图片、PDF、Office、文本或代码文件";
+  } else if (zone === "stage") {
+    title.textContent = "松开以打开 PDF";
+    hint.textContent = "阅读器只打开 PDF；其他文件请拖到右侧 AI 面板";
+  } else {
+    title.textContent = "拖到左侧打开 PDF，或拖到右侧添加附件";
+    hint.textContent = "支持 PDF、图片、Office 与文本/代码文件";
+  }
+}
+
+function hideDropOverlay() {
+  dropOverlay?.remove();
+  dropOverlay = null;
+}
+
 function initFileDrops() {
   document.addEventListener("dragover", (event) => {
     if (!hasFileDrop(event)) return;
@@ -2577,16 +2621,21 @@ function initFileDrops() {
     const stage = target?.closest(".stage");
     if (panel) panel.classList.add("drop-active");
     else if (stage) stage.classList.add("drop-active");
+    updateDropOverlay(panel ? "panel" : stage ? "stage" : "none");
   });
 
   document.addEventListener("dragleave", (event) => {
-    if (event.relatedTarget === null) clearDropTargets();
+    if (event.relatedTarget === null) {
+      clearDropTargets();
+      hideDropOverlay();
+    }
   });
 
   document.addEventListener("drop", (event) => {
     if (!hasFileDrop(event)) return;
     event.preventDefault();
     clearDropTargets();
+    hideDropOverlay();
     const files = [...(event.dataTransfer?.files ?? [])];
     if (files.length === 0) return;
     const target = event.target instanceof Element ? event.target : null;
@@ -2604,6 +2653,11 @@ function initFileDrops() {
       return;
     }
     dropNotice("把 PDF 拖到左侧阅读器，或把附件拖到右侧 AI 面板");
+  });
+
+  document.addEventListener("dragend", () => {
+    clearDropTargets();
+    hideDropOverlay();
   });
 }
 

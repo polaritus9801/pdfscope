@@ -7,7 +7,8 @@ use wasm_bindgen_futures::JsFuture;
 
 use crate::icons::{icon, provider_tile};
 use crate::panel::{
-    PRESET_LABELS, apply_font_size, apply_theme, bridge, flag_of, number_of, preset, text_of,
+    PRESET_LABELS, RESUME_PREFERENCE_KEY, apply_font_size, apply_theme, bridge, flag_of, number_of,
+    preset, text_of,
 };
 
 /// Publishes the timeout to the bridge, in milliseconds; zero disables the watchdog.
@@ -21,6 +22,22 @@ fn apply_request_timeout(seconds: &str) {
         &JsValue::from_str("PDFScopeRequestTimeout"),
         &JsValue::from_f64((seconds * 1000) as f64),
     );
+}
+
+fn read_resume_preference() -> String {
+    web_sys::window()
+        .and_then(|window| window.local_storage().ok().flatten())
+        .and_then(|storage| storage.get_item(RESUME_PREFERENCE_KEY).ok().flatten())
+        .filter(|value| value == "pinned" || value == "latest")
+        .unwrap_or_else(|| "latest".to_owned())
+}
+
+fn write_resume_preference(value: &str) {
+    if let Some(storage) =
+        web_sys::window().and_then(|window| window.local_storage().ok().flatten())
+    {
+        let _ = storage.set_item(RESUME_PREFERENCE_KEY, value);
+    }
 }
 
 /// Splits the comma-separated model list into unique, trimmed names.
@@ -78,6 +95,8 @@ pub(crate) fn SettingsSheet(
     let form_zoom = RwSignal::new("100".to_owned());
 
     let form_mode = RwSignal::new("continuous".to_owned());
+
+    let form_resume = RwSignal::new(read_resume_preference());
     let form_page_limit = RwSignal::new(0_u32);
     let form_timeout = RwSignal::new("0".to_owned());
     let form_context_limit = RwSignal::new("128000".to_owned());
@@ -532,6 +551,25 @@ pub(crate) fn SettingsSheet(
                                         </p>
 
                                         <label class="settings-row">
+                                            <span>"打开文档时"</span>
+                                            <select on:change=move |event| {
+                                                let value = event_target_value(&event);
+                                                form_resume.set(value.clone());
+                                                write_resume_preference(&value);
+                                            }>
+                                                <option value="latest" selected=move || form_resume.get() == "latest">
+                                                    "最新对话优先"
+                                                </option>
+                                                <option value="pinned" selected=move || form_resume.get() == "pinned">
+                                                    "置顶对话优先"
+                                                </option>
+                                            </select>
+                                        </label>
+                                        <p class="settings-hint">
+                                            "置顶组内部也按最新对话排序；此选项立即生效。"
+                                        </p>
+
+                                        <label class="settings-row">
                                             <span>"双页奇偶偏移"</span>
                                             <input
                                                 type="checkbox"
@@ -570,6 +608,8 @@ pub(crate) fn SettingsSheet(
                                                 on:click=move |_| {
                                                     form_zoom.set("100".to_owned());
                                                     form_remember.set(true);
+                                                    form_resume.set("latest".to_owned());
+                                                    write_resume_preference("latest");
                                                 }
                                             >
                                                 "恢复阅读默认"
