@@ -3508,7 +3508,9 @@ body.selection-quiet .textLayer :is(span, br)::selection {
 
 .question-row {
   display: flex;
+  align-items: flex-end;
   justify-content: flex-end;
+  gap: 6px;  /* size */
 }
 
 .turn-question {
@@ -4354,13 +4356,12 @@ body.panel-dragging .panel-resize::after {
   border-radius: var(--radius-sm);
 }
 
-/* One compact reference line above a question bubble; the full list is the native title tooltip. */
 .question-stack {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   gap: 4px;  /* size */
-  max-width: 86%;
+  max-width: calc(86% - 38px);  /* size */
   min-width: 0;
 }
 
@@ -4368,35 +4369,30 @@ body.panel-dragging .panel-resize::after {
   max-width: 100%;
 }
 
-.question-refs-line {
-  display: flex;
-  align-items: center;
-  gap: 4px;  /* size */
-  max-width: 100%;
-  overflow: hidden;
-  color: var(--ink-muted);
-  white-space: nowrap;
-}
-
-.question-refs-icon {
-  display: flex;
+/* A paperclip/count capsule to the left of a question bubble, bottom-aligned with it. */
+.question-refs-badge {
+  display: inline-flex;
   flex: none;
-  color: var(--ink-faint);
+  align-items: center;
+  gap: 3px;  /* size */
+  padding: 2px 7px;  /* size */
+  color: var(--ink-muted);
+  font: inherit;
+  font-size: 11px;  /* size */
+  line-height: 1.5;
+  background: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--accent) 34%, var(--border));
+  border-radius: var(--radius-full);
+  cursor: default;
+  appearance: none;
 }
 
-.question-refs-icon svg {
+.question-refs-badge svg {
   width: 13px;  /* size */
   height: 13px;  /* size */
+  color: var(--accent);
 }
 
-.question-ref {
-  flex: none;
-  padding: 1px 5px;  /* size */
-  overflow: hidden;
-  font-size: 10px;  /* size */
-  line-height: 1.5;
-  text-overflow: ellipsis;
-  background: var(--surface-sunken);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-full);
+.question-refs-badge span {
+  font-variant-numeric: tabular-nums;
 }

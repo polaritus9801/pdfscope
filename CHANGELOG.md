@@ -133,8 +133,9 @@ minor releases may contain breaking changes; they are always called out.
 - The first answer no longer flashes per token: the empty-state branch no longer reads the streaming
   answer, so tokens cannot rebuild the transcript. Markdown and `[p.N]` citations still render
   incrementally; copy is hidden until completion/stop.
-- Each question records its full reference context in the conversation tree. A compact one-line chip
-  summary sits above the question bubble, and edit/resend restores the original references.
+- Each question records its full reference context in the conversation tree. A bottom-aligned
+  paperclip/count capsule sits to the left of the question bubble, and edit/resend restores the
+  original references.
 
 ### Added
 

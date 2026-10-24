@@ -35,17 +35,20 @@ passages, regions, pages, answers, images, files, web, scope_mode, page
 
 ## Compact display
 
-A question with references gets one line above its bubble:
+A question with references gets a small capsule immediately to the left of its bubble, bottom-aligned
+with the bubble:
 
 ```text
-📎 p.2  p.4  文件 notes.txt  +1
+[ 📎 4 ]  问题气泡
 ```
 
-- At most three chips, then `+N`; pages are collapsed into ranges.
-- The icon is the existing paperclip; chips are small muted capsules.
-- Hovering the line exposes the full list (with count) through the native title; no popover and no
-  extra vertical space until a question actually has references.
-- The live question uses the same line from `current_context`, so references are visible while the
+- Count = passages + regions + pages + previous answers + images + files + web — every attached
+  context item, not just the visible text.
+- The capsule uses the surface background (white in light mode), a thin light-purple border and a
+  full pill radius. The paperclip is followed by the number.
+- Hovering exposes the full list, including the count, through the native title.
+- No capsule for a question with no references; the bubble keeps its normal right alignment.
+- The live question uses the same capsule from `current_context`, so references are visible while the
   answer streams.
 
 ## Acceptance
@@ -53,7 +56,7 @@ A question with references gets one line above its bubble:
 - First answer no longer rebuilds the transcript per token; the live turn node stays stable.
 - Markdown and citations are parsed incrementally while tokens arrive.
 - Copy does not appear during streaming; copy/regenerate appear when the turn is complete or stopped.
-- A question with references displays a one-line summary above the bubble.
+- A question with references displays a bottom-aligned paperclip/count capsule to the left of its bubble.
 - Editing that question restores its passages, regions, pages, answer refs, images, files and web
   flag; resending records the same context on the new sibling.
 - Old conversations load with empty contexts and no reference line.

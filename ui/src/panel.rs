@@ -301,26 +301,25 @@ impl TurnContext {
     }
 }
 
-/// A compact, one-line reference summary above a question bubble. The full list lives in the
-/// native title so the summary never grows beyond three chips.
-fn reference_line(context: &TurnContext) -> Option<AnyView> {
-    let labels = context.labels();
-    if labels.is_empty() {
+/// A paperclip/count capsule to the left of a question bubble, with the full list in the title.
+fn reference_badge(context: &TurnContext) -> Option<AnyView> {
+    let count = context.count();
+    if count == 0 {
         return None;
     }
-    let title = format!("{} 项引用：{}", context.count(), labels.join(" · "));
-    let chips: Vec<String> = labels.iter().take(3).cloned().collect();
-    let more = labels.len().saturating_sub(chips.len());
+    let labels = context.labels();
+    let title = format!("{count} 项引用：{}", labels.join(" · "));
     Some(
         view! {
-            <div class="question-refs-line" title=title>
-                <span class="question-refs-icon">{paperclip()}</span>
-                {chips
-                    .into_iter()
-                    .map(|label| view! { <span class="question-ref">{label}</span> })
-                    .collect_view()}
-                {(more > 0).then(|| view! { <span class="question-ref">"+" {more}</span> })}
-            </div>
+            <button
+                type="button"
+                class="question-refs-badge"
+                title=title.clone()
+                aria-label=title
+            >
+                {paperclip()}
+                <span>{count}</span>
+            </button>
         }
         .into_any(),
     )
@@ -2850,7 +2849,7 @@ pub fn AiPanel(
                                                     })
                                                 };
                                                 let edit_context = turn.context.clone();
-                                                let refs = reference_line(&turn.context);
+                                                let refs = reference_badge(&turn.context);
                                                 let edit = icon_action(
                                                     "edit",
                                                     "编辑这个问题并重发",
@@ -2926,8 +2925,8 @@ pub fn AiPanel(
                                                 view! {
                                                     <div class="turn">
                                                         <div class="question-row">
+                                                            {refs}
                                                             <div class="question-stack">
-                                                                {refs}
                                                                 <p class="turn-question">{turn.question.clone()}</p>
                                                             </div>
                                                         </div>
@@ -3016,12 +3015,12 @@ pub fn AiPanel(
                                                     .into_any()
                                             }
                                         };
-                                        let refs = reference_line(&current_context.get());
+                                        let refs = reference_badge(&current_context.get());
                                         view! {
                                             <div class="turn current" class:is-streaming=move || streaming.get()>
                                                 <div class="question-row">
+                                                    {refs}
                                                     <div class="question-stack">
-                                                        {refs}
                                                         <p class="turn-question">
                                                         {move || {
                                                             if continue_target.get().is_some() {
