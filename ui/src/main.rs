@@ -25,6 +25,67 @@ pub(crate) use page::PageView;
 
 use model::{parse_page_sizes, parse_rects, parse_selection, read_flag, read_number, read_string};
 
+#[derive(Clone, PartialEq)]
+struct RecentDoc {
+    id: String,
+    name: String,
+    size: f64,
+    updated: f64,
+}
+
+fn parse_recents(value: &JsValue) -> Vec<RecentDoc> {
+    if !value.is_array() {
+        return Vec::new();
+    }
+    js_sys::Array::from(value)
+        .iter()
+        .filter_map(|entry| {
+            let id = read_string(&entry, "id")?;
+            let name = read_string(&entry, "name")?;
+            if id.is_empty() || name.trim().is_empty() {
+                return None;
+            }
+            Some(RecentDoc {
+                id,
+                name,
+                size: read_number(&entry, "size").unwrap_or(0.0).max(0.0),
+                updated: read_number(&entry, "updated").unwrap_or(0.0),
+            })
+        })
+        .collect()
+}
+
+fn recent_size(size: f64) -> String {
+    if size >= 1024.0 * 1024.0 {
+        format!("{:.1} MB", size / (1024.0 * 1024.0))
+    } else if size >= 1024.0 {
+        format!("{:.0} KB", size / 1024.0)
+    } else {
+        format!("{size:.0} B")
+    }
+}
+
+fn recent_age(updated: f64) -> String {
+    if !updated.is_finite() || updated <= 0.0 {
+        return "刚刚".to_owned();
+    }
+    let minutes = ((js_sys::Date::now() - updated) / 60_000.0).max(0.0);
+    if minutes < 1.0 {
+        "刚刚".to_owned()
+    } else if minutes < 60.0 {
+        format!("{:.0} 分钟前", minutes)
+    } else if minutes < 60.0 * 24.0 {
+        format!("{:.0} 小时前", minutes / 60.0)
+    } else if minutes < 60.0 * 48.0 {
+        "昨天".to_owned()
+    } else if minutes < 60.0 * 24.0 * 7.0 {
+        format!("{:.0} 天前", minutes / (60.0 * 24.0))
+    } else {
+        let date = js_sys::Date::new(&JsValue::from_f64(updated));
+        format!("{} 月 {} 日", date.get_month() + 1, date.get_date())
+    }
+}
+
 /// Calls one of the functions the renderer exposes.
 pub(crate) fn call(name: &str, args: &[JsValue]) -> Option<JsValue> {
     let window = web_sys::window()?;
@@ -54,6 +115,8 @@ fn App() -> impl IntoView {
     let ready = RwSignal::new(false);
     let file_name = RwSignal::new(String::new());
     let error = RwSignal::new(Option::<String>::None);
+    let recents = RwSignal::new(Vec::<RecentDoc>::new());
+    let recents_ready = RwSignal::new(false);
     let settings_open = RwSignal::new(false);
     let reading = RwSignal::new(false);
     // 0 pointer, 1 text, 2 box, 3 pages: the rail's active tool.
@@ -269,18 +332,24 @@ fn App() -> impl IntoView {
         let _ = call("fitWidth", &[]);
     };
 
-    let open = move |event: web_sys::Event| {
-        let Some(input) = event
-            .target()
-            .and_then(|target| target.dyn_into::<HtmlInputElement>().ok())
-        else {
-            return;
-        };
-        let Some(file) = input.files().and_then(|files| files.get(0)) else {
-            return;
-        };
+    let refresh_recents = Callback::new(move |_: ()| {
+        if let Some(handle) = call("recentsList", &[]) {
+            spawn_local(async move {
+                if let Ok(value) = settle(handle).await {
+                    recents.set(parse_recents(&value));
+                }
+                recents_ready.set(true);
+            });
+        } else {
+            recents_ready.set(true);
+        }
+    });
 
-        file_name.set(file.name());
+    // Load the recent shelf once the renderer is available.
+    Effect::new(move |_| refresh_recents.run(()));
+
+    let load_document = Callback::new(move |(name, bytes): (String, js_sys::Uint8Array)| {
+        file_name.set(name.clone());
         error.set(None);
         pages.set(0);
         page_sizes.set(Vec::new());
@@ -302,13 +371,12 @@ fn App() -> impl IntoView {
         focused_ref.set(None);
 
         spawn_local(async move {
-            let Ok(buffer) = JsFuture::from(file.array_buffer()).await else {
-                error.set(Some("这个文件读不出来。".to_owned()));
-                return;
-            };
-
-            let bytes = js_sys::Uint8Array::new(&buffer);
-            let Some(handle) = call("load", &[bytes.into(), file.name().into()]) else {
+            // PDF.js may transfer the input buffer to its worker. Keep a private copy for the recent
+            // store; saving the original after `load` would serialize a detached view.
+            let recent_bytes = js_sys::Uint8Array::new_with_length(bytes.length());
+            recent_bytes.set(&bytes, 0);
+            let Some(handle) = call("load", &[bytes.clone().into(), JsValue::from_str(&name)])
+            else {
                 error.set(Some("阅读器还没准备好，请重试。".to_owned()));
                 return;
             };
@@ -366,11 +434,66 @@ fn App() -> impl IntoView {
 
                     page.set(1);
                     ready.set(true);
+
+                    if let Some(handle) = call(
+                        "recentsSave",
+                        &[JsValue::from_str(&name), recent_bytes.into()],
+                    ) {
+                        spawn_local(async move {
+                            let _ = settle(handle).await;
+                            refresh_recents.run(());
+                        });
+                    }
                 }
                 Err(_) => error.set(Some("这个 PDF 打不开，可能已损坏或被加密。".to_owned())),
             }
         });
+    });
+
+    let open = move |event: web_sys::Event| {
+        let Some(input) = event
+            .target()
+            .and_then(|target| target.dyn_into::<HtmlInputElement>().ok())
+        else {
+            return;
+        };
+        let Some(file) = input.files().and_then(|files| files.get(0)) else {
+            return;
+        };
+        let name = file.name();
+        spawn_local(async move {
+            let Ok(buffer) = JsFuture::from(file.array_buffer()).await else {
+                error.set(Some("这个文件读不出来。".to_owned()));
+                return;
+            };
+            load_document.run((name, js_sys::Uint8Array::new(&buffer)));
+        });
     };
+
+    let open_recent = Callback::new(move |(id, name): (String, String)| {
+        let Some(handle) = call("recentsLoad", &[JsValue::from_str(&id)]) else {
+            error.set(Some("最近记录暂时不可用。".to_owned()));
+            return;
+        };
+        spawn_local(async move {
+            match settle(handle).await {
+                Ok(value) => {
+                    let loaded_name = read_string(&value, "name")
+                        .filter(|value| !value.trim().is_empty())
+                        .unwrap_or(name);
+                    let bytes = js_sys::Reflect::get(&value, &JsValue::from_str("bytes"))
+                        .ok()
+                        .and_then(|value| value.dyn_into::<js_sys::Uint8Array>().ok());
+                    if let Some(bytes) = bytes {
+                        load_document.run((loaded_name, bytes));
+                    } else {
+                        error.set(Some("这个最近文件已无法读取。".to_owned()));
+                    }
+                }
+                Err(_) => error.set(Some("这个最近文件已无法读取。".to_owned())),
+            }
+        });
+    });
 
     let jump = move |event: web_sys::Event| {
         let Some(input) = event
@@ -1275,54 +1398,135 @@ fn App() -> impl IntoView {
                 </div>
 
                 <div class="empty" class:hidden=move || ready.get()>
-                    <div class="welcome">
-                        <p class="welcome-eyebrow">"PDFScope"</p>
-                        <h1 class="welcome-title">"边读边问，答案带页码"</h1>
-                        <ol class="welcome-steps">
-                            <li>
-                                <span class="step-index">"1"</span>
+                    <div
+                        class="welcome-shell"
+                        on:dblclick=move |event: web_sys::MouseEvent| event.stop_propagation()
+                    >
+                        <div class="welcome">
+                            <p class="welcome-eyebrow">"PDFScope"</p>
+                            <h1 class="welcome-title">"边读边问，答案带页码"</h1>
+                            <ol class="welcome-steps">
+                                <li>
+                                    <span class="step-index">"1"</span>
+                                    <div>
+                                        <b>"打开一本 PDF"</b>
+                                        <small>"⌘O，或把文件拖进来"</small>
+                                    </div>
+                                </li>
+                                <li>
+                                    <span class="step-index">"2"</span>
+                                    <div>
+                                        <b>"选中一段文字"</b>
+                                        <small>"也可以用左上角的「框」框住图表"</small>
+                                    </div>
+                                </li>
+                                <li>
+                                    <span class="step-index">"3"</span>
+                                    <div>
+                                        <b>"在右侧提问"</b>
+                                        <small>"答案里的 p.31 可以点，会带你回原文"</small>
+                                    </div>
+                                </li>
+                            </ol>
+                            <div class="welcome-actions">
+                                <button
+                                    class="button welcome-action"
+                                    on:click=move |_| {
+                                        let _ = call(
+                                            "openSample",
+                                            &[JsValue::from_str("sample.pdf")],
+                                        );
+                                    }
+                                >
+                                    "试试示例"
+                                </button>
+                                <button
+                                    class="button button-primary welcome-action"
+                                    on:click=move |_| {
+                                        if let Some(input) = web_sys::window()
+                                            .and_then(|window| window.document())
+                                            .and_then(|document| document.get_element_by_id("file-input"))
+                                            .and_then(|element| element.dyn_into::<HtmlInputElement>().ok())
+                                        {
+                                            input.click();
+                                        }
+                                    }
+                                >
+                                    "打开 PDF"
+                                </button>
+                            </div>
+                        </div>
+
+                        <aside class="recent" aria-label="最近打开">
+                            <div class="recent-head">
                                 <div>
-                                    <b>"打开一本 PDF"</b>
-                                    <small>"⌘O，或把文件拖进来"</small>
+                                    <h2 class="recent-title">"最近打开"</h2>
+                                    <p class="recent-sub">"从上次停下的地方继续"</p>
                                 </div>
-                            </li>
-                            <li>
-                                <span class="step-index">"2"</span>
-                                <div>
-                                    <b>"选中一段文字"</b>
-                                    <small>"也可以用左上角的「框」框住图表"</small>
-                                </div>
-                            </li>
-                            <li>
-                                <span class="step-index">"3"</span>
-                                <div>
-                                    <b>"在右侧提问"</b>
-                                    <small>"答案里的 p.31 可以点，会带你回原文"</small>
-                                </div>
-                            </li>
-                        </ol>
-                        <button
-                            class="button welcome-action"
-                            on:click=move |_| {
-                                let _ = call("openSample", &[JsValue::from_str("sample.pdf")]);
-                            }
-                        >
-                            "试试示例"
-                        </button>
-                        <button
-                            class="button button-primary welcome-action"
-                            on:click=move |_| {
-                                if let Some(input) = web_sys::window()
-                                    .and_then(|window| window.document())
-                                    .and_then(|document| document.get_element_by_id("file-input"))
-                                    .and_then(|element| element.dyn_into::<HtmlInputElement>().ok())
-                                {
-                                    input.click();
-                                }
-                            }
-                        >
-                            "打开 PDF"
-                        </button>
+                                <span class="recent-count">
+                                    {move || {
+                                        let count = recents.get().len();
+                                        if count > 0 { count.to_string() } else { String::new() }
+                                    }}
+                                </span>
+                            </div>
+                            <div class="recent-list">
+                                {move || {
+                                    if !recents_ready.get() {
+                                        return view! {
+                                            <p class="recent-loading">"正在读取最近打开…"</p>
+                                        }
+                                            .into_any();
+                                    }
+                                    let all = recents.get();
+                                    if all.is_empty() {
+                                        return view! {
+                                            <div class="recent-empty">
+                                                <span class="recent-empty-icon">
+                                                    {icons::icon("file", 18)}
+                                                </span>
+                                                <p>"还没有打开过文档"</p>
+                                                <small>"打开一本 PDF，下次它会出现在这里。"</small>
+                                            </div>
+                                        }
+                                            .into_any();
+                                    }
+                                    all.into_iter()
+                                        .map(|recent| {
+                                            let id = recent.id;
+                                            let name = recent.name;
+                                            let meta = format!(
+                                                "{} · {}",
+                                                recent_size(recent.size),
+                                                recent_age(recent.updated),
+                                            );
+                                            let open_name = name.clone();
+                                            view! {
+                                                <button
+                                                    class="recent-item"
+                                                    title=name.clone()
+                                                    on:click=move |_| {
+                                                        open_recent.run((id.clone(), open_name.clone()));
+                                                    }
+                                                >
+                                                    <span class="recent-icon">
+                                                        {icons::icon("file", 15)}
+                                                    </span>
+                                                    <span class="recent-copy">
+                                                        <span class="recent-name">{name.clone()}</span>
+                                                        <span class="recent-meta">{meta}</span>
+                                                    </span>
+                                                    <span class="recent-arrow">
+                                                        {icons::icon("chevron-right", 12)}
+                                                    </span>
+                                                </button>
+                                            }
+                                        })
+                                        .collect_view()
+                                        .into_any()
+                                }}
+                            </div>
+                        </aside>
                     </div>
                 </div>
 

@@ -2615,6 +2615,19 @@ window.PDFScope = {
     armPanelFollow();
   },
 
+  /// Recent documents live in IndexedDB so they can be reopened after a restart.
+  recentsList() {
+    return window.Recents ? window.Recents.list() : Promise.resolve([]);
+  },
+
+  recentsSave(name, bytes) {
+    return window.Recents ? window.Recents.save(name, bytes) : Promise.resolve(false);
+  },
+
+  recentsLoad(id) {
+    return window.Recents ? window.Recents.load(id) : Promise.resolve(null);
+  },
+
   /// The reader's preferred panel width, remembered between launches.
   loadPanelWidth() {
     try {

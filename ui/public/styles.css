@@ -311,15 +311,190 @@ body {
 }
 
 /* First run: three steps, each naming a control the reader can see. */
-.welcome {
+.welcome-shell {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  justify-content: center;
+  gap: var(--space-4);
+  width: min(880px, 100%);  /* size */
   pointer-events: auto;
-  width: min(440px, 100%);  /* size */
+}
+
+.welcome {
+  flex: 1 1 400px;  /* size */
+  width: auto;
+  min-width: 0;
+  max-width: 460px;  /* size */
   padding: var(--space-6);
   text-align: left;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-2);
+}
+
+.recent {
+  display: flex;
+  flex: 1 1 300px;  /* size */
+  flex-direction: column;
+  min-width: 260px;  /* size */
+  max-width: 380px;  /* size */
+  min-height: 0;
+  padding: var(--space-5);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-2);
+}
+
+.recent-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.recent-title {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+
+.recent-sub {
+  margin: 4px 0 0;  /* size */
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+}
+
+.recent-count {
+  flex: none;
+  min-width: 20px;  /* size */
+  padding: 1px 7px;  /* size */
+  color: var(--accent);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  background: var(--accent-soft);
+  border-radius: var(--radius-full);
+}
+
+.recent-count:empty {
+  display: none;
+}
+
+.recent-list {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;  /* size */
+  min-height: 0;
+  overflow: auto;
+}
+
+.recent-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-width: 0;
+  padding: var(--space-2) var(--space-2);
+  text-align: left;
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background var(--duration) var(--ease);
+}
+
+.recent-item:hover {
+  background: var(--surface-sunken);
+}
+
+.recent-icon {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 28px;  /* size */
+  height: 28px;  /* size */
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 8px;  /* size */
+}
+
+.recent-copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;  /* size */
+  min-width: 0;
+}
+
+.recent-name {
+  overflow: hidden;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-meta {
+  overflow: hidden;
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-arrow {
+  flex: none;
+  display: flex;
+  color: var(--ink-faint);
+}
+
+.recent-empty {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 180px;  /* size */
+  padding: var(--space-4);
+  text-align: center;
+  color: var(--ink-muted);
+}
+
+.recent-empty-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;  /* size */
+  height: 36px;  /* size */
+  margin-bottom: var(--space-2);
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 10px;  /* size */
+}
+
+.recent-empty p {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.recent-empty small {
+  margin-top: 4px;  /* size */
+  font-size: var(--text-xs);
+}
+
+.recent-loading {
+  margin: var(--space-4) 0;
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
 }
 
 .welcome-eyebrow {
@@ -376,6 +551,12 @@ body {
   margin-top: 2px;  /* size */
   font-size: var(--text-sm);
   color: var(--ink-muted);
+}
+
+.welcome-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
 }
 
 .welcome-action {

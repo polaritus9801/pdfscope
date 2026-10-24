@@ -130,6 +130,12 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- The empty reader is now a left/right OOBE: the existing guide on the left (with a gap between its
+  two actions) and an IndexedDB-backed “最近打开” shelf on the right. Recents keep the document bytes,
+  show size/relative age, reopen through the normal load path, and persist across restarts.
+
+### Added
+
 - The AI panel keeps the paragraph at a 35% reading line (shared with the PDF stage) while the panel
   is resized, and a FOLLOW-END state: sending arms it, transcript growth follows the end, and an upward scroll detaches
   until the reader returns to the bottom. No per-token IPC; MutationObserver/ResizeObserver follow
