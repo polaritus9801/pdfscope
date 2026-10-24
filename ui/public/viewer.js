@@ -956,8 +956,9 @@ function ensurePage(number, render) {
 async function buildTextLayer(number, page, baseViewport, baseScale) {
   const container = document.createElement("div");
   container.className = "textLayer";
-  container.style.width = `${baseViewport.width}px`;
-  container.style.height = `${baseViewport.height}px`;
+  // Fill the page layer instead of freezing the base viewport size. During a panel reflow the old
+  // (wider) text layer would otherwise overflow for one frame and flash the stage's horizontal
+  // scrollbar. Spans keep their PDF.js coordinates; .textLayer clips them until the next render.
   container.style.setProperty("--scale-factor", String(baseScale));
 
   const layer = new pdfjs.TextLayer({

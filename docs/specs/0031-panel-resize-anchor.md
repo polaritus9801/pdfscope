@@ -26,6 +26,10 @@ every release jumped once and repeated drags accumulated a vertical drift.
   base size for one frame, until the async rerender replaced them. The canvas CSS box now fills its
   `page-layer` (`width/height: 100%`) and has no inline base-size styles; the old bitmap is briefly
   stretched into the new box until `rerenderCanvas` catches up.
+- PDF.js writes the old base width/height inline on the text layer as well. Even though the text is
+  transparent, that box widened the stage's `scrollWidth` for one frame and flashed the horizontal
+  scrollbar. The text layer now fills and is clamped by its page layer (`width/height: 100%`,
+  `max-width/max-height: 100%`, `overflow: clip`) until its next render.
 - On pointer-up, the final pointer coordinate is applied on the next animation frame. The anchor
   `{page, fraction}` is captured while that frame's drag scale is still applied; the base layout is
   reflowed and the saved zoom restored only on the following frame. This lets the last drag frame
@@ -52,6 +56,8 @@ every release jumped once and repeated drags accumulated a vertical drift.
 - A short (vertically centred) document does not jump at release.
 - Page gaps during the drag and after release match within 0.02 px; the zoomed gap scales with the
   page column rather than snapping to a fixed screen size.
-- A mounted canvas never exceeds its page layer during the reflow; only its backing store is
-  replaced asynchronously.
+- A mounted canvas or text layer never exceeds its page layer during the reflow; only their backing
+  content is replaced asynchronously.
+- The stage has no spurious horizontal overflow frame after a panel drag, whether the horizontal
+  scrollbar was initially present or absent.
 - `just check` green.

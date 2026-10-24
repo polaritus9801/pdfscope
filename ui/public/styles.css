@@ -432,6 +432,12 @@ body {
 .textLayer {
   position: absolute;
   inset: 0;
+  width: 100%;
+  height: 100%;
+  /* PDF.js writes the base-viewport width/height inline. Clamp it to the current page layer so an
+     old, wider text layer cannot flash the stage's horizontal scrollbar during a panel reflow. */
+  max-width: 100%;
+  max-height: 100%;
   overflow: clip;
   line-height: 1;
   text-align: initial;
