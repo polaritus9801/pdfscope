@@ -719,8 +719,18 @@ function applyDisplayScale(scale, origin) {
     };
 
     setDisplayScale(scale);
-    scaler.style.marginTop = "0px";
     updateScalerSize();
+
+    // Keep short columns centred during the drag too. Resetting the margin here and restoring it
+    // only on release would make a one-page or zoomed-out document jump vertically at pointer-up.
+    if (document.body.classList.contains("panel-dragging")) {
+      const available = stageContentHeight(stage);
+      const scaledHeight = baseHeight * scale;
+      scaler.style.marginTop =
+        scaledHeight + 0.5 < available ? `${(available - scaledHeight) / 2}px` : "0px";
+    } else {
+      scaler.style.marginTop = "0px";
+    }
 
     const after = pages.getBoundingClientRect();
     stage.scrollLeft += after.left + point.x * displayScale - origin.x;
@@ -2137,6 +2147,8 @@ function beginPanelResize() {
   const panel = panelElement();
   const stage = stageElement();
   if (!panel || !stage || panelDrag) return;
+  // A pending window-resize check must not re-anchor the page in the middle of this drag.
+  clearTimeout(resizeTimer);
   panelDrag = {
     panel,
     stage,
@@ -2181,7 +2193,7 @@ function applyPanelResize() {
     const stageBox = stage.getBoundingClientRect();
     applyDisplayScale(scale, {
       x: stageBox.left + stage.clientWidth / 2,
-      y: stageBox.top + stage.clientHeight / 2,
+      y: stageBox.top + readingOffset(),
     });
   } else {
     stage.scrollLeft = Math.max(0, panelDrag.anchorX - stage.clientWidth / 2);
@@ -2195,9 +2207,15 @@ function finishPanelResize() {
     panelDragFrame = 0;
   }
   if (panelDrag.clientX > 0) applyPanelResize();
+
+  // Capture the reading-line anchor while the drag scale is still applied. Reflowing the base
+  // layout first and resetting the visual scale second would make the two frames disagree and
+  // produce the old release jump.
+  const anchor = readAnchor();
   const width = Math.round(panelDrag.width);
+  const finalScale = panelDrag.baseScale;
   panelDrag.panel.style.width = `${width}px`;
-  const restoreScale = panelDrag.baseScale;
+
   window.removeEventListener("pointermove", onPanelResizeMove, true);
   window.removeEventListener("pointerup", finishPanelResize, true);
   window.removeEventListener("blur", finishPanelResize, true);
@@ -2205,11 +2223,22 @@ function finishPanelResize() {
   document.documentElement.classList.remove("resizing");
   panelDrag = null;
 
-  // The continuous visual scale is replaced by the new base layout at the same visual size.
-  setDisplayScale(restoreScale);
-  targetScale = restoreScale;
+  // Reflow the fit-width base layout to the final stage width, then put the same PDF point back
+  // on the reading line at the restored zoom. The order matters: the anchor is in base-layout
+  // coordinates, so it survives both the reflow and the scale reset.
+  const reflowed = measureBaseLayout(false);
+  setDisplayScale(finalScale);
+  targetScale = finalScale;
   updateScalerSize();
-  runResizeCheck();
+  scrollToAnchor(anchor);
+  centerAtRest();
+  reportZoom(true);
+
+  if (reflowed) {
+    updateWindow(true).catch(() => {});
+  } else {
+    scheduleUpdate(false);
+  }
   window.__pdfscopePanelResized?.(width);
   return width;
 }

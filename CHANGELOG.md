@@ -128,6 +128,11 @@ minor releases may contain breaking changes; they are always called out.
 - The panel keeps the conversation: finished exchanges stay on screen and the last four are sent with
   the next question so pronouns resolve.
 
+### Fixed
+
+- Dragging the AI panel now keeps the reading-line anchor through both the drag and the final base
+  reflow; releasing the pointer no longer jumps and repeated drags no longer drift vertically.
+
 ### Added
 
 - The page-scope segment is back to its pre-tile appearance (pale lilac trough, white active tile) and uses the newly redrawn PDF/page/reference artwork; the icons keep native proportions.
