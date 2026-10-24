@@ -16,7 +16,7 @@ pub(crate) struct Selection {
 }
 
 /// A rectangle the reader captured, as a PNG data URL.
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub(crate) struct Region {
     pub(crate) id: u64,
     pub(crate) page: u32,
@@ -25,7 +25,7 @@ pub(crate) struct Region {
 }
 
 /// A passage the reader added to the tray.
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub(crate) struct Passage {
     pub(crate) id: u64,
     pub(crate) page: u32,
@@ -40,7 +40,7 @@ pub(crate) struct Passage {
 }
 
 /// A previous assistant answer, quoted as context.
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub(crate) struct AnswerRef {
     pub(crate) id: u64,
     pub(crate) label: String,

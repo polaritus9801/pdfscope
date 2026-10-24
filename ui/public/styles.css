@@ -4353,3 +4353,50 @@ body.panel-dragging .panel-resize::after {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
 }
+
+/* One compact reference line above a question bubble; the full list is the native title tooltip. */
+.question-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;  /* size */
+  max-width: 86%;
+  min-width: 0;
+}
+
+.question-stack .turn-question {
+  max-width: 100%;
+}
+
+.question-refs-line {
+  display: flex;
+  align-items: center;
+  gap: 4px;  /* size */
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--ink-muted);
+  white-space: nowrap;
+}
+
+.question-refs-icon {
+  display: flex;
+  flex: none;
+  color: var(--ink-faint);
+}
+
+.question-refs-icon svg {
+  width: 13px;  /* size */
+  height: 13px;  /* size */
+}
+
+.question-ref {
+  flex: none;
+  padding: 1px 5px;  /* size */
+  overflow: hidden;
+  font-size: 10px;  /* size */
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+}

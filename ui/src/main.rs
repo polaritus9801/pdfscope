@@ -1895,6 +1895,7 @@ fn App() -> impl IntoView {
                     provider_preset=provider_preset
                     answers=answers
                     next_answer=next_answer
+                    next_ref=next_ref
                     document_key=file_name
                 />
                 </div>

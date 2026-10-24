@@ -224,6 +224,108 @@ struct Source {
 }
 
 /// One finished exchange.
+#[derive(Clone, PartialEq, serde::Serialize, serde::Deserialize, Default)]
+struct TurnContext {
+    #[serde(default)]
+    passages: Vec<Passage>,
+    #[serde(default)]
+    regions: Vec<Region>,
+    #[serde(default)]
+    pages: Vec<u32>,
+    #[serde(default)]
+    answers: Vec<crate::AnswerRef>,
+    #[serde(default)]
+    images: Vec<UserImage>,
+    #[serde(default)]
+    files: Vec<UserFile>,
+    #[serde(default)]
+    web: bool,
+    #[serde(default)]
+    scope_mode: u8,
+    #[serde(default)]
+    page: u32,
+}
+
+impl TurnContext {
+    fn count(&self) -> usize {
+        self.passages.len()
+            + self.regions.len()
+            + self.pages.len()
+            + self.answers.len()
+            + self.images.len()
+            + self.files.len()
+            + usize::from(self.web)
+    }
+
+    fn labels(&self) -> Vec<String> {
+        let mut labels = Vec::new();
+        labels.extend(
+            self.passages
+                .iter()
+                .map(|passage| format!("p.{}", passage.page)),
+        );
+        labels.extend(
+            self.regions
+                .iter()
+                .map(|region| format!("图 p.{}", region.page)),
+        );
+        let mut pages = self.pages.clone();
+        pages.sort_unstable();
+        pages.dedup();
+        let mut index = 0;
+        while index < pages.len() {
+            let start = pages[index];
+            let mut end = start;
+            while index + 1 < pages.len() && pages[index + 1] == end + 1 {
+                index += 1;
+                end = pages[index];
+            }
+            labels.push(if start == end {
+                format!("p.{start}")
+            } else {
+                format!("p.{start}–{end}")
+            });
+            index += 1;
+        }
+        labels.extend(self.answers.iter().map(|answer| answer.label.clone()));
+        labels.extend(
+            self.images
+                .iter()
+                .map(|image| format!("图片 {}", image.name)),
+        );
+        labels.extend(self.files.iter().map(|file| format!("文件 {}", file.name)));
+        if self.web {
+            labels.push("联网搜索".to_owned());
+        }
+        labels
+    }
+}
+
+/// A compact, one-line reference summary above a question bubble. The full list lives in the
+/// native title so the summary never grows beyond three chips.
+fn reference_line(context: &TurnContext) -> Option<AnyView> {
+    let labels = context.labels();
+    if labels.is_empty() {
+        return None;
+    }
+    let title = format!("{} 项引用：{}", context.count(), labels.join(" · "));
+    let chips: Vec<String> = labels.iter().take(3).cloned().collect();
+    let more = labels.len().saturating_sub(chips.len());
+    Some(
+        view! {
+            <div class="question-refs-line" title=title>
+                <span class="question-refs-icon">{paperclip()}</span>
+                {chips
+                    .into_iter()
+                    .map(|label| view! { <span class="question-ref">{label}</span> })
+                    .collect_view()}
+                {(more > 0).then(|| view! { <span class="question-ref">"+" {more}</span> })}
+            </div>
+        }
+        .into_any(),
+    )
+}
+
 #[derive(Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub(crate) struct Turn {
     question: String,
@@ -238,6 +340,9 @@ pub(crate) struct Turn {
     /// The model that produced this answer, when known.
     #[serde(default)]
     model: Option<String>,
+    /// Everything that was attached to this question, kept for the reference summary and edit-resend.
+    #[serde(default)]
+    context: TurnContext,
 }
 
 /// A half-finished answer saved while streaming, used for crash recovery.
@@ -374,7 +479,7 @@ fn ensure_tree(conversation: &mut Conversation) {
 }
 
 /// A text file the reader attached to a question.
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 struct UserFile {
     id: u64,
     name: String,
@@ -382,7 +487,7 @@ struct UserFile {
 }
 
 /// An image the reader attached to a question.
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 struct UserImage {
     id: u64,
     name: String,
@@ -417,6 +522,7 @@ pub fn AiPanel(
     provider_preset: RwSignal<String>,
     answers: RwSignal<Vec<crate::AnswerRef>>,
     next_answer: RwSignal<u64>,
+    next_ref: RwSignal<u64>,
     document_key: RwSignal<String>,
 ) -> impl IntoView {
     let model = RwSignal::new("未配置".to_owned());
@@ -425,6 +531,7 @@ pub fn AiPanel(
     let tree = RwSignal::new(ConversationTree::default());
     let pending_branch = RwSignal::new(Option::<Option<u64>>::None);
     let current_question = RwSignal::new(String::new());
+    let current_context = RwSignal::new(TurnContext::default());
     let interrupted = RwSignal::new(false);
     let continue_target = RwSignal::new(None::<usize>);
     let reasoning = RwSignal::new(String::new());
@@ -536,6 +643,56 @@ pub fn AiPanel(
         }
     };
 
+    let capture_context = move || TurnContext {
+        passages: passages.get_untracked(),
+        regions: regions.get_untracked(),
+        pages: page_set.get_untracked(),
+        answers: answers.get_untracked(),
+        images: images.get_untracked(),
+        files: files.get_untracked(),
+        web: web.get_untracked(),
+        scope_mode: scope_mode.get_untracked(),
+        page: page.get_untracked(),
+    };
+
+    let restore_context = move |context: &TurnContext| {
+        passages.set(context.passages.clone());
+        regions.set(context.regions.clone());
+        page_set.set(context.pages.clone());
+        answers.set(context.answers.clone());
+        images.set(context.images.clone());
+        files.set(context.files.clone());
+        web.set(context.web);
+        scope_mode.set(context.scope_mode.min(2));
+        if context.scope_mode == 1 && context.page > 0 {
+            page.set(context.page);
+        }
+        let max_ref = context
+            .passages
+            .iter()
+            .map(|entry| entry.id)
+            .chain(context.regions.iter().map(|entry| entry.id))
+            .max()
+            .unwrap_or(0);
+        next_ref.set(max_ref + 1);
+        let max_answer = context
+            .answers
+            .iter()
+            .map(|answer| answer.id)
+            .max()
+            .unwrap_or(0);
+        next_answer.set(max_answer + 1);
+        let max_image = context
+            .images
+            .iter()
+            .map(|image| image.id)
+            .max()
+            .unwrap_or(0);
+        next_image.set(max_image + 1);
+        let max_file = context.files.iter().map(|file| file.id).max().unwrap_or(0);
+        next_file.set(max_file + 1);
+    };
+
     // A finished turn is archived here rather than on the next send: an answer that ends empty
     // (reasoning consumed the budget) must still leave a trace instead of vanishing.
     let archive = move || {
@@ -579,6 +736,7 @@ pub fn AiPanel(
             interrupted: interrupted.get(),
             sources: sources.get(),
             model: session_model.get(),
+            context: current_context.get_untracked(),
         };
         let mut tree_now = tree.get_untracked();
         let id = tree_now.next_id.max(1);
@@ -811,6 +969,7 @@ pub fn AiPanel(
                 interrupted: true,
                 sources: Vec::new(),
                 model: None,
+                context: TurnContext::default(),
             });
         });
         notify.run("已恢复上次被打断的回答".to_owned());
@@ -1618,6 +1777,7 @@ pub fn AiPanel(
         } else {
             pending_branch.set(None);
         }
+        current_context.set(capture_context());
         last_asked.set(text.clone());
         send_text(text);
         // Only a request that really started should clear the field; an early return (not
@@ -1651,6 +1811,7 @@ pub fn AiPanel(
             .get(index)
             .and_then(|id| tree_now.nodes.iter().find(|node| node.id == *id))
             .and_then(|node| node.parent);
+        current_context.set(turn.context.clone());
         pending_branch.set(Some(parent));
         editing.set(None);
         send_text(turn.question);
@@ -2487,7 +2648,7 @@ pub fn AiPanel(
                                 </div>
                             }
                                 .into_any()
-                        } else if turns.get().is_empty() && answer.get().is_empty() && !streaming.get() {
+                        } else if turns.get().is_empty() && !streaming.get() && current_question.get().is_empty() {
                             view! {
                                 <div class="empty-state">
                                     {provider_tile(provider_preset.get(), 40)}
@@ -2688,6 +2849,8 @@ pub fn AiPanel(
                                                         }
                                                     })
                                                 };
+                                                let edit_context = turn.context.clone();
+                                                let refs = reference_line(&turn.context);
                                                 let edit = icon_action(
                                                     "edit",
                                                     "编辑这个问题并重发",
@@ -2695,6 +2858,7 @@ pub fn AiPanel(
                                                         if streaming.get() {
                                                             return;
                                                         }
+                                                        restore_context(&edit_context);
                                                         editing.set(Some(index));
                                                         let _ = composer(
                                                             "setPlainText",
@@ -2762,7 +2926,10 @@ pub fn AiPanel(
                                                 view! {
                                                     <div class="turn">
                                                         <div class="question-row">
-                                                            <p class="turn-question">{turn.question.clone()}</p>
+                                                            <div class="question-stack">
+                                                                {refs}
+                                                                <p class="turn-question">{turn.question.clone()}</p>
+                                                            </div>
                                                         </div>
                                                         <div class="answer-block">
                                                         <div class="answer-head">
@@ -2849,10 +3016,13 @@ pub fn AiPanel(
                                                     .into_any()
                                             }
                                         };
+                                        let refs = reference_line(&current_context.get());
                                         view! {
                                             <div class="turn current" class:is-streaming=move || streaming.get()>
                                                 <div class="question-row">
-                                                    <p class="turn-question">
+                                                    <div class="question-stack">
+                                                        {refs}
+                                                        <p class="turn-question">
                                                         {move || {
                                                             if continue_target.get().is_some() {
                                                                 "继续生成…".to_owned()
@@ -2860,7 +3030,8 @@ pub fn AiPanel(
                                                                 current_question.get()
                                                             }
                                                         }}
-                                                    </p>
+                                                        </p>
+                                                    </div>
                                                 </div>
                                                 <div class="answer-block">
                                                 <div class="answer-identity">
@@ -2885,18 +3056,22 @@ pub fn AiPanel(
                                                 <div
                                                     class="answer-text markdown"
                                                     aria-live="polite"
-                                                    inner_html=move || pdfscope_core::to_html(&answer.get())
+                                                    inner_html=move || {
+                                                        pdfscope_core::to_html(&answer.get())
+                                                    }
                                                 ></div>
-                                                <div class="turn-actions">
-                                                    {icon_action(
-                                                        "copy",
-                                                        "复制",
-                                                        move |_event: web_sys::MouseEvent| {
-                                                            copy_to_clipboard(&answer.get());
-                                                            notify.run("已复制".to_owned());
-                                                        },
-                                                    )}
-                                                </div>
+                                                <Show when=move || !streaming.get()>
+                                                    <div class="turn-actions">
+                                                        {icon_action(
+                                                            "copy",
+                                                            "复制",
+                                                            move |_event: web_sys::MouseEvent| {
+                                                                copy_to_clipboard(&answer.get());
+                                                                notify.run("已复制".to_owned());
+                                                            },
+                                                        )}
+                                                    </div>
+                                                </Show>
                                                 </div>
                                             </div>
                                         }

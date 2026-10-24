@@ -128,6 +128,14 @@ minor releases may contain breaking changes; they are always called out.
 - The panel keeps the conversation: finished exchanges stay on screen and the last four are sent with
   the next question so pronouns resolve.
 
+### Fixed
+
+- The first answer no longer flashes per token: the empty-state branch no longer reads the streaming
+  answer, so tokens cannot rebuild the transcript. Markdown and `[p.N]` citations still render
+  incrementally; copy is hidden until completion/stop.
+- Each question records its full reference context in the conversation tree. A compact one-line chip
+  summary sits above the question bubble, and edit/resend restores the original references.
+
 ### Added
 
 - The empty reader is a floating OOBE overlay above the whole app (dimmed blurred backdrop, centred
