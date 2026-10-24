@@ -135,7 +135,8 @@ minor releases may contain breaking changes; they are always called out.
 - Every answer can regenerate; each user bubble carries a chrome-free branch switch and an icon-only
   edit, with the caret at the end.
 - History gains a copy icon and a trash delete; the branch-to-new-chat and copy-with-citations actions
-  are removed. The attachment control uses the supplied 16 px SVG and the three tool icons align.
+  are removed. The attachment control uses the supplied SVG, the three tool icons are optically
+  matched, the model name fills its row before the branch controls, and panel scrollbars are 4 px.
 - Editing/regenerating creates a sibling in a persisted conversation tree. Each user bubble has an
   icon-only edit and, when needed, a `< n / total >` switch for that node's alternatives; old branches
   remain reachable. Duplicated answer durations are gone.

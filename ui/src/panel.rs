@@ -3642,7 +3642,7 @@ pub fn AiPanel(
                     ></div>
                     <div class="composer-toolbar">
                         <button
-                            class="icon-button"
+                            class="icon-button tool-at"
                             title="插入引用（输入 @）"
                             on:click=move |_| {
                                 mention_open.set(true);
@@ -3652,7 +3652,7 @@ pub fn AiPanel(
                             {icon("at", 16)}
                         </button>
                         <button
-                            class="icon-button attach-button"
+                            class="icon-button attach-button tool-search"
                             class:active=move || web.get()
                             title="联网搜索（需要 Tavily Key）"
                             on:click=move |_| web.update(|on| *on = !*on)
@@ -3662,7 +3662,7 @@ pub fn AiPanel(
                                 <path d="M3.5 12h17M12 3.5c2.4 2.3 3.6 5.1 3.6 8.5s-1.2 6.2-3.6 8.5c-2.4-2.3-3.6-5.1-3.6-8.5S9.6 5.8 12 3.5z" />
                             </svg>
                         </button>
-                        <label class="icon-button attach-button" title="附加图片、PDF、Office 或文本/代码文件">
+                        <label class="icon-button attach-button tool-attach" title="附加图片、PDF、Office 或文本/代码文件">
     {paperclip()}
                             <input
                                 id="attach-input"

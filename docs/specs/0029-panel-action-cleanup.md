@@ -23,9 +23,10 @@
 
 ## Composer
 
-- The attachment control uses the supplied 16 px paperclip SVG (`viewBox="0 0 16 16"`).
-- Quote/at, search/globe and attachment share a 16 × 16 optical box, so their top and bottom edges
-  align inside the 28 px buttons.
+- The attachment control uses the supplied paperclip SVG (`viewBox="0 0 16 16"`).
+- The three tools are optically matched: the 24-grid at glyph renders at 18 px, the globe at 20 px,
+  and the 16-grid paperclip at 16 px. Their visual bounds are all about 15 px and their centres share
+  the 28 px button's centre, so the top and bottom edges align.
 - Editing recalls a question with the caret at the end (set synchronously and again on the next frame,
   because WebKit restores its old caret after focus).
 
@@ -33,7 +34,9 @@
 
 - Thinking timer visibly advances during reasoning, stops at the first answer token, and the collapsed
   pill is compact.
-- Branch/edit controls align with the model name; arrows have no grey background.
+- Branch/edit controls align with the model name; the name stretches until the branch controls and
+  only then truncates; arrows have no grey background.
+- Panel scroll surfaces use a 4 px scrollbar in both axes.
 - History has a copy icon and a trash delete; no branch-to-new-chat action remains.
 - Regenerate exists on every answer and creates a sibling.
 - Paperclip is the 16 px supplied path; the three tool icons align.

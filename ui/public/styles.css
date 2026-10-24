@@ -3304,7 +3304,9 @@ body.selection-quiet .textLayer :is(span, br)::selection {
 
 .answer-identity {
   display: flex;
+  flex: 1;
   align-items: center;
+  min-width: 0;
   gap: 6px;  /* size */
   min-height: 22px;  /* size */
   color: var(--ink-muted);
@@ -3312,11 +3314,17 @@ body.selection-quiet .textLayer :is(span, br)::selection {
 }
 
 .answer-model {
-  max-width: 60%;
+  flex: 1;
+  min-width: 0;
+  max-width: none;
   overflow: hidden;
   font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.answer-head .question-actions {
+  flex: none;
 }
 
 
@@ -3991,9 +3999,41 @@ body.panel-dragging .panel-resize::after {
 }
 
 
-/* Quote, search and attachment share one 16 px optical box. */
-.composer-toolbar .icon-button > svg {
+/* Match optical bounds: the 24-grid glyphs need twenty pixels, the 16-grid paperclip sixteen. */
+.composer-toolbar .tool-at > svg {
+  display: block;
+  width: 18px;  /* size */
+  height: 18px;  /* size */
+}
+
+.composer-toolbar .tool-search > svg {
+  display: block;
+  width: 20px;  /* size */
+  height: 20px;  /* size */
+}
+
+.composer-toolbar .tool-attach > svg {
   display: block;
   width: 16px;  /* size */
   height: 16px;  /* size */
+}
+
+
+/* Every scroll surface inside the AI panel gets the same quiet four-pixel scrollbar. */
+.panel *::-webkit-scrollbar {
+  width: 4px;  /* size */
+  height: 4px;  /* size */
+}
+
+.panel *::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.panel *::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 999px;  /* size */
+}
+
+.panel * {
+  scrollbar-width: thin;
 }
