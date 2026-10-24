@@ -178,6 +178,25 @@ function clamp(value, minimum, maximum) {
 
 let thumbnailObserver = null;
 const thumbnailCache = new Map();
+const referencePreviewCache = new Map();
+
+async function renderReferencePage(number, width) {
+  if (!document_) return "";
+  const key = `${number}:${width}`;
+  const cached = referencePreviewCache.get(key);
+  if (cached) return cached;
+  const page = await document_.getPage(number);
+  const base = page.getViewport({ scale: 1 });
+  const viewport = page.getViewport({ scale: (width * 2) / base.width });
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.ceil(viewport.width));
+  canvas.height = Math.max(1, Math.ceil(viewport.height));
+  await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+  const url = canvas.toDataURL("image/png");
+  referencePreviewCache.set(key, url);
+  return url;
+}
+
 
 async function renderThumbnail(element) {
   const number = Number(element.dataset.page);
@@ -2448,14 +2467,19 @@ async function showPreview(row) {
       figure.append(image, caption);
       strip.append(figure);
     }
+    let more = null;
     if (data.total > data.pages.length) {
-      const more = document.createElement("span");
+      more = document.createElement("span");
       more.className = "oobe-preview-more";
       more.textContent = `+${data.total - data.pages.length}`;
       strip.append(more);
     }
     bubble.append(strip);
     document.body.append(bubble);
+    if (more) {
+      const lastPage = strip.querySelector(".oobe-preview-page:last-of-type");
+      if (lastPage) more.style.height = `${lastPage.getBoundingClientRect().height}px`;
+    }
     previewElement = bubble;
     positionPreview(row, bubble);
     requestAnimationFrame(() => {
@@ -2499,6 +2523,91 @@ function initOobePreview() {
 function panelElement() {
   return document.querySelector(".panel");
 }
+// ── Finder drops ─────────────────────────────────────────────────────────────────────────────
+//
+// Files dropped on the reader open as PDFs; files dropped on the AI panel go through the same
+// attachment input as the paperclip button. Tauri's native drag-drop interception is disabled so the
+// webview receives real File objects.
+
+function hasFileDrop(event) {
+  const types = event.dataTransfer?.types;
+  return types ? Array.from(types).includes("Files") : false;
+}
+
+function dropNotice(message) {
+  document.querySelector(".app-drop-notice")?.remove();
+  const notice = document.createElement("div");
+  notice.className = "app-drop-notice";
+  notice.textContent = message;
+  document.body.append(notice);
+  window.setTimeout(() => notice.remove(), 3200);
+}
+
+function dropTargets() {
+  return [...document.querySelectorAll(".stage.drop-active, .panel.drop-active")];
+}
+
+function clearDropTargets() {
+  for (const element of dropTargets()) element.classList.remove("drop-active");
+}
+
+function isPdfFile(file) {
+  return file.name.toLowerCase().endsWith(".pdf") || file.type === "application/pdf";
+}
+
+function openDroppedPdf(file) {
+  const input = document.getElementById("file-input");
+  if (!input) return false;
+  const transfer = new DataTransfer();
+  transfer.items.add(file);
+  input.value = "";
+  input.files = transfer.files;
+  input.dispatchEvent(new Event("change", { bubbles: true }));
+  return true;
+}
+
+function initFileDrops() {
+  document.addEventListener("dragover", (event) => {
+    if (!hasFileDrop(event)) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+    clearDropTargets();
+    const target = event.target instanceof Element ? event.target : null;
+    const panel = target?.closest(".panel");
+    const stage = target?.closest(".stage");
+    if (panel) panel.classList.add("drop-active");
+    else if (stage) stage.classList.add("drop-active");
+  });
+
+  document.addEventListener("dragleave", (event) => {
+    if (event.relatedTarget === null) clearDropTargets();
+  });
+
+  document.addEventListener("drop", (event) => {
+    if (!hasFileDrop(event)) return;
+    event.preventDefault();
+    clearDropTargets();
+    const files = [...(event.dataTransfer?.files ?? [])];
+    if (files.length === 0) return;
+    const target = event.target instanceof Element ? event.target : null;
+    if (target?.closest(".panel")) {
+      window.Composer?.attachFiles?.(files);
+      return;
+    }
+    if (target?.closest(".stage")) {
+      const pdf = files.find(isPdfFile);
+      if (!pdf) {
+        dropNotice("阅读器只支持打开 PDF；其他文件请拖到右侧 AI 面板");
+        return;
+      }
+      openDroppedPdf(pdf);
+      return;
+    }
+    dropNotice("把 PDF 拖到左侧阅读器，或把附件拖到右侧 AI 面板");
+  });
+}
+
+
 
 let panelDrag = null;
 let panelDragFrame = 0;
@@ -2726,6 +2835,17 @@ window.PDFScope = {
     input.files = transfer.files;
     input.dispatchEvent(new Event("change", { bubbles: true }));
     return true;
+  },
+
+  /// A small page image for a reference whose page is outside the reader's viewport.
+  async previewPage(number, width = 180) {
+    if (!document_) return "";
+    const page = Math.max(1, Math.min(Number(number) || 1, document_.numPages));
+    try {
+      return await renderReferencePage(page, width);
+    } catch {
+      return "";
+    }
   },
 
   /// `single` shows one page at a time; anything else keeps the continuous column.
@@ -3281,3 +3401,82 @@ function stopZoom() {
 }
 
 initOobePreview();
+
+initFileDrops();
+
+// ── Offscreen reference thumbnails ─────────────────────────────────────────────────────────────
+//
+// Hovering a page-bearing reference highlights the PDF through Rust. If that page is outside the
+// reader viewport, no scroll happens (by design), so show a small page image next to the popover.
+
+let refPreviewElement = null;
+let refPreviewTimer = 0;
+let refPreviewToken = 0;
+
+function hideReferencePreview() {
+  if (refPreviewTimer) {
+    clearTimeout(refPreviewTimer);
+    refPreviewTimer = 0;
+  }
+  refPreviewToken += 1;
+  refPreviewElement?.remove();
+  refPreviewElement = null;
+}
+
+function referencePageVisible(number) {
+  const page = document.querySelector(`.page[data-page="${number}"]`);
+  const stage = document.querySelector(".stage");
+  if (!page || !stage) return false;
+  const pageBox = page.getBoundingClientRect();
+  const stageBox = stage.getBoundingClientRect();
+  return pageBox.bottom > stageBox.top && pageBox.top < stageBox.bottom;
+}
+
+async function showReferencePreview(row, number) {
+  const token = refPreviewToken;
+  const url = await window.PDFScope?.previewPage?.(number, 180);
+  if (!url || token !== refPreviewToken || !row.matches(":hover")) return;
+  const box = document.createElement("div");
+  box.className = "ref-page-preview";
+  box.title = `第 ${number} 页`;
+  const image = document.createElement("img");
+  image.src = url;
+  image.alt = `第 ${number} 页`;
+  box.append(image);
+  document.body.append(box);
+  refPreviewElement = box;
+  const target = row.getBoundingClientRect();
+  const left = target.left - box.offsetWidth - 10;
+  box.style.left = `${Math.max(8, left)}px`;
+  box.style.top = `${Math.max(8, Math.min(target.top, window.innerHeight - box.offsetHeight - 8))}px`;
+  if (left < 8) box.style.left = `${Math.min(window.innerWidth - box.offsetWidth - 8, target.right + 10)}px`;
+}
+
+function initReferencePreviews() {
+  document.addEventListener("pointerover", (event) => {
+    const row = event.target instanceof Element ? event.target.closest(".refs-row[data-ref-page]") : null;
+    if (!row) return;
+    hideReferencePreview();
+    const number = Number(row.dataset.refPage);
+    if (!number || referencePageVisible(number)) return;
+    const token = refPreviewToken;
+    refPreviewTimer = window.setTimeout(() => {
+      refPreviewTimer = 0;
+      if (token === refPreviewToken) showReferencePreview(row, number);
+    }, 120);
+  });
+  document.addEventListener("pointerout", (event) => {
+    const row = event.target instanceof Element ? event.target.closest(".refs-row[data-ref-page]") : null;
+    if (!row) return;
+    if (event.relatedTarget instanceof Node && row.contains(event.relatedTarget)) return;
+    hideReferencePreview();
+  });
+  document.addEventListener("scroll", hideReferencePreview, true);
+  document.addEventListener("click", hideReferencePreview, true);
+  window.addEventListener("resize", hideReferencePreview);
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") hideReferencePreview();
+  });
+}
+
+initReferencePreviews();

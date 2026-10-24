@@ -111,6 +111,10 @@ request is refused above the cap rather than truncated.
   provider may still bill for a few more tokens.
 - Answer tokens are coalesced into one reactive update per 50 ms. The answer re-parses citations on
   every change, so per-token updates were quadratic in the answer length.
+- The three scope modes only decide which **extra page bulk** is sent: all pages, the current page, or
+  no extra pages. Every mode still sends the reader's active references, including explicit page
+  references; current-page scope unions the current page with those page references.
+- The only-references scope sends the explicitly selected pages, not an empty page list.
 - `⌘↵` sends and `Esc` stops, handled on the composer rather than globally so they never fight the
   page's own shortcuts.
 - The coalescing buffer is flushed before `done`, `stopped` or `error`, so the last fragment never

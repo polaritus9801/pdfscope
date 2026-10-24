@@ -30,6 +30,7 @@ Inside that floating panel is a single surface with one internal vertical rule:
   above the backdrop.
 - Hovering a row for 600 ms renders a one-row preview bubble above it: up to the number of page
   thumbnails that fit in 780px (at most 12), each numbered, with a `+N` tile for longer documents.
+  The `+N` tile takes the measured height of the last displayed page thumbnail.
   Recent previews read IndexedDB bytes; recommended previews read the native path. Previews are
   cached briefly, cancel on leave/scroll/resize/Escape, and fail silently if the file moved.
 

@@ -160,6 +160,16 @@ function insertToken(key, label) {
   emit();
 }
 
+function attachFiles(files) {
+  const input = document.getElementById("attach-input");
+  if (!input || !files?.length) return false;
+  const transfer = new DataTransfer();
+  for (const file of files) transfer.items.add(file);
+  input.files = transfer.files;
+  input.dispatchEvent(new Event("change", { bubbles: true }));
+  return true;
+}
+
 window.Composer = {
   init(element, callback) {
     root = element;
@@ -170,8 +180,15 @@ window.Composer = {
       checkMention();
     });
     root.addEventListener("paste", (event) => {
+      const clipboard = event.clipboardData;
+      const files = [...(clipboard?.files ?? [])];
+      if (files.length > 0) {
+        event.preventDefault();
+        attachFiles(files);
+        return;
+      }
       event.preventDefault();
-      const text = event.clipboardData?.getData("text/plain") ?? "";
+      const text = clipboard?.getData("text/plain") ?? "";
       insertText(text);
     });
     root.addEventListener("blur", () => {
@@ -204,6 +221,8 @@ window.Composer = {
     root.replaceChildren();
     if (!silent) emit();
   },
+
+  attachFiles,
 
   removeToken(key) {
     if (!root) return;

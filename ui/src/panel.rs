@@ -13,6 +13,46 @@ use crate::scope_ui::PageManager;
 use crate::settings::SettingsSheet;
 use crate::{Passage, Region, truncate};
 
+/// Times are browser-local. Today is HH:MM, another day this year is MM-DD, and an older
+/// day includes the year. Returns empty for legacy turns without a timestamp.
+fn format_moment(timestamp: f64) -> String {
+    if !timestamp.is_finite() || timestamp <= 0.0 {
+        return String::new();
+    }
+    let date = js_sys::Date::new(&JsValue::from_f64(timestamp));
+    let now = js_sys::Date::new_0();
+    if date.get_full_year() == now.get_full_year()
+        && date.get_month() == now.get_month()
+        && date.get_date() == now.get_date()
+    {
+        format!("{:02}:{:02}", date.get_hours(), date.get_minutes())
+    } else if date.get_full_year() == now.get_full_year() {
+        format!("{:02}-{:02}", date.get_month() + 1, date.get_date())
+    } else {
+        format!(
+            "{}-{:02}-{:02}",
+            date.get_full_year(),
+            date.get_month() + 1,
+            date.get_date()
+        )
+    }
+}
+
+fn format_moment_full(timestamp: f64) -> String {
+    if !timestamp.is_finite() || timestamp <= 0.0 {
+        return String::new();
+    }
+    let date = js_sys::Date::new(&JsValue::from_f64(timestamp));
+    format!(
+        "{}-{:02}-{:02} {:02}:{:02}",
+        date.get_full_year(),
+        date.get_month() + 1,
+        date.get_date(),
+        date.get_hours(),
+        date.get_minutes()
+    )
+}
+
 /// Consecutive page numbers collapsed into inclusive ranges.
 fn page_ranges(pages: &[u32]) -> Vec<(u32, u32)> {
     let mut ranges: Vec<(u32, u32)> = Vec::new();
@@ -301,25 +341,222 @@ impl TurnContext {
     }
 }
 
-/// A paperclip/count capsule to the left of a question bubble, with the full list in the title.
-fn reference_badge(context: &TurnContext) -> Option<AnyView> {
+/// Which question owns the open reference popover. There is only one at a time.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RefTarget {
+    Current,
+    Turn(usize),
+}
+
+/// One shared activation path for reference rows and the input's reference chips.
+#[derive(Clone, Copy)]
+struct ReferenceActions {
+    passage: Callback<Passage>,
+    region: Callback<Region>,
+    page: Callback<u32>,
+    answer: Callback<crate::AnswerRef>,
+    image: Callback<UserImage>,
+    file: Callback<UserFile>,
+    web: Callback<()>,
+    hover: Callback<Option<(u32, (f64, f64, f64, f64))>>,
+}
+
+/// The paperclip/count capsule and its reference popover. Clicking a row keeps the popover open and
+/// runs the same callbacks that clicking an active input reference uses.
+fn reference_capsule(
+    context: &TurnContext,
+    target: RefTarget,
+    open_refs: RwSignal<Option<RefTarget>>,
+    actions: ReferenceActions,
+) -> Option<AnyView> {
     let count = context.count();
     if count == 0 {
         return None;
     }
     let labels = context.labels();
     let title = format!("{count} 项引用：{}", labels.join(" · "));
+    let open = open_refs.get() == Some(target);
+    let popover = open.then(|| {
+        let mut rows: Vec<AnyView> = Vec::new();
+        for passage in context.passages.iter().cloned() {
+            let page = passage.page;
+            let rect = passage.rect;
+            let hover = actions;
+            let click = actions;
+            let quote = passage.quote.clone();
+            rows.push(
+                view! {
+                    <button
+                        type="button"
+                        class="refs-row"
+                        data-ref-page=page
+                        on:mouseenter=move |_| hover.hover.run(Some((page, rect)))
+                        on:mouseleave=move |_| hover.hover.run(None)
+                        on:click=move |_| click.passage.run(passage.clone())
+                    >
+                        <span class="refs-kind">{icon("quote", 12)}</span>
+                        <span class="refs-label">{truncate(&quote, 52)}</span>
+                        <span class="refs-meta">{format!("p.{page}")}</span>
+                    </button>
+                }
+                .into_any(),
+            );
+        }
+        for region in context.regions.iter().cloned() {
+            let page = region.page;
+            let rect = region.rect;
+            let hover = actions;
+            let click = actions;
+            rows.push(
+                view! {
+                    <button
+                        type="button"
+                        class="refs-row"
+                        data-ref-page=page
+                        on:mouseenter=move |_| hover.hover.run(Some((page, rect)))
+                        on:mouseleave=move |_| hover.hover.run(None)
+                        on:click=move |_| click.region.run(region.clone())
+                    >
+                        <span class="refs-kind">{icon("image", 12)}</span>
+                        <span class="refs-label">"截图"</span>
+                        <span class="refs-meta">{format!("p.{page}")}</span>
+                    </button>
+                }
+                .into_any(),
+            );
+        }
+        for page in context.pages.iter().copied() {
+            let hover = actions;
+            let click = actions;
+            rows.push(
+                view! {
+                    <button
+                        type="button"
+                        class="refs-row"
+                        data-ref-page=page
+                        on:mouseenter=move |_| hover.hover.run(Some((page, (0.0, 0.0, 1.0, 1.0))))
+                        on:mouseleave=move |_| hover.hover.run(None)
+                        on:click=move |_| click.page.run(page)
+                    >
+                        <span class="refs-kind">{icon("page", 12)}</span>
+                        <span class="refs-label">"页面"</span>
+                        <span class="refs-meta">{format!("p.{page}")}</span>
+                    </button>
+                }
+                .into_any(),
+            );
+        }
+        for answer in context.answers.iter().cloned() {
+            let click = actions;
+            let quote = answer.quote.clone();
+            let label = answer.label.clone();
+            rows.push(
+                view! {
+                    <button
+                        type="button"
+                        class="refs-row"
+                        on:click=move |_| click.answer.run(answer.clone())
+                    >
+                        <span class="refs-kind">{icon("sparkle", 12)}</span>
+                        <span class="refs-label">{truncate(&quote, 52)}</span>
+                        <span class="refs-meta">{label}</span>
+                    </button>
+                }
+                .into_any(),
+            );
+        }
+        for image in context.images.iter().cloned() {
+            let click = actions;
+            let name = image.name.clone();
+            rows.push(
+                view! {
+                    <button
+                        type="button"
+                        class="refs-row"
+                        on:click=move |_| click.image.run(image.clone())
+                    >
+                        <span class="refs-kind">{icon("image", 12)}</span>
+                        <span class="refs-label">{truncate(&name, 52)}</span>
+                        <span class="refs-meta">"图片"</span>
+                    </button>
+                }
+                .into_any(),
+            );
+        }
+        for file in context.files.iter().cloned() {
+            let click = actions;
+            let name = file.name.clone();
+            rows.push(
+                view! {
+                    <button
+                        type="button"
+                        class="refs-row"
+                        on:click=move |_| click.file.run(file.clone())
+                    >
+                        <span class="refs-kind">{icon("file", 12)}</span>
+                        <span class="refs-label">{truncate(&name, 52)}</span>
+                        <span class="refs-meta">"文件"</span>
+                    </button>
+                }
+                .into_any(),
+            );
+        }
+        if context.web {
+            let click = actions;
+            rows.push(
+                view! {
+                    <button type="button" class="refs-row" on:click=move |_| click.web.run(())>
+                        <span class="refs-kind">{icon("globe", 12)}</span>
+                        <span class="refs-label">"联网搜索"</span>
+                    </button>
+                }
+                .into_any(),
+            );
+        }
+        let close = move |_| open_refs.set(None);
+        view! {
+            <div class="question-refs-scrim" on:click=close></div>
+            <div class="question-refs-popover" role="dialog" on:click=move |event| event.stop_propagation()>
+                <div class="question-refs-head">
+                    <span>{format!("引用 · {count}")}</span>
+                    <button
+                        type="button"
+                        class="question-refs-close"
+                        title="关闭"
+                        on:click=move |_| open_refs.set(None)
+                    >
+                        {icon("close", 12)}
+                    </button>
+                </div>
+                <div class="question-refs-list">{rows.collect_view()}</div>
+            </div>
+        }
+        .into_any()
+    });
     Some(
         view! {
-            <button
-                type="button"
-                class="question-refs-badge"
-                title=title.clone()
-                aria-label=title
-            >
-                {paperclip()}
-                <span>{count}</span>
-            </button>
+            <div class="question-refs">
+                <button
+                    type="button"
+                    class="question-refs-badge"
+                    class:open=open
+                    title=title.clone()
+                    aria-label=title
+                    on:click=move |_| {
+                        open_refs.update(|current| {
+                            *current = if *current == Some(target) {
+                                None
+                            } else {
+                                Some(target)
+                            };
+                        });
+                    }
+                >
+                    {paperclip()}
+                    <span>{count}</span>
+                </button>
+                {popover}
+            </div>
         }
         .into_any(),
     )
@@ -342,6 +579,12 @@ pub(crate) struct Turn {
     /// Everything that was attached to this question, kept for the reference summary and edit-resend.
     #[serde(default)]
     context: TurnContext,
+    /// Epoch milliseconds when the question was sent.
+    #[serde(default)]
+    asked_at: f64,
+    /// Epoch milliseconds when the answer settled (done, stop or error).
+    #[serde(default)]
+    completed_at: f64,
 }
 
 /// A half-finished answer saved while streaming, used for crash recovery.
@@ -493,13 +736,6 @@ struct UserImage {
     image: String,
 }
 
-/// A reference that was used and moved to history.
-#[derive(Clone, PartialEq)]
-enum Stored {
-    Passage(Passage),
-    Region(Region),
-}
-
 #[component]
 pub fn AiPanel(
     passages: RwSignal<Vec<Passage>>,
@@ -531,6 +767,8 @@ pub fn AiPanel(
     let pending_branch = RwSignal::new(Option::<Option<u64>>::None);
     let current_question = RwSignal::new(String::new());
     let current_context = RwSignal::new(TurnContext::default());
+    let current_asked_at = RwSignal::new(0.0_f64);
+    let open_refs = RwSignal::new(Option::<RefTarget>::None);
     let interrupted = RwSignal::new(false);
     let continue_target = RwSignal::new(None::<usize>);
     let reasoning = RwSignal::new(String::new());
@@ -570,8 +808,6 @@ pub fn AiPanel(
     let next_file = RwSignal::new(0_u64);
     let editor_ref = NodeRef::<leptos::html::Div>::new();
     let failed = RwSignal::new(false);
-    let history = RwSignal::new(Vec::<Stored>::new());
-    let show_all = RwSignal::new(false);
     let notice = RwSignal::new(Option::<String>::None);
     let collapsed = RwSignal::new(false);
     let width = RwSignal::new(380_u32);
@@ -618,6 +854,122 @@ pub fn AiPanel(
         let _ = crate::call("flash", &[JsValue::from(target)]);
     };
 
+    let activate_passage = Callback::new(move |passage: Passage| {
+        if !passages
+            .get_untracked()
+            .iter()
+            .any(|item| item.id == passage.id)
+        {
+            undo_push.run(());
+            next_ref.update(|next| *next = (*next).max(passage.id + 1));
+            passages.update(|list| list.push(passage.clone()));
+        }
+        jump(passage.page);
+    });
+    let activate_region = Callback::new(move |region: Region| {
+        if !regions
+            .get_untracked()
+            .iter()
+            .any(|item| item.id == region.id)
+        {
+            undo_push.run(());
+            next_ref.update(|next| *next = (*next).max(region.id + 1));
+            regions.update(|list| list.push(region.clone()));
+        }
+        jump(region.page);
+    });
+    let activate_page = Callback::new(move |page_number: u32| {
+        if !page_set.get_untracked().contains(&page_number) {
+            undo_push.run(());
+            page_set.update(|set| {
+                set.push(page_number);
+                set.sort_unstable();
+                set.dedup();
+            });
+        }
+        jump(page_number);
+    });
+    let activate_answer = Callback::new(move |answer: crate::AnswerRef| {
+        if !answers
+            .get_untracked()
+            .iter()
+            .any(|item| item.id == answer.id)
+        {
+            undo_push.run(());
+            let id = next_answer.get_untracked() + 1;
+            next_answer.set(id);
+            answers.update(|list| {
+                list.push(crate::AnswerRef {
+                    id,
+                    label: answer.label.clone(),
+                    quote: answer.quote.clone(),
+                });
+            });
+        }
+    });
+    let activate_image = Callback::new(move |image: UserImage| {
+        if !images
+            .get_untracked()
+            .iter()
+            .any(|item| item.id == image.id)
+        {
+            undo_push.run(());
+            let id = next_image.get_untracked() + 1;
+            next_image.set(id);
+            images.update(|list| {
+                list.push(UserImage {
+                    id,
+                    name: image.name.clone(),
+                    image: image.image.clone(),
+                });
+            });
+        }
+    });
+    let activate_file = Callback::new(move |file: UserFile| {
+        if !files
+            .get_untracked()
+            .iter()
+            .any(|item| item.name == file.name && item.text == file.text)
+        {
+            undo_push.run(());
+            let id = next_file.get_untracked() + 1;
+            next_file.set(id);
+            files.update(|list| {
+                list.push(UserFile {
+                    id,
+                    name: file.name.clone(),
+                    text: file.text.clone(),
+                });
+            });
+        }
+    });
+    let activate_web = Callback::new(move |_: ()| web.set(true));
+    let reference_actions = ReferenceActions {
+        passage: activate_passage,
+        region: activate_region,
+        page: activate_page,
+        answer: activate_answer,
+        image: activate_image,
+        file: activate_file,
+        web: activate_web,
+        hover: Callback::new(move |target| hovered.set(target)),
+    };
+
+    Effect::new(move |_| {
+        let Some(document) = web_sys::window().and_then(|window| window.document()) else {
+            return;
+        };
+        let handler =
+            Closure::<dyn Fn(web_sys::KeyboardEvent)>::new(move |event: web_sys::KeyboardEvent| {
+                if event.key() == "Escape" {
+                    open_refs.set(None);
+                }
+            });
+        let _ =
+            document.add_event_listener_with_callback("keydown", handler.as_ref().unchecked_ref());
+        handler.forget();
+    });
+
     let manager_open = RwSignal::new(false);
     let reference_count = move || {
         passages.get().len()
@@ -625,15 +977,8 @@ pub fn AiPanel(
             + page_set.get().len()
             + images.get().len()
             + files.get().len()
-    };
-
-    let redeem = move |index: usize| {
-        if let Some(entry) = history.get().get(index).cloned() {
-            match entry {
-                Stored::Passage(passage) => passages.update(|list| list.push(passage)),
-                Stored::Region(region) => regions.update(|list| list.push(region)),
-            }
-        }
+            + answers.get().len()
+            + usize::from(web.get())
     };
 
     let settle_seconds = move || {
@@ -709,6 +1054,7 @@ pub fn AiPanel(
                 if let Some(turn) = list.get_mut(index) {
                     turn.answer.push_str(&addition);
                     turn.interrupted = cut;
+                    turn.completed_at = js_sys::Date::now();
                 }
             });
             if let Some(turn) = turns.get_untracked().get(index).cloned() {
@@ -736,6 +1082,8 @@ pub fn AiPanel(
             sources: sources.get(),
             model: session_model.get(),
             context: current_context.get_untracked(),
+            asked_at: current_asked_at.get_untracked(),
+            completed_at: js_sys::Date::now(),
         };
         let mut tree_now = tree.get_untracked();
         let id = tree_now.next_id.max(1);
@@ -969,6 +1317,8 @@ pub fn AiPanel(
                 sources: Vec::new(),
                 model: None,
                 context: TurnContext::default(),
+                asked_at: 0.0,
+                completed_at: 0.0,
             });
         });
         notify.run("已恢复上次被打断的回答".to_owned());
@@ -1182,13 +1532,13 @@ pub fn AiPanel(
             });
         }
 
+        // Opening a document resumes its newest conversation, not an older pinned one. Pinning
+        // still controls the drawer's ordering.
         list.sort_by(|left, right| {
-            right.pinned.cmp(&left.pinned).then_with(|| {
-                right
-                    .updated
-                    .partial_cmp(&left.updated)
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            })
+            right
+                .updated
+                .partial_cmp(&left.updated)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
         let first = list[0].id.clone();
@@ -1204,7 +1554,6 @@ pub fn AiPanel(
         editing.set(None);
         restore_draft(&first);
         restore_partial(&first);
-        show_all.set(false);
         sync_ready.set(true);
         save_conversations();
     });
@@ -1251,6 +1600,8 @@ pub fn AiPanel(
             interrupted.set(false);
         }
         current_question.set(asked.clone());
+        current_asked_at.set(js_sys::Date::now());
+        open_refs.set(None);
         let _ = crate::call("panelSent", &[]);
         answer.set(String::new());
         reasoning.set(String::new());
@@ -1344,8 +1695,25 @@ pub fn AiPanel(
                 1 => pdfscope_core::pages::Scope::Current,
                 _ => pdfscope_core::pages::Scope::Selected,
             };
-            let (selected, wanted) =
+            let (mut selected, mut wanted) =
                 pdfscope_core::pages::request_pages(scope, total, current_page, &explicit, cap);
+            // The current-page scope adds one page of bulk context, but page references the reader
+            // explicitly added must still travel with it. Document scope already contains them.
+            if mode == 1 {
+                for page in explicit.iter().copied() {
+                    if (1..=total).contains(&page) && !selected.contains(&page) {
+                        selected.push(page);
+                    }
+                }
+                selected.sort_unstable();
+                selected.dedup();
+                wanted = selected.len();
+                if let Some(limit) = cap {
+                    if selected.len() > limit {
+                        selected.truncate(limit);
+                    }
+                }
+            }
 
             if mode == 2 && explicit.is_empty() && passages_now.is_empty() && regions_now.is_empty()
             {
@@ -1411,10 +1779,6 @@ pub fn AiPanel(
             // Only a request that actually starts consumes the references. A failed search or a
             // guard trip must leave them in the shelf so the reader can retry without re-selecting.
             if !passages_now.is_empty() || !regions_now.is_empty() {
-                history.update(|list| {
-                    list.extend(passages_now.iter().cloned().map(Stored::Passage));
-                    list.extend(regions_now.iter().cloned().map(Stored::Region));
-                });
                 passages.set(Vec::new());
                 regions.set(Vec::new());
                 reset_history.run(());
@@ -2033,11 +2397,11 @@ pub fn AiPanel(
     };
 
     let reset_transient = move || {
+        open_refs.set(None);
         current_question.set(String::new());
         answer.set(String::new());
         reasoning.set(String::new());
         failed.set(false);
-        show_all.set(false);
         editing.set(None);
         question.set(String::new());
         mentions.set(Vec::new());
@@ -2858,7 +3222,24 @@ pub fn AiPanel(
                                                     })
                                                 };
                                                 let edit_context = turn.context.clone();
-                                                let refs = reference_badge(&turn.context);
+                                                let refs = reference_capsule(
+                                                    &turn.context,
+                                                    RefTarget::Turn(index),
+                                                    open_refs,
+                                                    reference_actions,
+                                                );
+                                                let completed_label = format_moment(turn.completed_at);
+                                                let asked_label = format_moment(turn.asked_at);
+                                                let asked_full = format_moment_full(turn.asked_at);
+                                                let question_copy = turn.question.clone();
+                                                let copy_question = icon_action(
+                                                    "copy",
+                                                    "复制问题",
+                                                    move |_event: web_sys::MouseEvent| {
+                                                        copy_to_clipboard(&question_copy);
+                                                        notify.run("已复制问题".to_owned());
+                                                    },
+                                                );
                                                 let edit = icon_action(
                                                     "edit",
                                                     "编辑这个问题并重发",
@@ -2934,7 +3315,19 @@ pub fn AiPanel(
                                                 view! {
                                                     <div class="turn">
                                                         <div class="question-row">
-                                                            {refs}
+                                                            <div class="question-meta">
+                                                                {(!asked_label.is_empty()).then(|| {
+                                                                    view! {
+                                                                        <span
+                                                                            class="question-time"
+                                                                            title=asked_full.clone()
+                                                                        >
+                                                                            {asked_label.clone()}
+                                                                        </span>
+                                                                    }
+                                                                })}
+                                                                {refs}
+                                                            </div>
                                                             <div class="question-stack">
                                                                 <p class="turn-question">{turn.question.clone()}</p>
                                                             </div>
@@ -2948,6 +3341,7 @@ pub fn AiPanel(
                                                             <div class="question-actions">
                                                                 {move || branch_nav()}
                                                                 {edit}
+                                                                {copy_question}
                                                             </div>
                                                         </div>
                                                         {detail}
@@ -2966,6 +3360,16 @@ pub fn AiPanel(
                                                             )}
                                                             {regenerate}
                                                             {continued}
+                                                            {(!completed_label.is_empty()).then(|| {
+                                                                view! {
+                                                                    <span
+                                                                        class="turn-time"
+                                                                        title=format_moment_full(turn.completed_at)
+                                                                    >
+                                                                        {completed_label.clone()}
+                                                                    </span>
+                                                                }
+                                                            })}
                                                         </div>
                                                         </div>
                                                     </div>
@@ -3024,11 +3428,31 @@ pub fn AiPanel(
                                                     .into_any()
                                             }
                                         };
-                                        let refs = reference_badge(&current_context.get());
+                                        let refs = reference_capsule(
+                                            &current_context.get(),
+                                            RefTarget::Current,
+                                            open_refs,
+                                            reference_actions,
+                                        );
+                                        let asked_at = current_asked_at.get();
+                                        let asked_label = format_moment(asked_at);
+                                        let asked_full = format_moment_full(asked_at);
                                         view! {
                                             <div class="turn current" class:is-streaming=move || streaming.get()>
                                                 <div class="question-row">
-                                                    {refs}
+                                                    <div class="question-meta">
+                                                        {(!asked_label.is_empty()).then(|| {
+                                                            view! {
+                                                                <span
+                                                                    class="question-time"
+                                                                    title=asked_full.clone()
+                                                                >
+                                                                    {asked_label.clone()}
+                                                                </span>
+                                                            }
+                                                        })}
+                                                        {refs}
+                                                    </div>
                                                     <div class="question-stack">
                                                         <p class="turn-question">
                                                         {move || {
@@ -3094,72 +3518,6 @@ pub fn AiPanel(
 
                 <div class="composer">
                     {move || {
-                        let all = history.get();
-                        if all.is_empty() {
-                            return ().into_any();
-                        }
-                        let start = if show_all.get() { 0 } else { all.len().saturating_sub(3) };
-                        let entries: Vec<(usize, Stored)> = all
-                            .iter()
-                            .cloned()
-                            .enumerate()
-                            .skip(start)
-                            .collect();
-                        view! {
-                            <div class="history">
-                                <div class="history-head">
-                                    <span>"历史引用"</span>
-                                    <button
-                                        class="link"
-                                        on:click=move |_| show_all.update(|open| *open = !*open)
-                                    >
-                                        {move || if show_all.get() { "收起" } else { "全部" }}
-                                    </button>
-                                </div>
-                                {entries
-                                    .into_iter()
-                                    .map(|(index, entry)| {
-                                        let (label, preview, page_number, rect) = match &entry {
-                                            Stored::Passage(passage) => (
-                                                format!("p.{} · {}", passage.page, truncate(&passage.quote, 14)),
-                                                passage.quote.clone(),
-                                                passage.page,
-                                                passage.rect,
-                                            ),
-                                            Stored::Region(region) => (
-                                                format!("p.{} · 截图", region.page),
-                                                "（截图）".to_owned(),
-                                                region.page,
-                                                region.rect,
-                                            ),
-                                        };
-                                        view! {
-                                            <div
-                                                class="history-row"
-                                                on:mouseenter=move |_| {
-                                                    hovered.set(Some((page_number, rect)));
-                                                }
-                                                on:mouseleave=move |_| hovered.set(None)
-                                                on:click=move |event: web_sys::MouseEvent| {
-                                                    if event.shift_key() {
-                                                        jump(page_number);
-                                                    } else {
-                                                        redeem(index);
-                                                    }
-                                                }
-                                            >
-                                                <span class="history-label">{label}</span>
-                                                <span class="history-preview">{preview}</span>
-                                                <span class="pill">{format!("p.{page_number} →")}</span>
-                                            </div>
-                                        }
-                                    })
-                                    .collect_view()}
-                            </div>
-                        }
-                            .into_any()
-                    }}
-                    {move || {
                         let quotes = passages.get();
                         let shots = regions.get();
                         let pages_selected = page_set.get();
@@ -3196,12 +3554,13 @@ pub fn AiPanel(
                                             .map(|passage| {
                                                 let page_number = passage.page;
                                                 let id = passage.id;
+                                                let activation = passage.clone();
                                                 view! {
                                                     <div
                                                         class="attach-chip"
                                                         draggable="true"
                                                         title=passage.quote.clone()
-                                                        on:click=move |_| jump(page_number)
+                                                        on:click=move |_| activate_passage.run(activation.clone())
                                                         on:dragstart=move |event: web_sys::DragEvent| {
                                                             if let Some(data) = event.data_transfer() {
                                                                 let _ = data.set_data(
@@ -3244,12 +3603,13 @@ pub fn AiPanel(
                                             .map(|region| {
                                                 let page_number = region.page;
                                                 let id = region.id;
+                                                let activation = region.clone();
                                                 view! {
                                                     <div
                                                         class="attach-thumb"
                                                         draggable="true"
                                                         title=format!("p.{} · 截图", region.page)
-                                                        on:click=move |_| jump(page_number)
+                                                        on:click=move |_| activate_region.run(activation.clone())
                                                         on:dragstart=move |event: web_sys::DragEvent| {
                                                             if let Some(data) = event.data_transfer() {
                                                                 let _ = data.set_data(
@@ -3365,7 +3725,7 @@ pub fn AiPanel(
                                                     <div
                                                         class="attach-chip"
                                                         draggable="true"
-                                                        on:click=move |_| jump(start)
+                                                        on:click=move |_| activate_page.run(start)
                                                         on:dragstart=move |event: web_sys::DragEvent| {
                                                             if let Some(data) = event.data_transfer() {
                                                                 let _ = data.set_data("text/plain", &drag_key);

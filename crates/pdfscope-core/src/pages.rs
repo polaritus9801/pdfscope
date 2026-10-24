@@ -170,7 +170,18 @@ pub fn request_pages(
     let wanted: Vec<u32> = match scope {
         Scope::Document => (1..=total).collect(),
         Scope::Current => vec![current.clamp(1, total)],
-        Scope::References => Vec::new(),
+        // "Only references" still carries page references the reader added; it just adds no
+        // document/current page bulk of its own.
+        Scope::References => {
+            let mut kept: Vec<u32> = selected
+                .iter()
+                .copied()
+                .filter(|page| (1..=total).contains(page))
+                .collect();
+            kept.sort_unstable();
+            kept.dedup();
+            kept
+        }
         Scope::Selected => {
             let mut kept: Vec<u32> = selected
                 .iter()
@@ -222,10 +233,10 @@ mod request_tests {
     }
 
     #[test]
-    fn references_only_sends_nothing() {
-        let (pages, wanted) = request_pages(Scope::References, 50, 3, &[2, 4], Some(20));
-        assert!(pages.is_empty());
-        assert_eq!(wanted, 0);
+    fn references_send_only_the_selected_pages() {
+        let (pages, wanted) = request_pages(Scope::References, 50, 3, &[2, 4, 4, 51], Some(20));
+        assert_eq!(pages, vec![2, 4]);
+        assert_eq!(wanted, 2);
     }
 
     #[test]

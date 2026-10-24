@@ -50,10 +50,33 @@ with the bubble:
   context item, not just the visible text.
 - The capsule uses the surface background (white in light mode), a thin light-purple border and a
   full pill radius. The paperclip is followed by the number.
-- Hovering exposes the full list, including the count, through the native title.
+- Hovering the capsule exposes the full list, including the count, through the native title.
 - No capsule for a question with no references; the bubble keeps its normal right alignment.
 - The live question uses the same capsule from `current_context`, so references are visible while the
   answer streams.
+
+### Reference popover
+
+- Clicking the capsule opens one popover below it; clicking again, clicking outside (scrim), or Esc
+  closes it. It stays open after a reference row is clicked, so several can be added.
+- The popover lists every stored reference with a kind icon, label and page/kind metadata.
+- Hovering a passage, region or page sets the shared `hovered` highlight; the reader does **not**
+  scroll. If that page is outside the viewport, a small page image appears beside the popover instead.
+  Files, images, answers and web have no PDF rectangle and therefore no overlay.
+- Clicking a row calls the same activation callbacks as clicking an active input reference: it adds
+  the item to the current context shelf if absent, then jumps/flashes the page for page-bearing items.
+  It never edits the historical turn.
+- The old "历史引用" list, `Stored`, `redeem` and its send-time bookkeeping were removed. Conversation
+  history and prompt history are unaffected.
+
+### Persistence
+
+- `TurnContext` is part of `Turn` and is serialized in both `turns` and the conversation tree. New
+  turns survive reload; `asked_at`/`completed_at` are serialized alongside it.
+- Conversations created before this field have no context and cannot reconstruct it from old text;
+  those questions intentionally show no capsule.
+- The document load selects the newest `updated` conversation, ignoring pinning for the initial
+  choice; pinning still orders the drawer.
 
 ## Acceptance
 
@@ -61,7 +84,10 @@ with the bubble:
 - Markdown and citations are parsed incrementally while tokens arrive.
 - Copy does not appear during streaming; copy/regenerate appear when the turn is complete or stopped.
 - A question with references displays a bottom-aligned paperclip/count capsule to the left of its bubble.
+- The popover lists all references, keeps itself open on row clicks, and shares activation with input
+  reference chips. Offscreen page hovers show a page thumbnail without scrolling.
+- New conversations persist their contexts; opening a document resumes its newest conversation.
 - Editing that question restores its passages, regions, pages, answer refs, images, files and web
   flag; resending records the same context on the new sibling.
-- Old conversations load with empty contexts and no reference line.
+- Old conversations load with empty contexts and no reference capsule.
 - `just check` green.

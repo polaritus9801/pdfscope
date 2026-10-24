@@ -128,6 +128,27 @@ minor releases may contain breaking changes; they are always called out.
 - The panel keeps the conversation: finished exchanges stay on screen and the last four are sent with
   the next question so pronouns resolve.
 
+### Added
+
+- Per-question reference capsules now open a full reference popover. Hovering a passage/region/page
+  highlights it without scrolling; offscreen pages show a thumbnail. Clicking adds the reference to
+  the input context through the same path as active chips, and keeps the popover open.
+- Question hover shows its ask time above the capsule; completed answers end with a completion time.
+  A copy-question action sits beside edit. Times use today HH:MM, this year MM-DD, older YYYY-MM-DD.
+- Pasting or dropping images/files on the AI panel attaches them to the composer; dropping a PDF on
+  the reader opens it. Tauri native drag interception is disabled so the webview receives File objects.
+- The OOBE preview `+N` tile now matches the last page thumbnail's height.
+
+### Changed
+
+- All three scope modes carry the active references, including page references. The modes only choose
+  extra page bulk (all pages / current page / no extras).
+- Opening a document resumes its newest conversation; pinning only affects drawer ordering.
+
+### Removed
+
+- The incomplete "历史引用" list and its `Stored`/`redeem` bookkeeping.
+
 ### Fixed
 
 - Thinking now collapses as soon as the first answer tokens arrive. The auto-collapse added in

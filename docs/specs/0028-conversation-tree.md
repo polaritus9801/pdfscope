@@ -62,3 +62,9 @@ per node, hidden when the node has no alternative and while a turn streams. The 
   that node's alternatives and the old continuation remains in the tree.
 - Switch branch, reload: the selected branch is restored.
 - `just check` green.
+
+
+## Resume selection
+
+Opening a document selects the conversation with the newest `updated` timestamp, not the first pinned
+conversation. Pinning still controls the drawer's ordering.
