@@ -128,6 +128,13 @@ minor releases may contain breaking changes; they are always called out.
 - The panel keeps the conversation: finished exchanges stay on screen and the last four are sent with
   the next question so pronouns resolve.
 
+### Added
+
+- The AI panel keeps the paragraph at its vertical centre while the panel is resized, and a
+  FOLLOW-END state: sending arms it, transcript growth follows the end, and an upward scroll detaches
+  until the reader returns to the bottom. No per-token IPC; a MutationObserver and ResizeObserver feed
+  one rAF.
+
 ### Fixed
 
 - Dragging the AI panel now keeps the reading-line anchor through both the drag and the final base

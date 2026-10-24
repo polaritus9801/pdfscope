@@ -2150,6 +2150,165 @@ function slideNumber(name) {
   return match ? Number(match[1]) : 0;
 }
 
+function panelBodyElement() {
+  return document.querySelector(".panel-body");
+}
+
+const PANEL_BOTTOM_SLOP = 12;
+const PANEL_FOLLOW_SLOP = 8;
+const PANEL_ANCHOR_BLOCKS =
+  "p, li, pre, blockquote, h1, h2, h3, h4, h5, h6, .turn-question, .answer-text, .think-pill, .turn, .empty-state, .error-card";
+
+// FOLLOW-END state. It is armed by a send and disarmed only by a deliberate upward scroll; while
+// armed, every content growth or panel resize keeps the transcript at its end. When disarmed, panel
+// resizes anchor the content at the vertical centre instead.
+let panelFollowing = false;
+let panelBodyBound = null;
+let panelMutation = null;
+let panelTranscriptObserver = null;
+let panelObservedTranscript = null;
+let panelEndFrame = 0;
+let panelLastScrollTop = 0;
+
+function panelDistanceFromEnd(body) {
+  return body.scrollHeight - body.scrollTop - body.clientHeight;
+}
+
+function scrollPanelTo(body, top) {
+  body.scrollTop = top;
+  panelLastScrollTop = body.scrollTop;
+}
+
+function schedulePanelEnd() {
+  if (panelEndFrame) return;
+  panelEndFrame = requestAnimationFrame(() => {
+    panelEndFrame = 0;
+    if (!panelFollowing) return;
+    const body = panelBodyElement();
+    if (body && panelDistanceFromEnd(body) > 0.5) {
+      scrollPanelTo(body, body.scrollHeight);
+    }
+  });
+}
+
+function refreshPanelTranscriptObserver() {
+  const transcript = document.getElementById("transcript");
+  if (transcript === panelObservedTranscript) return;
+  panelTranscriptObserver?.disconnect();
+  panelObservedTranscript = transcript;
+  if (!transcript || typeof ResizeObserver !== "function") return;
+  panelTranscriptObserver = new ResizeObserver(() => {
+    if (panelFollowing) schedulePanelEnd();
+  });
+  panelTranscriptObserver.observe(transcript);
+}
+
+function onPanelScroll() {
+  const body = panelBodyBound;
+  if (!body) return;
+  const top = body.scrollTop;
+  const distance = panelDistanceFromEnd(body);
+  // Only an upward scroll is a detach gesture. Auto-follow moves down; content growth does not move
+  // the scroll position at all. Testing distance alone would let a late scroll event from an
+  // auto-follow, fired after the next chunk grew the transcript, disable following by accident.
+  if (distance > PANEL_BOTTOM_SLOP && top < panelLastScrollTop - 1) {
+    panelFollowing = false;
+  } else if (distance <= PANEL_FOLLOW_SLOP) {
+    panelFollowing = true;
+    if (distance > 0.5) schedulePanelEnd();
+  }
+  panelLastScrollTop = top;
+}
+
+function onPanelWheel(event) {
+  // Wheel-up is an explicit reading gesture; detach before the first scroll event so no queued
+  // content update can pull the reader back down.
+  if (event.deltaY < 0) panelFollowing = false;
+}
+
+function bindPanelScroll() {
+  const body = panelBodyElement();
+  if (!body || panelBodyBound === body) return;
+  panelBodyBound = body;
+  panelLastScrollTop = body.scrollTop;
+  body.addEventListener("scroll", onPanelScroll, { passive: true });
+  body.addEventListener("wheel", onPanelWheel, { passive: true });
+  panelMutation?.disconnect();
+  panelMutation = new MutationObserver(() => {
+    refreshPanelTranscriptObserver();
+    if (panelFollowing) schedulePanelEnd();
+  });
+  panelMutation.observe(body, { childList: true, subtree: true, characterData: true });
+  refreshPanelTranscriptObserver();
+  if (panelDistanceFromEnd(body) <= PANEL_FOLLOW_SLOP) {
+    panelFollowing = true;
+  }
+}
+
+function armPanelFollow() {
+  bindPanelScroll();
+  panelFollowing = true;
+  schedulePanelEnd();
+}
+
+/// A vertical reading anchor for the transcript: the smallest block under the centre plus the
+/// fraction into it. A pure scrollTop ratio would drift as text rewraps; a block ratio follows the
+/// same paragraph through width changes.
+function capturePanelAnchor() {
+  if (panelFollowing) return null;
+  const body = panelBodyElement();
+  if (!body) return null;
+  const box = body.getBoundingClientRect();
+  const x = box.left + body.clientWidth / 2;
+  const y = box.top + body.clientHeight / 2;
+  const hit = document.elementFromPoint(x, y);
+  let element = hit && body.contains(hit) ? hit.closest?.(PANEL_ANCHOR_BLOCKS) : null;
+  if (element === body) element = null;
+
+  if (!element) {
+    // The centre can land in the gap between two turns, or on the scrollbar/padding.
+    let nearest = null;
+    let nearestDistance = Infinity;
+    for (const turn of body.querySelectorAll(".turn, .empty-state, .error-card")) {
+      const rect = turn.getBoundingClientRect();
+      const distance = y < rect.top ? rect.top - y : y > rect.bottom ? y - rect.bottom : 0;
+      if (distance < nearestDistance) {
+        nearest = turn;
+        nearestDistance = distance;
+      }
+    }
+    element = nearest;
+  }
+
+  if (element) {
+    const rect = element.getBoundingClientRect();
+    if (rect.height > 0) {
+      return { element, ratio: clamp((y - rect.top) / rect.height, 0, 1) };
+    }
+  }
+
+  const range = Math.max(1, body.scrollHeight - body.clientHeight);
+  return { scrollRatio: clamp(body.scrollTop / range, 0, 1) };
+}
+
+function restorePanelAnchor(anchor) {
+  if (!anchor) return;
+  const body = panelBodyElement();
+  if (!body) return;
+  let top = null;
+  if (anchor.element?.isConnected) {
+    const rect = anchor.element.getBoundingClientRect();
+    if (rect.height > 0) {
+      const centre = body.getBoundingClientRect().top + body.clientHeight / 2;
+      top = body.scrollTop + rect.top + anchor.ratio * rect.height - centre;
+    }
+  }
+  if (top === null && anchor.scrollRatio !== undefined) {
+    top = anchor.scrollRatio * Math.max(1, body.scrollHeight - body.clientHeight);
+  }
+  if (top !== null) scrollPanelTo(body, Math.max(0, top));
+}
+
 function panelElement() {
   return document.querySelector(".panel");
 }
@@ -2165,6 +2324,7 @@ function beginPanelResize() {
   if (!panel || !stage || panelDrag) return;
   // A pending window-resize check must not re-anchor the page in the middle of this drag.
   clearTimeout(resizeTimer);
+  bindPanelScroll();
   panelDrag = {
     panel,
     stage,
@@ -2194,8 +2354,14 @@ function applyPanelResize() {
   panelDragFrame = 0;
   if (!panelDrag) return;
   const width = Math.min(720, Math.max(320, window.innerWidth - panelDrag.clientX));
+  const panelAnchor = capturePanelAnchor();
   panelDrag.width = width;
   panelDrag.panel.style.width = `${width}px`;
+  if (panelFollowing) {
+    schedulePanelEnd();
+  } else {
+    restorePanelAnchor(panelAnchor);
+  }
 
   // Reflow the stage continuously: keep the 100% layout, but visually scale the column so the page
   // width follows the divider instead of snapping only when the drag ends.
@@ -2253,9 +2419,15 @@ function commitPanelResize() {
   // layout first and resetting the visual scale second would make the two frames disagree and
   // produce the old release jump.
   const anchor = readAnchor();
+  const panelAnchor = capturePanelAnchor();
   const width = Math.round(panelDrag.width);
   const finalScale = panelDrag.baseScale;
   panelDrag.panel.style.width = `${width}px`;
+  if (panelFollowing) {
+    schedulePanelEnd();
+  } else {
+    restorePanelAnchor(panelAnchor);
+  }
 
   window.removeEventListener("pointermove", onPanelResizeMove, true);
   window.removeEventListener("pointerup", finishPanelResize, true);
@@ -2409,6 +2581,11 @@ window.PDFScope = {
       target.dataset.queued = "1";
       thumbnailObserver.observe(target);
     }
+  },
+
+  /// Arms FOLLOW-END after a send and binds transcript growth observers.
+  panelSent() {
+    armPanelFollow();
   },
 
   /// The reader's preferred panel width, remembered between launches.

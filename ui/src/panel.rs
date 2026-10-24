@@ -1093,6 +1093,7 @@ pub fn AiPanel(
             interrupted.set(false);
         }
         current_question.set(asked.clone());
+        let _ = crate::call("panelSent", &[]);
         answer.set(String::new());
         reasoning.set(String::new());
         reasoning_open.set(true);

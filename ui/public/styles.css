@@ -599,6 +599,9 @@ body {
   flex: 1;
   overflow: auto;
   padding: var(--space-3);
+  /* The transcript owns its own width-change anchor; browser scroll anchoring cannot know about
+     streaming text and would fight it. */
+  overflow-anchor: none;
 }
 
 .panel-hint {
