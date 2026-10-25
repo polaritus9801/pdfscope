@@ -319,16 +319,12 @@ body {
 /* ── Page ruler ─────────────────────────────────────────────────────────────────────────────── */
 /* Replaces the platform vertical scrollbar; horizontal scrolling (when zoomed beyond the stage)
    stays native. The rail sits in the right gutter and never changes the PDF layout. */
-html[data-scroll-style="ruler"].ruler-ready .stage {
+html.ruler-ready .stage {
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
 
-html[data-scroll-style="ruler"].ruler-ready .stage::-webkit-scrollbar {
-  display: none;
-}
-
-html[data-scroll-style="native"] .page-ruler {
+html.ruler-ready .stage::-webkit-scrollbar {
   display: none;
 }
 
@@ -340,9 +336,31 @@ html[data-scroll-style="native"] .page-ruler {
   width: 16px;  /* size */
   height: 100%;
   background: color-mix(in srgb, var(--surface) 92%, var(--border));
+  /* Default is the neutral system-coloured skin. Future skins only swap these variables. */
+  --ruler-thumb-bg: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--ink-faint) 36%, var(--surface)),
+    color-mix(in srgb, var(--ink-faint) 66%, var(--surface))
+  );
+  --ruler-thumb-border: color-mix(in srgb, var(--surface) 82%, transparent);
+  --ruler-thumb-shadow:
+    0 2px 7px rgb(20 16 26 / 18%),  /* size */
+    inset 0 1px 0 rgb(255 255 255 / 40%);  /* size */
   outline: none;
   touch-action: none;
   cursor: default;
+}
+
+html[data-scroll-skin="purple"] .page-ruler {
+  --ruler-thumb-bg: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent) 58%, var(--surface)),
+    color-mix(in srgb, var(--accent) 88%, var(--surface))
+  );
+  --ruler-thumb-border: color-mix(in srgb, var(--surface) 84%, transparent);
+  --ruler-thumb-shadow:
+    0 2px 7px rgb(60 44 94 / 22%),  /* size */
+    inset 0 1px 0 rgb(255 255 255 / 48%);  /* size */
 }
 
 .page-ruler::before {
@@ -369,18 +387,11 @@ html[data-scroll-style="native"] .page-ruler {
   z-index: 3;
   width: 12px;  /* size */
   min-height: 32px;  /* size */
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--accent) 58%, var(--surface)),
-    color-mix(in srgb, var(--accent) 88%, var(--surface))
-  );
-  border: 1px solid color-mix(in srgb, var(--surface) 84%, transparent);
+  background: var(--ruler-thumb-bg);
+  border: 1px solid var(--ruler-thumb-border);
   border-radius: 999px;  /* size */
-  box-shadow:
-    0 2px 7px rgb(60 44 94 / 22%),  /* size */
-    inset 0 1px 0 rgb(255 255 255 / 48%);  /* size */
+  box-shadow: var(--ruler-thumb-shadow);
   cursor: grab;
-  transition: filter var(--duration) var(--ease);
 }
 
 .page-ruler-thumb:active {
@@ -1991,6 +2002,89 @@ body {
 .theme-card:hover {
   border-color: var(--accent);
   color: var(--accent);
+}
+
+
+.scrollbar-style-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));  /* size */
+  gap: var(--space-3);
+}
+
+.scrollbar-style-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  text-align: left;
+}
+
+.scrollbar-style-card:hover {
+  border-color: var(--border-strong);
+}
+
+.scrollbar-style-card.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);  /* size */
+}
+
+.scrollbar-style-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;  /* size */
+}
+
+.scrollbar-style-copy b {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.scrollbar-style-copy small {
+  color: var(--ink-faint);
+  font-size: var(--text-xs);
+}
+
+.scrollbar-preview {
+  position: relative;
+  flex: none;
+  width: 16px;  /* size */
+  height: 46px;  /* size */
+  background: color-mix(in srgb, var(--surface) 82%, var(--border));
+  border: 1px solid var(--border);
+  border-radius: 999px;  /* size */
+}
+
+.scrollbar-preview::after {
+  position: absolute;
+  top: 7px;  /* size */
+  right: 2px;  /* size */
+  width: 10px;  /* size */
+  height: 20px;  /* size */
+  border-radius: 999px;  /* size */
+  content: "";
+}
+
+.scrollbar-preview.gray::after {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--ink-faint) 36%, var(--surface)),
+    color-mix(in srgb, var(--ink-faint) 66%, var(--surface))
+  );
+  box-shadow: 0 1px 3px rgb(20 16 26 / 16%);  /* size */
+}
+
+.scrollbar-preview.purple::after {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent) 58%, var(--surface)),
+    color-mix(in srgb, var(--accent) 88%, var(--surface))
+  );
+  box-shadow: 0 1px 3px rgb(60 44 94 / 20%);  /* size */
 }
 
 .theme-card.active {

@@ -8,8 +8,8 @@ use wasm_bindgen_futures::JsFuture;
 use crate::icons::{icon, provider_tile};
 use crate::panel::{
     PAGE_REPEAT_KEY, PRESET_LABELS, RESUME_PREFERENCE_KEY, apply_font_size, apply_theme, bridge,
-    flag_of, number_of, preset, read_page_bar_side, read_scroll_style, text_of,
-    write_page_bar_side, write_scroll_style,
+    flag_of, number_of, preset, read_page_bar_side, read_scroll_skin, text_of, write_page_bar_side,
+    write_scroll_skin,
 };
 
 /// Publishes the timeout to the bridge, in milliseconds; zero disables the watchdog.
@@ -116,7 +116,7 @@ pub(crate) fn SettingsSheet(
     let form_resume = RwSignal::new(read_resume_preference());
     let form_page_repeat = RwSignal::new(read_page_repeat_preference());
     let form_page_bar_side = RwSignal::new(read_page_bar_side());
-    let form_scroll_style = RwSignal::new(read_scroll_style());
+    let form_scroll_skin = RwSignal::new(read_scroll_skin());
     let form_page_limit = RwSignal::new(0_u32);
     let form_timeout = RwSignal::new("0".to_owned());
     let form_context_limit = RwSignal::new("128000".to_owned());
@@ -360,6 +360,7 @@ pub(crate) fn SettingsSheet(
                         model.set(form_model.get());
                         model_choices.set(parse_choices(&form_model_choices.get()));
                         apply_theme(&form_theme.get());
+                        write_scroll_skin(&form_scroll_skin.get());
                         apply_font_size(&form_font_size.get());
                         page_limit.set(form_page_limit.get());
                         apply_request_timeout(&form_timeout.get());
@@ -521,6 +522,37 @@ pub(crate) fn SettingsSheet(
                                         </div>
                                     </section>
 
+                                    <section class="settings-section">
+                                        <h3>"滚动条"</h3>
+                                        <p class="settings-hint">
+                                            "阅读区右侧滚动条的样式；更多样式后续加入。"
+                                        </p>
+                                        <div class="scrollbar-style-cards">
+                                            {[
+                                                ("gray", "灰色", "系统滚动条颜色"),
+                                                ("purple", "紫色", "跟随强调色"),
+                                            ]
+                                                .into_iter()
+                                                .map(|(value, label, description)| {
+                                                    view! {
+                                                        <button
+                                                            class="scrollbar-style-card"
+                                                            class:active=move || form_scroll_skin.get() == value
+                                                            on:click=move |_| {
+                                                                form_scroll_skin.set(value.to_owned());
+                                                            }
+                                                        >
+                                                            <span class=format!("scrollbar-preview {value}")></span>
+                                                            <span class="scrollbar-style-copy">
+                                                                <b>{label}</b>
+                                                                <small>{description}</small>
+                                                            </span>
+                                                        </button>
+                                                    }
+                                                })
+                                                .collect_view()}
+                                        </div>
+                                    </section>
 
                                 </Show>
 
@@ -634,25 +666,6 @@ pub(crate) fn SettingsSheet(
                                         </p>
 
                                         <label class="settings-row">
-                                            <span>"PDF 滚动条"</span>
-                                            <select on:change=move |event| {
-                                                let value = event_target_value(&event);
-                                                form_scroll_style.set(value.clone());
-                                                write_scroll_style(&value);
-                                            }>
-                                                <option value="ruler" selected=move || form_scroll_style.get() == "ruler">
-                                                    "页面标尺（默认）"
-                                                </option>
-                                                <option value="native" selected=move || form_scroll_style.get() == "native">
-                                                    "系统滚动条"
-                                                </option>
-                                            </select>
-                                        </label>
-                                        <p class="settings-hint">
-                                            "页面标尺显示页、章节和当前可视范围；切换系统滚动条可直接对比。"
-                                        </p>
-
-                                        <label class="settings-row">
                                             <span>"双页奇偶偏移"</span>
                                             <input
                                                 type="checkbox"
@@ -697,8 +710,6 @@ pub(crate) fn SettingsSheet(
                                                     write_page_repeat_preference("adjust");
                                                     form_page_bar_side.set("right".to_owned());
                                                     write_page_bar_side("right");
-                                                    form_scroll_style.set("ruler".to_owned());
-                                                    write_scroll_style("ruler");
                                                 }
                                             >
                                                 "恢复阅读默认"

@@ -693,10 +693,12 @@ Firefox), independent of the reader scrollbar. The manager grid keeps its normal
 
 ## 2026-10-26 — page ruler, manager drag and native-drag fix
 
-**Page ruler.** 设置 → 阅读 → **PDF 滚动条** defaults to 页面标尺 and can be switched to 系统滚动条 for
-direct comparison. The ruler is a 16 px overlay at the reader's right edge. Ruler mode hides the
-platform scrollbars entirely (vertical and horizontal); horizontal panning remains available through
-trackpad/shift-wheel, and 系统滚动条 restores both. It draws:
+**Page ruler.** 设置 → 通用设置 → 外观 → **滚动条** offers two skins: 灰色（system-scrollbar colour,
+default）and 紫色 (accent). The setting applies on 保存, like the theme cards. The page ruler is always
+present; the platform scrollbars stay hidden (horizontal panning remains available through
+trackpad/shift-wheel). The skin is stored as `localStorage["pdfscope.scroll-skin"]` and exposed as
+`html[data-scroll-skin]`; adding a future skin is one new value plus one CSS block swapping the three
+`--ruler-thumb-*` variables, with no reader-layout change. It draws:
 
 - page ticks at each page's *centred* scroll position, so the tick lines up with the middle of the
   viewport thumb, not its top; the thumb centre tracks `scrollTop + clientHeight / 2`;
@@ -709,8 +711,9 @@ trackpad/shift-wheel, and 系统滚动条 restores both. It draws:
   is ~16 bars (1/2/5×10ⁿ pages);
 - bookmarks are always drawn, while minor page ticks are sampled by the exact density rule below;
 - no separate current-page line (the thumb is the only current-position indicator);
-- a modern accent scrollbar thumb (`12 px`, gradient, soft shadow) that always sits above the
-  neutral ruler; the hover line sits *below* the canvas, so tick marks and thumb cover it;
+- a modern 12 px scrollbar thumb that always sits above the neutral ruler; the hover line sits
+  *below* the canvas, so tick marks and thumb cover it. Grey uses the system-scrollbar grey; purple
+  uses the accent gradient;
 - page ruler marks are neutral `--ink-faint`; purple is reserved for the scrollbar thumb.
 
 **Tick length and density algorithm.** Let `bookmarks` be the deduplicated page map (one shallowest
@@ -758,7 +761,7 @@ number plus the nearest outline title, draws a hover tick, and after 160 ms show
 preview. Clicking centres that page; the thumb drags; the wheel over the ruler scrolls the reader;
 Arrow/Page/Home/End work when the ruler is focused. The ruler is a scrollbar role with
 `aria-valuemin/max/now`, page-valued text and an accessible focus ring. Ruler mode reads
-`localStorage["pdfscope.scroll-style"]`; `native` shows the platform scrollbar instead.
+`localStorage["pdfscope.scroll-skin"]`; both skins use the same ruler and geometry.
 
 **Manager drag.** The manager used per-card `pointerup` and did not suppress the browser's native
 image drag. Dragging a card therefore started an HTML5 drag of the thumbnail image, which the app's

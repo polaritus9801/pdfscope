@@ -48,12 +48,14 @@ minor releases may contain breaking changes; they are always called out.
   grows symmetrically into the gutters and only starts scrolling when it exceeds the stage itself.
 - The 目录/缩略图 scrollbars now match the AI panel exactly: 4 px, transparent track and the same
   `--border-strong` thumb, with no custom accent/hover styling.
-- Added a complete page ruler, enabled by default under 设置 → 阅读 → PDF 滚动条 (switch to 系统滚动条
-  to compare). Page marks are neutral; the accent is reserved for a larger, modern scrollbar thumb.
-  Ticks sit at page-centred scroll positions so they align with the thumb centre, bookmark bars span
-  16/8 px by outline depth (shortest exactly 50% of longest), and no-bookmark documents use smart
-  page-count majors plus density sampling for very long PDFs. There is no separate current-page line;
-  scrollbar thumb > ruler marks > hover line, and ruler mode hides the platform scrollbars.
+- Added a complete page ruler. Page marks are neutral; only the modern 12 px scrollbar thumb is
+  coloured. Ticks sit at page-centred scroll positions so they align with the thumb centre, bookmark
+  bars span 16/8 px by outline depth (shortest exactly 50% of longest), and no-bookmark documents use
+  smart page-count majors plus density sampling for very long PDFs. There is no separate current-page
+  line; scrollbar thumb > ruler marks > hover line, and the platform scrollbars stay hidden.
+- 设置 → 通用设置 → 外观 now has a **滚动条** picker: 灰色 (system-scrollbar grey, default) or 紫色
+  (accent). It applies on save and is stored as `pdfscope.scroll-skin`; future skins only add a value
+  plus a `--ruler-thumb-*` CSS variant. The old reading-tab PDF-scrollbar mode selector is gone.
 - Page manager drags no longer start a native image drag. Pointer capture on the grid, blocked
   dragstart, non-draggable images and pointerdown default prevention make drag select a live range
   (Shift add, Ctrl/Command subtract, or add/subtract chosen by the starting page's current state)
