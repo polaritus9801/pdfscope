@@ -37,7 +37,8 @@ are handled by editor commands, so a pill is removed or skipped as a whole.
 ## Markdown live source mode
 
 A small dot sits in the top-right corner of the composer card, tangent to its top and right edges.
-Its default state is an accent ring; when live Markdown is on it becomes filled. Clicking toggles
+Its default state is a white-centred 8px accent ring; hover fills it with light accent, and live
+Markdown on fills it deep purple. Clicking toggles
 live Markdown and stores the choice in `localStorage["pdfscope.composer.markdown"]` (first run is
 plain). The mode only changes decorations: the document is always the raw Markdown source, so
 turning it off/on never rewrites or loses anything.
@@ -49,17 +50,22 @@ per-span cursor flips. The serialized question, draft and prompt history contain
 
 The editor's height is held at the larger of the plain and decorated heights while switching the
 mode, so repeated toggles cannot push the AI panel up or make the bottom bar oscillate. The floor is
-released as soon as the document changes or a manual resize starts.
+released as soon as the document changes or a manual resize starts. While the composer is being
+dragged vertically the body uses an explicit `ns-resize` cursor, never the horizontal panel-resize
+cursor.
 
 Supported now:
 
 - inline: `**strong**`, `__strong__`, `*em*`, `_em_`, `~~strike~~`, `` `code` ``,
   `[label](url)`
-- blocks: `#`–`######`, `>` block quotes, `-`/`*`/`+` and `1.` lists, fenced ``` code blocks
+- blocks: `#`–`######`, `>` block quotes, nested `-`/`*`/`+` and `1.` lists (Tab/Shift+Tab), fenced
+  ``` code blocks
 
 List markers stay visible and use a fixed hanging indent, so `1.`/`2.` lines and wrapped lines keep
-the same text column. Paragraph-level arrow movement jumps between block ends instead of mapping
-through hidden marker widths.
+the same text column. Nested lists carry their leading-space depth as `--md-list-indent`; Tab inserts
+two spaces in a list (Shift+Tab removes up to two), while Tab outside a list keeps normal focus
+navigation. Paragraph-level arrow movement jumps between block ends instead of mapping through
+hidden marker widths.
 
 Not supported: tables, images, task checkboxes, footnotes and math. Those are document-level GFM
 features; pretending to support them with regex spans would recreate exactly the cursor/layout bugs

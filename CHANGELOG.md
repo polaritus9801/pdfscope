@@ -14,8 +14,10 @@ minor releases may contain breaking changes; they are always called out.
   syntax reveals on the active line, inline delimiters hide elsewhere, the preference is persisted,
   and the composer supports headings, quotes, hanging-indent lists, fenced code, links and inline
   emphasis.
-- The dot is now a high-contrast ring when off and filled on hover/on; toggling no longer changes
-  the composer or AI-panel height.
+- The dot is now a high-contrast ring when off, light-filled on hover and deep-filled when on;
+  toggling no longer changes the composer or AI-panel height.
+- Nested lists render with a per-level hanging indent and Tab/Shift+Tab indent source lines; Tab
+  outside a list keeps normal focus navigation. Vertical resize uses an explicit vertical cursor.
 - Structured arrow navigation crosses paragraph boundaries at the block edge, so hidden syntax can
   never make Left/Right jump mid-word.
 - The composer's top edge can be dragged to set a manual height floor while content still

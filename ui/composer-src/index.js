@@ -417,10 +417,23 @@ function buildMarkdownDecorations(state) {
           const list = /^(\s*)([-*+]|\d+\.)\s+/.exec(text);
           if (list) {
             classes.push("md-list", /^\d/.test(list[2]) ? "md-list-ol" : "md-list-ul");
-            const marker = Decoration.inline(from + 1, from + 1 + list[0].length, {
-              class: "md-list-marker",
-            });
-            decorations.push(marker);
+            const indent = list[1].replace(/\t/g, "  ").length;
+            attrs.style = `--md-list-indent: ${indent}ch`;
+            if (list[1].length > 0) {
+              decorations.push(
+                Decoration.inline(from + 1, from + 1 + list[1].length, {
+                  class: "md-list-indent",
+                }),
+              );
+            }
+            const markerStart = from + 1 + list[1].length;
+            decorations.push(
+              Decoration.inline(
+                markerStart,
+                from + 1 + list[0].length,
+                { class: "md-list-marker" },
+              ),
+            );
           }
         }
       }
@@ -573,6 +586,40 @@ function handleDragOver(event) {
   if (data.types?.includes("text/plain")) event.preventDefault();
 }
 
+function handleListTab(view, event) {
+  if (event.key !== "Tab" || event.metaKey || event.ctrlKey || event.altKey) return false;
+  if (document.querySelector(".mention-picker")) return false;
+  const selection = view.state.selection;
+  if (!selection.empty) return false;
+  const $from = selection.$from;
+  if ($from.depth !== 1) return false;
+  const blockStart = $from.before(1);
+  const text = $from.parent.textContent;
+  const list = /^(\s*)([-*+]|\d+\.)\s+/.exec(text);
+  const previous =
+    blockStart > 0 ? view.state.doc.resolve(blockStart - 1).parent.textContent : "";
+  const previousList = /^\s*([-*+]|\d+\.)\s+/.test(previous);
+  const emptyAfterList = /^\s*$/.test(text) && previousList;
+  if (!list && !emptyAfterList) return false;
+  const indent = /^\s*/.exec(text)[0].length;
+
+  if (event.shiftKey) {
+    if (indent === 0) return false;
+    const remove = Math.min(2, indent);
+    const tr = view.state.tr.delete(blockStart + 1, blockStart + 1 + remove);
+    tr.setSelection(TextSelection.create(tr.doc, Math.max(blockStart + 1, selection.from - remove)));
+    view.dispatch(tr.scrollIntoView());
+    event.preventDefault();
+    return true;
+  }
+
+  const tr = view.state.tr.insertText("  ", blockStart + 1);
+  tr.setSelection(TextSelection.create(tr.doc, selection.from + 2));
+  view.dispatch(tr.scrollIntoView());
+  event.preventDefault();
+  return true;
+}
+
 function handleVerticalArrow(view, event) {
   if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.key)) return false;
   if (event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) return false;
@@ -706,7 +753,8 @@ function installComposerHandles() {
       target.style.removeProperty("--composer-min-height");
       target.style.removeProperty("--composer-mode-min");
     }
-    card.classList.remove("resizing");
+    card.classList.remove("composer-resizing");
+    document.body.classList.remove("composer-resizing");
   };
   const setHeight = (value) => {
     const target = ask();
@@ -727,7 +775,8 @@ function installComposerHandles() {
     let latest = startHeight;
     modeHeightFloor = 0;
     target.style.removeProperty("--composer-mode-min");
-    card.classList.add("resizing");
+    card.classList.add("composer-resizing");
+    document.body.classList.add("composer-resizing");
     handle.setPointerCapture?.(event.pointerId);
 
     const move = (moveEvent) => {
@@ -737,7 +786,8 @@ function installComposerHandles() {
       handle.removeEventListener("pointermove", move);
       handle.removeEventListener("pointerup", finish);
       handle.removeEventListener("pointercancel", finish);
-      card.classList.remove("resizing");
+      card.classList.remove("composer-resizing");
+      document.body.classList.remove("composer-resizing");
       if (latest === undefined || latest <= 57) reset();
     };
     handle.addEventListener("pointermove", move);
@@ -851,9 +901,11 @@ window.Composer = {
     view.dom.addEventListener(
       "keydown",
       (event) => {
-        if (!view || !handleVerticalArrow(view, event)) return;
-        event.preventDefault();
-        event.stopPropagation();
+        if (!view) return;
+        if (handleListTab(view, event) || handleVerticalArrow(view, event)) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
       },
       true,
     );

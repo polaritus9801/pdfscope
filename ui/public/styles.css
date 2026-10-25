@@ -2773,8 +2773,12 @@ body.selection-quiet .textLayer :is(span, br)::selection {
 }
 
 .ask.editor .ProseMirror p.md-list {
-  padding-left: 2em;
+  padding-left: calc(2em + var(--md-list-indent, 0));
   text-indent: -2em;
+}
+
+.ask.editor .ProseMirror .md-list-indent {
+  display: none;
 }
 
 .ask.editor .ProseMirror .md-list-marker {
@@ -2821,8 +2825,8 @@ body.selection-quiet .textLayer :is(span, br)::selection {
 
 .markdown-dot:hover,
 .markdown-dot:focus-visible {
-  background: #7f5cbf;
-  border-color: #7f5cbf;
+  background: var(--accent-soft);
+  border-color: var(--accent);
 }
 
 .markdown-dot.active {
@@ -2865,13 +2869,20 @@ body.selection-quiet .textLayer :is(span, br)::selection {
 
 .composer-card:hover .composer-resize-handle::after,
 .composer-resize-handle:focus-visible::after,
-.composer-card.resizing .composer-resize-handle::after {
+.composer-card.composer-resizing .composer-resize-handle::after {
   background: var(--accent);
   opacity: 0.85;
 }
 
-.composer-card.resizing {
+.composer-card.composer-resizing {
   cursor: ns-resize;
+}
+
+body.composer-resizing,
+body.composer-resizing * {
+  cursor: ns-resize !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
 }
 
 .mention {
