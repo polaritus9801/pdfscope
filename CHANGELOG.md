@@ -11,11 +11,15 @@ minor releases may contain breaking changes; they are always called out.
 ### Added
 
 - Page reference ranges now use one wide continuous bar per committed range (43.2 px, square ends,
-  `#ac90d5` body with `#7f5cbf` end transitions) instead of a thin per-page line. The page actions are
-  the supplied SVGs exposed directly at 3/4 bar width, white and shadowed rather than circular.
-- Page-range previews show the actual operation: additions preview only newly added pages; fully
-  committed candidate ranges preview the post-subtraction result. Preview uses the lighter
-  `#cbb8ec` / `#9a7ad3` pair.
+  deep-body `#cbb8ec` with `#7f5cbf` end transitions) instead of a thin per-page line. The page
+  actions are the supplied SVGs exposed directly at 3/4 bar width, white and shadowed rather than
+  circular, and only the button under the pointer is visible.
+- Page-range previews use a lighter two-colour pair (`#b49be2` border / `#dccff3` body) and show the
+  actual operation: additions preview only newly added pages; fully committed candidate ranges
+  preview the post-subtraction result.
+- Each page action owns a full-width third of the bar: top starts, middle toggles one page, bottom
+  ends. The bar sits 12 px off the sheet and the page actions' hit area is the full bar width.
+- New setting 设置 → 阅读 → 页面引用条位置: left (default), right, both or hidden.
 - Adding a page range and removing one share one rule: a candidate interval entirely inside the
   committed set subtracts, otherwise it adds. Invalid start-after-end clicks discard the first click.
 - Repeated endpoint clicks can adjust the nearest range (default) or cancel, configurable under

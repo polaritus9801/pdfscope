@@ -8,7 +8,7 @@ use wasm_bindgen_futures::JsFuture;
 use crate::icons::{icon, provider_tile};
 use crate::panel::{
     PAGE_REPEAT_KEY, PRESET_LABELS, RESUME_PREFERENCE_KEY, apply_font_size, apply_theme, bridge,
-    flag_of, number_of, preset, text_of,
+    flag_of, number_of, preset, read_page_bar_side, text_of, write_page_bar_side,
 };
 
 /// Publishes the timeout to the bridge, in milliseconds; zero disables the watchdog.
@@ -114,6 +114,7 @@ pub(crate) fn SettingsSheet(
 
     let form_resume = RwSignal::new(read_resume_preference());
     let form_page_repeat = RwSignal::new(read_page_repeat_preference());
+    let form_page_bar_side = RwSignal::new(read_page_bar_side());
     let form_page_limit = RwSignal::new(0_u32);
     let form_timeout = RwSignal::new("0".to_owned());
     let form_context_limit = RwSignal::new("128000".to_owned());
@@ -606,6 +607,31 @@ pub(crate) fn SettingsSheet(
                                         </p>
 
                                         <label class="settings-row">
+                                            <span>"页面引用条位置"</span>
+                                            <select on:change=move |event| {
+                                                let value = event_target_value(&event);
+                                                form_page_bar_side.set(value.clone());
+                                                write_page_bar_side(&value);
+                                            }>
+                                                <option value="left" selected=move || form_page_bar_side.get() == "left">
+                                                    "左侧（默认）"
+                                                </option>
+                                                <option value="right" selected=move || form_page_bar_side.get() == "right">
+                                                    "右侧"
+                                                </option>
+                                                <option value="both" selected=move || form_page_bar_side.get() == "both">
+                                                    "两侧"
+                                                </option>
+                                                <option value="none" selected=move || form_page_bar_side.get() == "none">
+                                                    "不显示"
+                                                </option>
+                                            </select>
+                                        </label>
+                                        <p class="settings-hint">
+                                            "宽条和三个端点按钮会跟着移动；此选项立即生效。"
+                                        </p>
+
+                                        <label class="settings-row">
                                             <span>"双页奇偶偏移"</span>
                                             <input
                                                 type="checkbox"
@@ -648,6 +674,8 @@ pub(crate) fn SettingsSheet(
                                                     write_resume_preference("pinned");
                                                     form_page_repeat.set("adjust".to_owned());
                                                     write_page_repeat_preference("adjust");
+                                                    form_page_bar_side.set("left".to_owned());
+                                                    write_page_bar_side("left");
                                                 }
                                             >
                                                 "恢复阅读默认"

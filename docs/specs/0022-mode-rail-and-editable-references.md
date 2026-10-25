@@ -591,16 +591,22 @@ This supersedes the thin per-page bar and the old dashed page-outline preview.
 **Geometry.** One committed contiguous range draws one continuous vertical bar from the top of its
 first page to the bottom of its last page; page-gap space is filled so adjacent pages read as one bar.
 The bar is `1.8 ×` the original 24 px action diameter = 43.2 px wide, square-ended, and scales with the
-PDF. The stage reserves a left gutter for the bar and actions, so the bar is never clipped by the
-viewport at fit-width.
+PDF. It sits 12 px away from the page edge. The stage reserves a 116 px left gutter (and the same on
+the right when needed), so neither the bar nor its actions are clipped at fit-width.
 
-**Colours.** Committed bar body `#ac90d5`, end caps `#7f5cbf`, 18 px end transitions. Preview uses the
-lighter pair `#cbb8ec` body / `#9a7ad3` endpoint. A placed endpoint is committed `#7f5cbf`; the rest of
-an unplaced interval remains the light pair.
+**Colours.** Committed: `--deep-border: #7f5cbf` end caps and `--deep-body: #cbb8ec` body,
+with 18 px transitions. Preview: `--light-border: #b49be2` ends and `--light-body: #dccff3`
+body. A placed endpoint stays deep-border; the unplaced remainder uses the light pair. These are CSS
+variables on `.page`; the endpoint stops at 18 px.
 
-**Actions.** The three actions are the supplied SVGs exposed directly, 32.4 px = 3/4 bar width, centred
-on the bar. No circular button, no border: white semi-transparent fill plus a soft dark drop shadow for
-contrast on unselected white pages.
+**Actions.** The three supplied SVGs are exposed directly, 32.4 px = 3/4 bar width, with no circular
+chrome and no border. They are white at 86 % opacity with a soft dark drop shadow. Nothing is visible
+on page hover: only the button under the pointer is shown. Each button owns a full-width third of the
+bar: top 1/3 starts a range, middle 1/3 toggles one page, bottom 1/3 ends it.
+
+**Side preference.** 设置 → 阅读 → **页面引用条位置** offers 左侧 (default), 右侧, 两侧 and 不显示.
+It is stored in `localStorage["pdfscope.page-bar-side"]` and applied immediately. Right/both reserve a
+right gutter and reflow the page column; both renders a second independent bar/action column.
 
 **Add or subtract.** A candidate interval is a subtraction if and only if every page in it is already
 committed; otherwise it is an addition. Addition previews only the newly added pages in the light pair;

@@ -273,8 +273,13 @@ body {
   overflow-anchor: none;
   padding: var(--space-5);
   /* Reserve the left gutter for the wide page-range bar and its direct SVG actions. */
-  padding-left: calc(var(--space-5) * 4 + var(--space-2));
+  padding-left: calc(var(--space-5) * 4 + var(--space-4) + var(--space-1));
   padding-right: 0;
+}
+
+html[data-range-side="right"] .stage,
+html[data-range-side="both"] .stage {
+  padding-right: calc(var(--space-5) * 4 + var(--space-4) + var(--space-1));
 }
 
 /* The column is laid out once at the base width. Zoom transforms the whole column; the scaler
@@ -630,7 +635,11 @@ body {
   border-radius: 2px;  /* size */
   --page-range-width: 43.2px;  /* size */
   --page-action-size: 32.4px;  /* size */
-  --page-range-center: 26px;  /* size */
+  --page-range-center: 34px;  /* size */
+  --deep-border: #7f5cbf;
+  --deep-body: #cbb8ec;
+  --light-border: #b49be2;
+  --light-body: #dccff3;
 }
 
 .page-layer {
@@ -2433,65 +2442,112 @@ mark.find-hit {
   bottom: calc(-1 * var(--page-gap, var(--space-4)));
 }
 
+.page-range-bar.range-right,
+.page-bar-actions.range-right {
+  left: auto;
+  right: calc(-1 * var(--page-range-center) - var(--page-range-width) / 2);
+}
+
+.page-range-bar.range-right {
+  display: none;
+}
+
 .page-bar-actions {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: calc(-1 * var(--page-range-center) - var(--page-action-size) / 2);
+  left: calc(-1 * var(--page-range-center) - var(--page-range-width) / 2);
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  width: var(--page-action-size);
-  padding: var(--space-2) 0;
+  width: var(--page-range-width);
+  padding: 0;
   z-index: 6;
-  opacity: 0;
-  transition: opacity var(--duration) var(--ease);
 }
 
-.page:hover .page-bar-actions,
-.page-bar-actions:hover,
-.page-bar-actions:focus-within {
-  opacity: 1;
+.page-bar-actions.range-right {
+  display: none;
 }
 
 .page-bar-btn {
-  display: block;
-  width: var(--page-action-size);
-  height: var(--page-action-size);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 33.3333%;
   padding: 0;
   color: #ffffff;
   background: transparent;
   border: 0;
   cursor: pointer;
-  opacity: 0.86;
-  filter:
-    drop-shadow(0 1px 1px rgb(60 44 94 / 0.68))  /* size */
-    drop-shadow(0 0 1px rgb(60 44 94 / 0.35));  /* size */
-  transition: opacity var(--duration) var(--ease), filter var(--duration) var(--ease);
+  opacity: 0;
+  transition: opacity var(--duration) var(--ease);
+}
+
+.page-bar-start {
+  align-items: flex-start;
+  padding-top: var(--space-2);
+}
+
+.page-bar-end {
+  align-items: flex-end;
+  padding-bottom: var(--space-2);
 }
 
 .page-bar-btn svg {
   display: block;
-  width: 100%;
-  height: 100%;
+  flex: none;
+  width: var(--page-action-size);
+  height: var(--page-action-size);
+  filter:
+    drop-shadow(0 1px 1px rgb(60 44 94 / 0.68))  /* size */
+    drop-shadow(0 0 1px rgb(60 44 94 / 0.35));  /* size */
+}
+
+.page-bar-single svg path {
+  stroke: currentColor;
+  stroke-width: 44;  /* size */
+  stroke-linejoin: round;
+  paint-order: stroke fill;
 }
 
 .page-bar-end svg {
   transform: scaleY(-1);
 }
 
-.page-bar-btn:hover {
+.page-bar-btn:hover,
+.page-bar-btn:focus-visible {
   opacity: 1;
-  filter: drop-shadow(0 1px 2px rgb(60 44 94 / 0.8));  /* size */
 }
 
-.page-bar-btn:focus-visible {
-  outline: none;
-  opacity: 1;
+.page-bar-btn:focus-visible svg {
   filter:
     drop-shadow(0 0 2px #ffffff)  /* size */
     drop-shadow(0 1px 2px rgb(60 44 94 / 0.8));  /* size */
 }
+
+.page-bar-btn:hover svg {
+  filter: drop-shadow(0 1px 2px rgb(60 44 94 / 0.8));  /* size */
+}
+
+/* Left/right/both/none. Left is the default. */
+html[data-range-side="right"] .page-range-bar.range-left,
+html[data-range-side="right"] .page-bar-actions.range-left,
+html[data-range-side="none"] .page-range-bar,
+html[data-range-side="none"] .page-bar-actions {
+  display: none;
+}
+
+html[data-range-side="right"] .page-range-bar.range-right,
+html[data-range-side="both"] .page-range-bar.range-right {
+  display: block;
+}
+
+html[data-range-side="right"] .page-bar-actions.range-right,
+html[data-range-side="both"] .page-bar-actions.range-right {
+  display: flex;
+}
+
+/* The spread layout no longer decides the bar side; the reader preference does. */
 
 /* Scope row: one segmented control, three quiet icons, a count badge only where it means something. */
 .scope-row {
@@ -2608,16 +2664,7 @@ mark.find-hit {
   color: var(--accent);
 }
 
-/* The right sheet of a spread carries its bar and actions on the right, away from the spine. */
-.page[data-spread="right"] .page-range-bar {
-  left: auto;
-  right: calc(-1 * var(--page-range-center) - var(--page-range-width) / 2);
-}
-
-.page[data-spread="right"] .page-bar-actions {
-  left: auto;
-  right: calc(-1 * var(--page-range-center) - var(--page-action-size) / 2);
-}
+/* The reader preference, not the spread side, decides where the range bar lives. */
 
 /* An icon-only header button: the same height, less horizontal padding. */
 .button.icon-only {

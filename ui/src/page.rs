@@ -125,6 +125,73 @@ fn read_page_repeat() -> String {
 }
 
 #[component]
+fn PageBarActions(
+    number: u32,
+    side: &'static str,
+    hover_page: RwSignal<Option<u32>>,
+    hover_kind: RwSignal<Option<u8>>,
+    choose_start: Callback<web_sys::MouseEvent>,
+    toggle_page: Callback<web_sys::MouseEvent>,
+    choose_end: Callback<web_sys::MouseEvent>,
+) -> impl IntoView {
+    view! {
+        <div
+            class=format!("page-bar-actions range-{side}")
+            on:mouseenter=move |_| hover_page.set(Some(number))
+            on:mouseleave=move |_| {
+                hover_page.set(None);
+                hover_kind.set(None);
+            }
+        >
+            <button
+                class="page-bar-btn page-bar-start"
+                title="从这里开始"
+                aria-label=format!("{}：从这里开始", page_label(number))
+                on:mouseenter=move |_| {
+                    hover_page.set(Some(number));
+                    hover_kind.set(Some(0));
+                }
+                on:click=move |event| choose_start.run(event)
+            >
+                <svg viewBox="0 0 1024 1024" width="32" height="32" aria-hidden="true">
+                    <path fill="currentColor" d="M855.866698 106.426915c0 23.451108-19.010983 42.463114-42.463114 42.463114L203.435319 148.890029c-23.451108 0-42.463114-19.010983-42.463114-42.463114l0 0c0-23.451108 19.010983-42.463114 42.463114-42.463114l609.968266 0C836.855716 63.963801 855.866698 82.974783 855.866698 106.426915L855.866698 106.426915zM511.826038 264.35069c-23.451108 0-42.463114 19.010983-42.463114 42.463114l0 609.968266c0 23.451108 19.010983 42.463114 42.463114 42.463114l0 0c23.451108 0 42.463114-19.010983 42.463114-42.463114L554.289152 306.812781C554.288129 283.361673 535.277146 264.35069 511.826038 264.35069L511.826038 264.35069zM541.961382 233.023194c-16.582677-16.582677-42.517349-17.534352-57.927317-2.124384L171.253362 543.67849c-15.408945 15.408945-14.458293 41.343617 2.124384 57.926294l0 0c16.582677 16.582677 42.517349 17.534352 57.926294 2.124384L544.085766 290.949488C559.494711 275.540544 558.544059 249.605871 541.961382 233.023194L541.961382 233.023194zM481.696834 233.023194c-16.582677 16.582677-17.534352 42.517349-2.124384 57.926294l312.780703 312.780703c15.408945 15.408945 41.343617 14.458293 57.926294-2.124384l0 0c16.582677-16.582677 17.534352-42.517349 2.124384-57.926294L539.623128 230.897787C524.214183 215.488843 498.27951 216.440517 481.696834 233.023194L481.696834 233.023194z"></path>
+                </svg>
+            </button>
+            <button
+                class="page-bar-btn page-bar-single"
+                title="单独这一页"
+                aria-label=format!("{}：单独这一页", page_label(number))
+                on:mouseenter=move |_| {
+                    hover_page.set(Some(number));
+                    hover_kind.set(Some(2));
+                }
+                on:click=move |event| toggle_page.run(event)
+            >
+                <svg viewBox="0 0 1024 1024" width="32" height="32" aria-hidden="true">
+                    <path fill="currentColor" d="M896 512c0 212.074667-171.925333 384-384 384S128 724.074667 128 512 299.925333 128 512 128s384 171.925333 384 384zM512 853.333333c188.522667 0 341.333333-152.810667 341.333333-341.333333S700.522667 170.666667 512 170.666667 170.666667 323.477333 170.666667 512s152.810667 341.333333 341.333333 341.333333z"></path>
+                    <path fill="currentColor" d="M277.333333 512a21.333333 21.333333 0 0 1 21.333334-21.333333h423.104a21.333333 21.333333 0 1 1 0 42.666666H298.666667a21.333333 21.333333 0 0 1-21.333334-21.333333z"></path>
+                    <path fill="currentColor" d="M510.229333 744.896a21.333333 21.333333 0 0 1-21.333333-21.333333V300.437333a21.333333 21.333333 0 0 1 42.666667 0v423.125334a21.333333 21.333333 0 0 1-21.333334 21.333333z"></path>
+                </svg>
+            </button>
+            <button
+                class="page-bar-btn page-bar-end"
+                title="到这里结束"
+                aria-label=format!("{}：到这里结束", page_label(number))
+                on:mouseenter=move |_| {
+                    hover_page.set(Some(number));
+                    hover_kind.set(Some(1));
+                }
+                on:click=move |event| choose_end.run(event)
+            >
+                <svg viewBox="0 0 1024 1024" width="32" height="32" aria-hidden="true">
+                    <path fill="currentColor" d="M855.866698 106.426915c0 23.451108-19.010983 42.463114-42.463114 42.463114L203.435319 148.890029c-23.451108 0-42.463114-19.010983-42.463114-42.463114l0 0c0-23.451108 19.010983-42.463114 42.463114-42.463114l609.968266 0C836.855716 63.963801 855.866698 82.974783 855.866698 106.426915L855.866698 106.426915zM511.826038 264.35069c-23.451108 0-42.463114 19.010983-42.463114 42.463114l0 609.968266c0 23.451108 19.010983 42.463114 42.463114 42.463114l0 0c23.451108 0 42.463114-19.010983 42.463114-42.463114L554.289152 306.812781C554.288129 283.361673 535.277146 264.35069 511.826038 264.35069L511.826038 264.35069zM541.961382 233.023194c-16.582677-16.582677-42.517349-17.534352-57.927317-2.124384L171.253362 543.67849c-15.408945 15.408945-14.458293 41.343617 2.124384 57.926294l0 0c16.582677 16.582677 42.517349 17.534352 57.926294 2.124384L544.085766 290.949488C559.494711 275.540544 558.544059 249.605871 541.961382 233.023194L541.961382 233.023194zM481.696834 233.023194c-16.582677 16.582677-17.534352 42.517349-2.124384 57.926294l312.780703 312.780703c15.408945 15.408945 41.343617 14.458293 57.926294-2.124384l0 0c16.582677-16.582677 17.534352-42.517349 2.124384-57.926294L539.623128 230.897787C524.214183 215.488843 498.27951 216.440517 481.696834 233.023194L481.696834 233.023194z"></path>
+                </svg>
+            </button>
+        </div>
+    }
+}
+
+#[component]
 pub(crate) fn PageView(
     number: u32,
     width: f64,
@@ -479,10 +546,10 @@ pub(crate) fn PageView(
         }
     };
 
-    let choose_start = move |_| choose_endpoint(0);
-    let choose_end = move |_| choose_endpoint(1);
+    let choose_start = Callback::new(move |_: web_sys::MouseEvent| choose_endpoint(0));
+    let choose_end = Callback::new(move |_: web_sys::MouseEvent| choose_endpoint(1));
 
-    let toggle_page = move |_| {
+    let toggle_page = Callback::new(move |_: web_sys::MouseEvent| {
         let current = page_set.get_untracked();
         let mut next = current.clone();
         pdfscope_core::pages::toggle_page(&mut next, number);
@@ -492,7 +559,7 @@ pub(crate) fn PageView(
             scope_mode.set(2);
         }
         clear_draft();
-    };
+    });
 
     let bar = move || -> (String, String) {
         let set = page_set.get();
@@ -501,14 +568,18 @@ pub(crate) fn PageView(
         let kind = hover_kind.get();
         let visual = page_visual(number, &set, anchor, hovered, kind);
         if let Some((open_kind, placed)) = visual.open {
-            let cap = if placed { "#7f5cbf" } else { "#9a7ad3" };
+            let cap = if placed {
+                "var(--deep-border)"
+            } else {
+                "var(--light-border)"
+            };
             let background = if open_kind == 0 {
                 format!(
-                    "linear-gradient(to bottom, {cap} 0, #cbb8ec 18px, rgb(203 184 236 / 0) 100%)"
+                    "linear-gradient(to bottom, {cap} 0, var(--light-body) 18px, rgb(220 207 243 / 0) 100%)"
                 )
             } else {
                 format!(
-                    "linear-gradient(to bottom, rgb(203 184 236 / 0) 0, #cbb8ec calc(100% - 18px), {cap} 100%)"
+                    "linear-gradient(to bottom, rgb(220 207 243 / 0) 0, var(--light-body) calc(100% - 18px), {cap} 100%)"
                 )
             };
             return (
@@ -524,12 +595,16 @@ pub(crate) fn PageView(
             // start/end pair is legal, so the cap follows the anchor page, not the button label.
             let placed = anchor.map(|(_, page)| page == number).unwrap_or(false);
             let top = if first && placed {
-                "#7f5cbf"
+                "var(--deep-border)"
             } else {
-                "#9a7ad3"
+                "var(--light-border)"
             };
-            let bottom = if last && placed { "#7f5cbf" } else { "#9a7ad3" };
-            let background = bar_gradient(first, last, top, bottom, "#cbb8ec");
+            let bottom = if last && placed {
+                "var(--deep-border)"
+            } else {
+                "var(--light-border)"
+            };
+            let background = bar_gradient(first, last, top, bottom, "var(--light-body)");
             let class = if last {
                 "page-range-bar visible add last"
             } else {
@@ -541,7 +616,13 @@ pub(crate) fn PageView(
         if visual.base {
             let first = !page_visual(number - 1, &set, anchor, hovered, kind).base || number == 1;
             let last = !page_visual(number + 1, &set, anchor, hovered, kind).base;
-            let background = bar_gradient(first, last, "#7f5cbf", "#7f5cbf", "#ac90d5");
+            let background = bar_gradient(
+                first,
+                last,
+                "var(--deep-border)",
+                "var(--deep-border)",
+                "var(--deep-body)",
+            );
             let class = if last {
                 "page-range-bar visible base last"
             } else {
@@ -729,63 +810,33 @@ pub(crate) fn PageView(
             />
 
             <div
-                class=move || bar().0
+                class=move || format!("{} range-left", bar().0)
                 style=move || bar().1
                 aria-hidden="true"
             ></div>
             <div
-                class="page-bar-actions"
-                on:mouseenter=move |_| hover_page.set(Some(number))
-                on:mouseleave=move |_| {
-                    hover_page.set(None);
-                    hover_kind.set(None);
-                }
-            >
-                <button
-                    class="page-bar-btn page-bar-start"
-                    title="从这里开始"
-                    aria-label=move || format!("{}：从这里开始", page_label(number))
-                    on:mouseenter=move |_| {
-                        hover_page.set(Some(number));
-                        hover_kind.set(Some(0));
-                    }
-                    on:click=choose_start
-                >
-                    <svg viewBox="0 0 1024 1024" width="32" height="32" aria-hidden="true">
-                        <path fill="currentColor" d="M855.866698 106.426915c0 23.451108-19.010983 42.463114-42.463114 42.463114L203.435319 148.890029c-23.451108 0-42.463114-19.010983-42.463114-42.463114l0 0c0-23.451108 19.010983-42.463114 42.463114-42.463114l609.968266 0C836.855716 63.963801 855.866698 82.974783 855.866698 106.426915L855.866698 106.426915zM511.826038 264.35069c-23.451108 0-42.463114 19.010983-42.463114 42.463114l0 609.968266c0 23.451108 19.010983 42.463114 42.463114 42.463114l0 0c23.451108 0 42.463114-19.010983 42.463114-42.463114L554.289152 306.812781C554.288129 283.361673 535.277146 264.35069 511.826038 264.35069L511.826038 264.35069zM541.961382 233.023194c-16.582677-16.582677-42.517349-17.534352-57.927317-2.124384L171.253362 543.67849c-15.408945 15.408945-14.458293 41.343617 2.124384 57.926294l0 0c16.582677 16.582677 42.517349 17.534352 57.926294 2.124384L544.085766 290.949488C559.494711 275.540544 558.544059 249.605871 541.961382 233.023194L541.961382 233.023194zM481.696834 233.023194c-16.582677 16.582677-17.534352 42.517349-2.124384 57.926294l312.780703 312.780703c15.408945 15.408945 41.343617 14.458293 57.926294-2.124384l0 0c16.582677-16.582677 17.534352-42.517349 2.124384-57.926294L539.623128 230.897787C524.214183 215.488843 498.27951 216.440517 481.696834 233.023194L481.696834 233.023194z"></path>
-                    </svg>
-                </button>
-                <button
-                    class="page-bar-btn page-bar-single"
-                    title="单独这一页"
-                    aria-label=move || format!("{}：单独这一页", page_label(number))
-                    on:mouseenter=move |_| {
-                        hover_page.set(Some(number));
-                        hover_kind.set(Some(2));
-                    }
-                    on:click=toggle_page
-                >
-                    <svg viewBox="0 0 1024 1024" width="32" height="32" aria-hidden="true">
-                        <path fill="currentColor" d="M896 512c0 212.074667-171.925333 384-384 384S128 724.074667 128 512 299.925333 128 512 128s384 171.925333 384 384zM512 853.333333c188.522667 0 341.333333-152.810667 341.333333-341.333333S700.522667 170.666667 512 170.666667 170.666667 323.477333 170.666667 512s152.810667 341.333333 341.333333 341.333333z"></path>
-                        <path fill="currentColor" d="M277.333333 512a21.333333 21.333333 0 0 1 21.333334-21.333333h423.104a21.333333 21.333333 0 1 1 0 42.666666H298.666667a21.333333 21.333333 0 0 1-21.333334-21.333333z"></path>
-                        <path fill="currentColor" d="M510.229333 744.896a21.333333 21.333333 0 0 1-21.333333-21.333333V300.437333a21.333333 21.333333 0 0 1 42.666667 0v423.125334a21.333333 21.333333 0 0 1-21.333334 21.333333z"></path>
-                    </svg>
-                </button>
-                <button
-                    class="page-bar-btn page-bar-end"
-                    title="到这里结束"
-                    aria-label=move || format!("{}：到这里结束", page_label(number))
-                    on:mouseenter=move |_| {
-                        hover_page.set(Some(number));
-                        hover_kind.set(Some(1));
-                    }
-                    on:click=choose_end
-                >
-                    <svg viewBox="0 0 1024 1024" width="32" height="32" aria-hidden="true">
-                        <path fill="currentColor" d="M855.866698 106.426915c0 23.451108-19.010983 42.463114-42.463114 42.463114L203.435319 148.890029c-23.451108 0-42.463114-19.010983-42.463114-42.463114l0 0c0-23.451108 19.010983-42.463114 42.463114-42.463114l609.968266 0C836.855716 63.963801 855.866698 82.974783 855.866698 106.426915L855.866698 106.426915zM511.826038 264.35069c-23.451108 0-42.463114 19.010983-42.463114 42.463114l0 609.968266c0 23.451108 19.010983 42.463114 42.463114 42.463114l0 0c23.451108 0 42.463114-19.010983 42.463114-42.463114L554.289152 306.812781C554.288129 283.361673 535.277146 264.35069 511.826038 264.35069L511.826038 264.35069zM541.961382 233.023194c-16.582677-16.582677-42.517349-17.534352-57.927317-2.124384L171.253362 543.67849c-15.408945 15.408945-14.458293 41.343617 2.124384 57.926294l0 0c16.582677 16.582677 42.517349 17.534352 57.926294 2.124384L544.085766 290.949488C559.494711 275.540544 558.544059 249.605871 541.961382 233.023194L541.961382 233.023194zM481.696834 233.023194c-16.582677 16.582677-17.534352 42.517349-2.124384 57.926294l312.780703 312.780703c15.408945 15.408945 41.343617 14.458293 57.926294-2.124384l0 0c16.582677-16.582677 17.534352-42.517349 2.124384-57.926294L539.623128 230.897787C524.214183 215.488843 498.27951 216.440517 481.696834 233.023194L481.696834 233.023194z"></path>
-                    </svg>
-                </button>
-            </div>
+                class=move || format!("{} range-right", bar().0)
+                style=move || bar().1
+                aria-hidden="true"
+            ></div>
+            <PageBarActions
+                number=number
+                side="left"
+                hover_page=hover_page
+                hover_kind=hover_kind
+                choose_start=choose_start
+                toggle_page=toggle_page
+                choose_end=choose_end
+            />
+            <PageBarActions
+                number=number
+                side="right"
+                hover_page=hover_page
+                hover_kind=hover_kind
+                choose_start=choose_start
+                toggle_page=toggle_page
+                choose_end=choose_end
+            />
 
             {move || {
                 let mut frames = Vec::new();
