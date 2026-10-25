@@ -236,9 +236,15 @@ function anchorPage() {
 function installPageAnchor() {
   if (pageAnchorBound) return;
   pageAnchorBound = true;
-  document.addEventListener("focusin", () => requestAnimationFrame(anchorPage), true);
-  document.addEventListener("scroll", anchorPage, { capture: true, passive: true });
-  window.addEventListener("scroll", anchorPage, { passive: true });
+  document.addEventListener(
+    "focusin",
+    (event) => {
+      if (event.target instanceof Element && event.target.closest(".composer-card")) {
+        requestAnimationFrame(anchorPage);
+      }
+    },
+    true,
+  );
   anchorPage();
 }
 

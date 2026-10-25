@@ -91,10 +91,11 @@ markers. The placeholder is inset 12px, matching the editor content padding.
 PDF.js's hidden measurement canvas is kept out of flow (`position: fixed`, offscreen). In normal
 flow it added a 19px inline line box to `body`; focusing the composer could scroll `body` by that
 amount and shift the whole app even when the composer itself did not change height. As a second line
-of defence, `html`/`body` use `overflow: clip`, `body` is fixed to the viewport, `.app`/`.panel` are
-clipped, and the composer anchors body, document, app, workspace and panel scroll on `focusin` and
-scroll events. Any residual overflow therefore cannot push the panel header or expose the bottom
-bar.
+of defence, `html`/`body` use `overflow: clip` and `.app`/`.panel` are clipped, so no shell container
+can become a scroll container. The composer anchors shell scroll only on composer focus, mode
+toggles and caret placement. There is deliberately no `position: fixed` body and no global scroll
+listener: both were removed to avoid mobile-keyboard/print side effects and scroll jank while the PDF
+viewer is scrolling.
 
 There is one enforced automatic height cap: `--composer-auto-max`, computed as 30% of the AI panel's
 height and refreshed by a `ResizeObserver` (CSS fallback `30vh`, clamped to at least the 56px content floor). Content grows naturally up to that

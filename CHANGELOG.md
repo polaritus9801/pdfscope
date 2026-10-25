@@ -10,10 +10,11 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Fixed
 
-- Locked page scrolling with `overflow: clip`, a viewport-fixed `body`, clipped `.app`/`.panel`, and
-  focus/scroll anchoring for body, document, app, workspace and panel. Even if another element
-  overflows, focusing or toggling the composer can no longer scroll any shell container and put the
-  history/new-session buttons out of reach.
+- Locked shell scrolling with `overflow: clip` on `html`/`body` and clipped `.app`/`.panel`, plus
+  composer-focus and mode-toggle anchoring. Even if another element overflows, focusing or toggling
+  the composer can no longer scroll a shell container and put the history/new-session buttons out of
+  reach. Removed the heavier viewport-fixed body and global scroll listener; they were unnecessary
+  once the shell containers are clipped and added mobile/print and scroll-jank risk.
 
 - Removed the mode-height floor that kept the composer at the taller preview height: it left a blank
   white strip under the shorter plain-text layout, most obvious with stacked display formulas.
