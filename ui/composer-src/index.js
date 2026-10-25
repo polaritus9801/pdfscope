@@ -33,6 +33,7 @@ let markdownEnabled = readMarkdownPreference();
 let markdownDot = null;
 let resizeHandle = null;
 let autoCapObserver = null;
+let pageAnchorBound = false;
 
 function readMarkdownPreference() {
   try {
@@ -222,6 +223,21 @@ function dispatchTransaction(transaction) {
   syncMention(transaction.docChanged && !transaction.getMeta("programmatic"));
 }
 
+function anchorPage() {
+  if (window.scrollY !== 0 || window.scrollX !== 0) window.scrollTo(0, 0);
+  if (document.documentElement.scrollTop !== 0) document.documentElement.scrollTop = 0;
+  if (document.body.scrollTop !== 0) document.body.scrollTop = 0;
+}
+
+function installPageAnchor() {
+  if (pageAnchorBound) return;
+  pageAnchorBound = true;
+  document.addEventListener("focusin", () => requestAnimationFrame(anchorPage), true);
+  window.addEventListener("scroll", anchorPage, { passive: true });
+  document.body.addEventListener("scroll", anchorPage, { passive: true });
+  anchorPage();
+}
+
 function scrollCaretIntoView() {
   if (!view || !root) return;
   const coords = view.coordsAtPos(view.state.selection.head);
@@ -238,7 +254,11 @@ function placeEnd() {
   const selection = Selection.atEnd(view.state.doc);
   view.dispatch(view.state.tr.setSelection(selection).scrollIntoView());
   view.focus();
-  requestAnimationFrame(scrollCaretIntoView);
+  anchorPage();
+  requestAnimationFrame(() => {
+    anchorPage();
+    scrollCaretIntoView();
+  });
 }
 
 function replaceDoc(doc, silent = false) {
@@ -815,7 +835,11 @@ function setMarkdownEnabled(next) {
         .setMeta("markdownPreview", markdownEnabled),
     );
     view.focus();
-    requestAnimationFrame(scrollCaretIntoView);
+    anchorPage();
+    requestAnimationFrame(() => {
+      anchorPage();
+      scrollCaretIntoView();
+    });
   }
   updateMarkdownDot();
 }
@@ -1005,6 +1029,7 @@ window.Composer = {
       plugins: [history(), keymapPlugin, markdownPreviewPlugin],
     });
     view = installView(root, state);
+    installPageAnchor();
     view.dom.addEventListener("mousedown", handleMouseDown, true);
     view.dom.addEventListener(
       "keydown",

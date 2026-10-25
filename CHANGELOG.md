@@ -10,6 +10,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Fixed
 
+- Locked page scrolling with `overflow: clip` plus focus/scroll anchoring. Even if another element
+  overflows `body`, focusing or toggling the composer can no longer scroll the whole AI panel upward
+  and put the history/new-session buttons out of reach.
+
 - Removed the mode-height floor that kept the composer at the taller preview height: it left a blank
   white strip under the shorter plain-text layout, most obvious with stacked display formulas.
 - Capped automatic composer growth at 40% of the AI panel height. Long content scrolls inside the
