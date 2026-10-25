@@ -693,8 +693,9 @@ Firefox), independent of the reader scrollbar. The manager grid keeps its normal
 
 ## 2026-10-26 — page ruler, manager drag and native-drag fix
 
-**Page ruler.** 设置 → 通用设置 → 外观 → **滚动条** offers two skins: 灰色（system-scrollbar colour,
-default）and 紫色 (accent). The setting applies on 保存, like the theme cards. The page ruler is always
+**Page ruler.** 设置 → 通用设置 → 外观 → **滚动条** offers two skins: 紫色 (accent, default) and
+灰色 (solid platform-scrollbar grey with the white keyline, no shadow). The setting applies on 保存,
+like the theme cards. The page ruler is always
 present; the platform scrollbars stay hidden (horizontal panning remains available through
 trackpad/shift-wheel). The skin is stored as `localStorage["pdfscope.scroll-skin"]` and exposed as
 `html[data-scroll-skin]`; adding a future skin is one new value plus one CSS block swapping the three
@@ -712,9 +713,11 @@ trackpad/shift-wheel). The skin is stored as `localStorage["pdfscope.scroll-skin
 - bookmarks are always drawn, while minor page ticks are sampled by the exact density rule below;
 - no separate current-page line (the thumb is the only current-position indicator);
 - a modern 12 px scrollbar thumb that always sits above the neutral ruler; the hover line sits
-  *below* the canvas, so tick marks and thumb cover it. Grey uses the system-scrollbar grey; purple
-  uses the accent gradient;
-- page ruler marks are neutral `--ink-faint`; purple is reserved for the scrollbar thumb.
+  *below* the canvas, so tick marks and thumb cover it. Grey is solid platform-scrollbar grey with
+  no shadow; purple uses the accent gradient;
+- page ruler marks are neutral `--ink-faint`; purple is reserved for the scrollbar thumb. Tick
+  strokes use round caps, inset by the 0.5 px cap radius so the longest 16 px tick ends exactly at
+  the rail edge rather than poking outside; bookmark bars use an inset round-rect;
 
 **Tick length and density algorithm.** Let `bookmarks` be the deduplicated page map (one shallowest
 entry per page), `dMin`/`dMax` its minimum/maximum depth, and `longest = 16`, `shortest = 8`.

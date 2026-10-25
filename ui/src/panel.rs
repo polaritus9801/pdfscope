@@ -74,7 +74,7 @@ pub(crate) fn read_scroll_skin() -> String {
         .and_then(|window| window.local_storage().ok().flatten())
         .and_then(|storage| storage.get_item(SCROLL_SKIN_KEY).ok().flatten())
         .filter(|value| matches!(value.as_str(), "gray" | "purple"))
-        .unwrap_or_else(|| "gray".to_owned())
+        .unwrap_or_else(|| "purple".to_owned())
 }
 
 pub(crate) fn apply_scroll_skin(value: &str) {
@@ -90,7 +90,7 @@ pub(crate) fn write_scroll_skin(value: &str) {
     let value = if matches!(value, "gray" | "purple") {
         value
     } else {
-        "gray"
+        "purple"
     };
     if let Some(storage) =
         web_sys::window().and_then(|window| window.local_storage().ok().flatten())

@@ -529,8 +529,8 @@ pub(crate) fn SettingsSheet(
                                         </p>
                                         <div class="scrollbar-style-cards">
                                             {[
-                                                ("gray", "灰色", "系统滚动条颜色"),
                                                 ("purple", "紫色", "跟随强调色"),
+                                                ("gray", "灰色", "系统滚动条颜色"),
                                             ]
                                                 .into_iter()
                                                 .map(|(value, label, description)| {

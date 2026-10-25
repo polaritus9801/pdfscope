@@ -3788,8 +3788,12 @@ function drawPageRuler() {
   const shortest = 8;
 
   context.lineWidth = 1;
+  context.lineCap = "round";
   context.strokeStyle = colors.faint;
   context.fillStyle = colors.faint;
+  // Keep the round caps inside the 16 px rail: a 1 px stroke has a 0.5 px radius at each end.
+  const cap = context.lineWidth / 2;
+  const right = 16 - cap;
   for (let index = 0; index < ruler.marks.length; index += 1) {
     const mark = ruler.marks[index];
     const bookmark = bookmarks.get(mark.number);
@@ -3800,13 +3804,21 @@ function drawPageRuler() {
       const ratio = Math.min(1, Math.max(0, (bookmark.depth - depthMin) / depthSpan));
       const length = Math.round(longest - ratio * (longest - shortest));
       context.globalAlpha = 0.62;
-      context.fillRect(16 - length, y - 1, length, 2);
+      // A 2 px bookmark bar with a round left cap, square against the rail on the right.
+      const left = 16 - length;
+      context.beginPath();
+      context.moveTo(16, y - 1);
+      context.lineTo(left + 1, y - 1);
+      context.arc(left + 1, y, 1, -Math.PI / 2, Math.PI / 2, true);
+      context.lineTo(16, y + 1);
+      context.closePath();
+      context.fill();
     } else {
       const length = major ? longest : shortest;
       context.globalAlpha = major ? 0.58 : 0.34;
       context.beginPath();
-      context.moveTo(16 - length, y + 0.5);
-      context.lineTo(16, y + 0.5);
+      context.moveTo(16 - length + cap, y + 0.5);
+      context.lineTo(right, y + 0.5);
       context.stroke();
     }
   }

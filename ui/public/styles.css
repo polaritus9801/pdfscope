@@ -336,22 +336,7 @@ html.ruler-ready .stage::-webkit-scrollbar {
   width: 16px;  /* size */
   height: 100%;
   background: color-mix(in srgb, var(--surface) 92%, var(--border));
-  /* Default is the neutral system-coloured skin. Future skins only swap these variables. */
-  --ruler-thumb-bg: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--ink-faint) 36%, var(--surface)),
-    color-mix(in srgb, var(--ink-faint) 66%, var(--surface))
-  );
-  --ruler-thumb-border: color-mix(in srgb, var(--surface) 82%, transparent);
-  --ruler-thumb-shadow:
-    0 2px 7px rgb(20 16 26 / 18%),  /* size */
-    inset 0 1px 0 rgb(255 255 255 / 40%);  /* size */
-  outline: none;
-  touch-action: none;
-  cursor: default;
-}
-
-html[data-scroll-skin="purple"] .page-ruler {
+  /* The accent skin is the default. Future skins only swap these variables. */
   --ruler-thumb-bg: linear-gradient(
     180deg,
     color-mix(in srgb, var(--accent) 58%, var(--surface)),
@@ -361,6 +346,16 @@ html[data-scroll-skin="purple"] .page-ruler {
   --ruler-thumb-shadow:
     0 2px 7px rgb(60 44 94 / 22%),  /* size */
     inset 0 1px 0 rgb(255 255 255 / 48%);  /* size */
+  outline: none;
+  touch-action: none;
+  cursor: default;
+}
+
+html[data-scroll-skin="gray"] .page-ruler {
+  /* Platform-scrollbar grey: solid neutral grey, no gradient or shadow; the white keyline stays. */
+  --ruler-thumb-bg: #6f6f76;
+  --ruler-thumb-border: color-mix(in srgb, var(--surface) 86%, transparent);
+  --ruler-thumb-shadow: none;
 }
 
 .page-ruler::before {
@@ -1285,16 +1280,24 @@ html[data-scroll-skin="purple"] .page-ruler {
   transition: background 120ms ease;
 }
 
-/* The visible rail stays four pixels; a wider transparent overlay only enlarges the drag target. */
+/* The hit area is the divider itself. The old 12 px overlay reached into the page ruler and stole
+   its hover near the right edge. Touch pointers still get the wider target. */
 .rail::before {
   content: "";
   position: absolute;
   top: 0;
-  left: -4px;  /* size */
-  width: 12px;  /* size */
+  left: 0;
+  width: 100%;
   height: 100%;
   background: transparent;
   cursor: col-resize;
+}
+
+@media (pointer: coarse) {
+  .rail::before {
+    left: -4px;  /* size */
+    width: 12px;  /* size */
+  }
 }
 
 .rail:hover,
@@ -2070,12 +2073,8 @@ body {
 }
 
 .scrollbar-preview.gray::after {
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--ink-faint) 36%, var(--surface)),
-    color-mix(in srgb, var(--ink-faint) 66%, var(--surface))
-  );
-  box-shadow: 0 1px 3px rgb(20 16 26 / 16%);  /* size */
+  background: #6f6f76;
+  box-shadow: none;
 }
 
 .scrollbar-preview.purple::after {
