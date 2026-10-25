@@ -161,6 +161,12 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Fixed
 
+- The `@` picker floats above the composer instead of pushing the context shelf up.
+- Choosing an `@` reference now inserts a visible pill (the token builder no longer calls itself).
+- Deleting an inline `@` pill no longer deletes the reference from the context shelf; removing the
+  shelf chip removes both.
+- Answer completion time is 11px instead of 10px.
+
 - Thinking now collapses as soon as the first answer tokens arrive. The auto-collapse added in
   0adfe99 was checked only inside flush_pending, which the coalesced text path (718c71f) bypasses;
   it therefore ran only at done/stop and the pill stayed open during the answer.

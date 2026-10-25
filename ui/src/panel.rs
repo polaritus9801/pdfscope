@@ -1369,55 +1369,6 @@ pub fn AiPanel(
                     .map(|list| list.iter().filter_map(|value| value.as_string()).collect())
                     .unwrap_or_default();
 
-                let previous = known_mentions.get_untracked();
-                for key in previous.iter().filter(|key| !current.contains(key)) {
-                    // Remove only what still exists. `update` notifies even when the list is
-                    // unchanged, and a restore that re-emits the same keys used to turn that
-                    // notification into a reactive loop.
-                    if let Some(id) = key.strip_prefix("p:").and_then(|id| id.parse::<u64>().ok()) {
-                        if passages.get_untracked().iter().any(|entry| entry.id == id) {
-                            undo_push.run(());
-                            passages.update(|list| list.retain(|entry| entry.id != id));
-                        }
-                    } else if let Some(id) =
-                        key.strip_prefix("r:").and_then(|id| id.parse::<u64>().ok())
-                    {
-                        if regions.get_untracked().iter().any(|entry| entry.id == id) {
-                            undo_push.run(());
-                            regions.update(|list| list.retain(|entry| entry.id != id));
-                        }
-                    } else if let Some(page) = key
-                        .strip_prefix("page:")
-                        .and_then(|page| page.parse::<u32>().ok())
-                    {
-                        if page_set.get_untracked().contains(&page) {
-                            undo_push.run(());
-                            page_set.update(|set| set.retain(|entry| *entry != page));
-                        }
-                    } else if let Some(id) =
-                        key.strip_prefix("a:").and_then(|id| id.parse::<u64>().ok())
-                    {
-                        if answers.get_untracked().iter().any(|entry| entry.id == id) {
-                            undo_push.run(());
-                            answers.update(|list| list.retain(|entry| entry.id != id));
-                        }
-                    } else if let Some(id) = key
-                        .strip_prefix("img:")
-                        .and_then(|id| id.parse::<u64>().ok())
-                    {
-                        if images.get_untracked().iter().any(|entry| entry.id == id) {
-                            images.update(|list| list.retain(|entry| entry.id != id));
-                        }
-                    } else if let Some(id) = key
-                        .strip_prefix("file:")
-                        .and_then(|id| id.parse::<u64>().ok())
-                    {
-                        if files.get_untracked().iter().any(|entry| entry.id == id) {
-                            files.update(|list| list.retain(|entry| entry.id != id));
-                        }
-                    }
-                }
-
                 known_mentions.set(current.clone());
                 mentions.set(current);
                 question.set(text.clone());
@@ -2393,51 +2344,31 @@ pub fn AiPanel(
 
     let remove_passage = move |id: u64| {
         let key = format!("p:{id}");
-        let removed = composer("removeToken", &[JsValue::from_str(&key)])
-            .and_then(|value| value.as_bool())
-            .unwrap_or(false);
-        if !removed {
-            undo_push.run(());
-            passages.update(|list| list.retain(|entry| entry.id != id));
-        }
+        let _ = composer("removeToken", &[JsValue::from_str(&key)]);
+        undo_push.run(());
+        passages.update(|list| list.retain(|entry| entry.id != id));
     };
     let remove_region = move |id: u64| {
         let key = format!("r:{id}");
-        let removed = composer("removeToken", &[JsValue::from_str(&key)])
-            .and_then(|value| value.as_bool())
-            .unwrap_or(false);
-        if !removed {
-            undo_push.run(());
-            regions.update(|list| list.retain(|entry| entry.id != id));
-        }
+        let _ = composer("removeToken", &[JsValue::from_str(&key)]);
+        undo_push.run(());
+        regions.update(|list| list.retain(|entry| entry.id != id));
     };
     let remove_file = move |id: u64| {
         let key = format!("file:{id}");
-        let removed = composer("removeToken", &[JsValue::from_str(&key)])
-            .and_then(|value| value.as_bool())
-            .unwrap_or(false);
-        if !removed {
-            files.update(|list| list.retain(|entry| entry.id != id));
-        }
+        let _ = composer("removeToken", &[JsValue::from_str(&key)]);
+        files.update(|list| list.retain(|entry| entry.id != id));
     };
     let remove_image = move |id: u64| {
         let key = format!("img:{id}");
-        let removed = composer("removeToken", &[JsValue::from_str(&key)])
-            .and_then(|value| value.as_bool())
-            .unwrap_or(false);
-        if !removed {
-            images.update(|list| list.retain(|entry| entry.id != id));
-        }
+        let _ = composer("removeToken", &[JsValue::from_str(&key)]);
+        images.update(|list| list.retain(|entry| entry.id != id));
     };
     let remove_answer = move |id: u64| {
         let key = format!("a:{id}");
-        let removed = composer("removeToken", &[JsValue::from_str(&key)])
-            .and_then(|value| value.as_bool())
-            .unwrap_or(false);
-        if !removed {
-            undo_push.run(());
-            answers.update(|list| list.retain(|entry| entry.id != id));
-        }
+        let _ = composer("removeToken", &[JsValue::from_str(&key)]);
+        undo_push.run(());
+        answers.update(|list| list.retain(|entry| entry.id != id));
     };
 
     let reset_transient = move || {

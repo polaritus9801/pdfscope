@@ -123,7 +123,11 @@ function insertText(text) {
 }
 
 function makeToken(key, label) {
-  const token = makeToken(key, label);
+  const token = document.createElement("span");
+  token.className = "mention";
+  token.contentEditable = "false";
+  token.dataset.key = key;
+  token.textContent = `@${label}`;
   return token;
 }
 

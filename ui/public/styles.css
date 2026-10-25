@@ -2704,9 +2704,14 @@ body.selection-quiet .textLayer :is(span, br)::selection {
 }
 
 .mention-picker {
+  position: absolute;
+  right: var(--space-3);
+  bottom: calc(100% + 6px);  /* size */
+  left: var(--space-3);
+  z-index: 40;
   display: flex;
   flex-direction: column;
-  max-height: 240px;  /* size */
+  max-height: min(240px, 42vh);  /* size */
   overflow-y: auto;
   padding: var(--space-1);
   background: var(--surface);
@@ -3390,6 +3395,7 @@ body.selection-quiet .textLayer :is(span, br)::selection {
 
 /* P0 composer: one card, a toolbar inside it, a round send. */
 .composer {
+  position: relative;
   padding: var(--space-2) var(--space-3) var(--space-2);
   gap: var(--space-2);
 }
@@ -4542,7 +4548,7 @@ body.panel-dragging .panel-resize::after {
   align-self: center;
   margin-left: 4px;  /* size */
   color: var(--ink-faint);
-  font-size: 10px;  /* size */
+  font-size: 11px;  /* size */
   line-height: 1;
   white-space: nowrap;
 }
