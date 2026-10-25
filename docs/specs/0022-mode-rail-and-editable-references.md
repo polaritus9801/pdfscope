@@ -635,3 +635,28 @@ The preference is stored in `localStorage["pdfscope.page-repeat"]` and applies i
 single-page toggle pushes one snapshot before mutating. Merging or splitting is therefore one undo
 step. Cmd-Z with a draft cancels the draft first without consuming history; the next Cmd-Z reverts the
 last committed change. Redo clears any draft.
+
+## 2026-10-26 — page manager and navigation panels
+
+The two thumbnail panels now use the PDF's actual page proportions instead of a fixed 3:4 card.
+The viewer writes `--thumb-aspect: <width> / <height>` from `pageSizes` before queueing a thumbnail,
+and `renderThumbnail` keeps the page-number badge while prepending the image. This removes the large
+letterboxed `surface-sunken` blocks (very visible on landscape slide decks) and makes lazy cards keep
+the right height before their image arrives. Thumbnail renders are 200 px wide.
+
+**Manager.** The dialog is 1120 px wide, cards are at least 160 px and sit in a max-content grid so
+rows never collapse to fit the dialog. The header carries the interaction hint (`点击切换单页 ·
+拖拽选择范围 · Alt 拖拽减选`); selected cards get an accent ring, accent page pill and a check badge;
+the reader's current page gets a dashed outline. The footer shows the selected count, disables 清空
+when empty, and the current page is centred on open.
+
+**Navigation rail.** The rail is anchored inside a `.stage-shell` at the reader's top-right, so it
+stops at the AI-panel divider instead of floating over the panel. It is 360 px wide, with a fixed
+header (目录/缩略图 tabs, page count, close) and a scrollable body. Thumbnail cards keep their page
+numbers and mark the current page with an accent ring/pill; opening or reopening the thumbnail tab
+centres the current page. Directory rows are hierarchical: top-level entries are heavier, children
+are muted and indented, each row shows its target page, and the current section is highlighted.
+
+Outline destinations that arrive as PDF page references (`{num, gen}`) are now resolved through
+`getPageIndex` rather than coerced to a number; previously every such entry became page 0, which
+made the whole TOC appear disabled and page numbers blank.

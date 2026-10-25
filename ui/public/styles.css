@@ -797,6 +797,16 @@ html[data-range-side="both"] .stage {
   min-height: 0;
 }
 
+/* The reader plus its navigation overlay. The overlay is anchored to this shell, so it ends at the
+   AI panel divider instead of floating over the panel. */
+.stage-shell {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
 .panel {
   position: relative;
   display: flex;
@@ -1930,53 +1940,92 @@ body {
   opacity: 1;
 }
 
-/* Outline: an overlay beside the tool rail, so the column never narrows. */
+/* Outline: an overlay at the reader's top-right, anchored to its shell so it stops at the AI panel. */
 .outline {
   position: absolute;
-  top: var(--space-4);
+  top: var(--space-3);
+  right: var(--space-4);
   bottom: calc(var(--space-6) + var(--space-2));
-  left: 64px;  /* size */
   z-index: 7;
   display: flex;
   flex-direction: column;
-  width: min(300px, 42%);  /* size */
+  width: min(360px, 44%);  /* size */
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-2);
   overflow: hidden;
+  animation: outline-in var(--duration) var(--ease);
+}
+
+@keyframes outline-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);  /* size */
+  }
 }
 
 .outline-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--space-1);
   padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
   border-bottom: 1px solid var(--border);
   font-size: var(--text-sm);
   color: var(--ink-muted);
 }
 
+.outline-count {
+  margin-left: auto;
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .outline-list {
+  flex: 1;
+  min-height: 0;
   overflow: auto;
   padding: var(--space-2) 0;
+  overscroll-behavior: contain;
 }
 
 .outline-item {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   width: 100%;
   padding: var(--space-1) var(--space-3);
   text-align: left;
   font: inherit;
   font-size: var(--text-sm);
   line-height: 1.5;
-  color: var(--ink);
+  color: var(--ink-muted);
   background: transparent;
   border: none;
   cursor: pointer;
 }
 
-.outline-item:hover:not(:disabled) {
+.outline-item.top {
+  margin-top: var(--space-2);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.outline-item.top:first-child {
+  margin-top: 0;
+}
+
+.outline-item:hover:not(:disabled),
+.outline-item.active:not(:disabled) {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.outline-item:focus-visible {
+  outline: none;
   background: var(--accent-soft);
   color: var(--accent);
 }
@@ -1984,6 +2033,25 @@ body {
 .outline-item:disabled {
   color: var(--ink-faint);
   cursor: default;
+}
+
+.outline-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.outline-page {
+  margin-left: auto;
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.outline-item:hover .outline-page,
+.outline-item.active .outline-page {
+  color: var(--accent);
 }
 
 /* Find bar: a floating strip at the top of the reader, never taking a column. */
@@ -2095,10 +2163,16 @@ mark.find-hit {
 
 .thumb-list {
   display: grid;
+  flex: 1;
+  min-height: 0;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: max-content;
   gap: var(--space-2);
+  align-content: start;
+  align-items: start;
   overflow: auto;
   padding: var(--space-2);
+  overscroll-behavior: contain;
 }
 
 .thumb {
@@ -2106,34 +2180,63 @@ mark.find-hit {
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  aspect-ratio: 3 / 4;
+  aspect-ratio: var(--thumb-aspect, 3 / 4);
   padding: 0;
-  background: var(--surface-sunken);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   overflow: hidden;
   cursor: pointer;
+  transition:
+    border-color var(--duration) var(--ease),
+    box-shadow var(--duration) var(--ease),
+    transform var(--duration) var(--ease);
 }
 
 .thumb:hover {
   border-color: var(--accent);
+  box-shadow: var(--shadow-1);
+  transform: translateY(-1px);  /* size */
+}
+
+.thumb:focus-visible {
+  outline: 2px solid var(--accent);  /* size */
+  outline-offset: 2px;  /* size */
+}
+
+.thumb.current {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);  /* size */
 }
 
 .thumb img {
+  display: block;
   width: 100%;
   height: 100%;
   object-fit: contain;
+  background: var(--surface);
 }
 
 .thumb-number {
   position: absolute;
   right: var(--space-1);
   bottom: var(--space-1);
-  padding: 0 var(--space-1);
+  min-width: 18px;  /* size */
+  padding: 0 4px;  /* size */
   font-size: var(--text-xs);
+  line-height: 18px;  /* size */
+  text-align: center;
   color: var(--ink-muted);
-  background: rgb(255 255 255 / 78%);
+  background: rgb(255 255 255 / 86%);
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
   border-radius: var(--radius-xs);
+}
+
+.thumb.current .thumb-number,
+.manager-thumb.selected .thumb-number {
+  color: var(--accent-ink);
+  background: var(--accent);
+  border-color: var(--accent);
 }
 
 .outline-empty {
@@ -2681,33 +2784,84 @@ html[data-range-side="both"] .page-bar-actions.range-right {
 }
 
 .page-manager {
-  width: min(760px, 100%);  /* size */
+  width: min(1120px, 100%);  /* size */
+  max-height: min(860px, calc(100vh - 48px));  /* size */
+}
+
+.page-manager-head h2 {
+  margin: 0;
+}
+
+.page-manager-hint {
+  margin: 2px 0 0;  /* size */
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
 }
 
 .manager-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));  /* size */
-  gap: var(--space-2);
+  flex: 1;
+  min-height: 0;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));  /* size */
+  grid-auto-rows: max-content;
+  gap: var(--space-3);
+  align-content: start;
+  align-items: start;
   overflow: auto;
-  padding: var(--space-3);
+  padding: var(--space-4);
+  overscroll-behavior: contain;
 }
 
 .manager-thumb {
   position: relative;
-  aspect-ratio: 3 / 4;
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: var(--surface-sunken);
+  background: var(--surface);
+}
+
+.manager-thumb:hover {
+  border-color: var(--accent);
 }
 
 .manager-thumb.selected {
-  outline: 2px solid var(--accent);  /* size */
-  background: var(--accent-soft);
+  border-color: var(--accent);
+  background: var(--surface);
+  box-shadow:
+    0 0 0 1px var(--accent),  /* size */
+    0 0 0 3px var(--accent-soft);  /* size */
 }
 
-.manager-thumb.selected .thumb-number {
-  color: var(--accent);
+.manager-thumb.selected::after {
+  position: absolute;
+  top: var(--space-1);
+  right: var(--space-1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;  /* size */
+  height: 18px;  /* size */
+  font-size: 12px;  /* size */
+  font-weight: 700;
+  color: var(--accent-ink);
+  background: var(--accent);
+  border-radius: 50%;
+  content: "✓";
+  z-index: 2;
+}
+
+.manager-thumb.current:not(.selected) {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.page-manager-foot {
+  gap: var(--space-3);
+  background: var(--surface);
+}
+
+.page-manager-foot .settings-path {
+  margin-right: auto;
 }
 
 /* The reader preference, not the spread side, decides where the range bar lives. */

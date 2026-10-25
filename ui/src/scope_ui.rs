@@ -12,7 +12,6 @@ pub(crate) fn PageManager(
     undo_push: Callback<()>,
     page: RwSignal<u32>,
 ) -> impl IntoView {
-    let _ = page;
     // page, pointer x/y at press: a drag selects a range, a click toggles one page
     let manager_drag = RwSignal::new(Option::<(u32, f64, f64)>::None);
 
@@ -24,8 +23,13 @@ pub(crate) fn PageManager(
                     }
                 }>
                     <div class="settings-dialog page-manager">
-                        <header class="settings-head">
-                            <h2>"页面引用"</h2>
+                        <header class="settings-head page-manager-head">
+                            <div>
+                                <h2>"页面引用"</h2>
+                                <p class="page-manager-hint">
+                                    "点击切换单页 · 拖拽选择范围 · Alt 拖拽减选"
+                                </p>
+                            </div>
                             <button class="icon-button" title="关闭" on:click=move |_| open.set(false)>
                                 "✕"
                             </button>
@@ -38,6 +42,8 @@ pub(crate) fn PageManager(
                                             class="thumb manager-thumb"
                                             data-page=number
                                             class:selected=move || page_set.get().contains(&number)
+                                            class:current=move || page.get() == number
+                                            aria-pressed=move || page_set.get().contains(&number).to_string()
                                             on:pointerdown=move |event: web_sys::PointerEvent| {
                                                 manager_drag.set(Some((
                                                     number,
@@ -88,9 +94,10 @@ pub(crate) fn PageManager(
                                 })
                                 .collect_view()}
                         </div>
-                        <footer class="settings-foot">
+                        <footer class="settings-foot page-manager-foot">
                             <button
                                 class="button"
+                                prop:disabled=move || page_set.get().is_empty()
                                 on:click=move |_| {
                                     undo_push.run(());
                                     page_set.set(Vec::new());

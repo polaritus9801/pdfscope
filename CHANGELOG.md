@@ -28,6 +28,16 @@ minor releases may contain breaking changes; they are always called out.
   设置 → 阅读 → 重复点击同一端点.
 - Page-range previews, commits, merges and splits each follow the existing one-step snapshot undo;
   Cmd-Z with a pending endpoint cancels the draft before touching history.
+- Rebuilt the 管理页面引用 and 目录与缩略图 panels around each page's real aspect ratio. Page
+  thumbnails no longer sit in 3:4 letterboxes (the large purple blocks on landscape decks), keep
+  their page-number badge after lazy rendering, render at 200 px, and mark selected/current pages.
+- The page manager is wider with 160 px cards, a keyboard-focusable selection ring/check, current-page
+  outline, interaction hint, selected count and a disabled clear action when empty; it centres the
+  current page on open. The navigation rail is anchored to the reader's top-right, shows the page
+  count, centres the current thumbnail, and gives directory rows hierarchy, target page numbers and
+  current-section highlighting.
+- Outline destinations that use PDF page references now resolve through `getPageIndex`;
+  previously they became page 0, leaving the whole TOC disabled with blank page numbers.
 - The composer resize handle is now a square-ended border segment shown only while the handle itself
   is hovered/focused/dragged; its colour follows the input border state.
 

@@ -233,8 +233,16 @@ fn App() -> impl IntoView {
 
     let schedule_thumbnails = move || {
         if let Some(window) = web_sys::window() {
+            let current = page.get_untracked();
             let callback = Closure::once_into_js(move || {
                 let _ = call("thumbnails", &[]);
+                let _ = call(
+                    "centerThumb",
+                    &[
+                        JsValue::from_str("thumb-list"),
+                        JsValue::from_f64(f64::from(current)),
+                    ],
+                );
             });
             let _ = window.set_timeout_with_callback_and_timeout_and_arguments_0(
                 callback.unchecked_ref(),
@@ -242,6 +250,14 @@ fn App() -> impl IntoView {
             );
         }
     };
+
+    // Reopening the panel on the thumbnail tab should bring the current page back into view even
+    // when the tab itself does not change.
+    Effect::new(move |_| {
+        if outline_open.get() && rail_tab.get() == 1 {
+            schedule_thumbnails();
+        }
+    });
     let find_open = RwSignal::new(false);
     let find_text = RwSignal::new(String::new());
     let find_total = RwSignal::new(0_u32);
@@ -1355,6 +1371,7 @@ fn App() -> impl IntoView {
                             .into_any()
                     }}
 
+                    <div class="stage-shell">
                     <Show when=move || outline_open.get()>
                         <aside class="outline">
                             <div class="outline-head">
@@ -1369,14 +1386,14 @@ fn App() -> impl IntoView {
                                     <button
                                         class="rail-tab"
                                         class:active=move || rail_tab.get() == 1
-                                        on:click=move |_| {
-                                            rail_tab.set(1);
-                                            schedule_thumbnails();
-                                        }
+                                        on:click=move |_| rail_tab.set(1)
                                     >
                                         "缩略图"
                                     </button>
                                 </div>
+                                <span class="outline-count">
+                                    {move || format!("{} 页", pages.get())}
+                                </span>
                                 <button
                                     class="icon-button"
                                     title="关闭"
@@ -1388,13 +1405,15 @@ fn App() -> impl IntoView {
                             {move || {
                                 if rail_tab.get() == 1 {
                                     view! {
-                                        <div class="thumb-list">
+                                        <div class="thumb-list" id="thumb-list">
                                             {(1..=pages.get())
                                                 .map(|number| {
                                                     view! {
                                                         <button
                                                             class="thumb"
                                                             data-page=number
+                                                            class:current=move || page.get() == number
+                                                            aria-current=move || (page.get() == number).then_some("page")
                                                             title=format!("第 {number} 页")
                                                             on:click=move |_| {
                                                                 page.set(number);
@@ -1430,12 +1449,22 @@ fn App() -> impl IntoView {
                                             };
                                             view! {
                                                 <button
-                                                    class="outline-item"
+                                                    class=move || {
+                                                        let mut classes = String::from("outline-item");
+                                                        if depth == 0 {
+                                                            classes.push_str(" top");
+                                                        }
+                                                        if target > 0 && target == page.get() {
+                                                            classes.push_str(" active");
+                                                        }
+                                                        classes
+                                                    }
                                                     style=format!(
                                                         "padding-left: calc(var(--space-3) + {}px)",
                                                         u32::from(depth) * 12,
                                                     )
                                                     prop:disabled=target == 0
+                                                    aria-current=move || (target > 0 && target == page.get()).then_some("page")
                                                     on:click=move |_| {
                                                         if target > 0 {
                                                             page.set(target);
@@ -1443,7 +1472,10 @@ fn App() -> impl IntoView {
                                                         }
                                                     }
                                                 >
-                                                    {label}
+                                                    <span class="outline-label">{label}</span>
+                                                    <span class="outline-page">
+                                                        {if target > 0 { target.to_string() } else { String::new() }}
+                                                    </span>
                                                 </button>
                                             }
                                         })
@@ -1571,6 +1603,7 @@ fn App() -> impl IntoView {
                     }}
 
                 </main>
+                    </div>
                     <div class="oobe-overlay" class:hidden=move || ready.get()>
                         <div
                             class="welcome-shell"

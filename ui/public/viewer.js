@@ -208,8 +208,9 @@ async function renderThumbnail(element) {
     if (!url) {
       const page = await document_.getPage(number);
       const base = page.getViewport({ scale: 1 });
-      const scale = 150 / base.width;
+      const scale = 200 / base.width;
       const viewport = page.getViewport({ scale });
+      element.style.setProperty("--thumb-aspect", `${base.width} / ${base.height}`);
       const canvas = document.createElement("canvas");
       canvas.width = Math.max(1, Math.ceil(viewport.width));
       canvas.height = Math.max(1, Math.ceil(viewport.height));
@@ -222,7 +223,8 @@ async function renderThumbnail(element) {
     image.src = url;
     image.alt = `第 ${number} 页`;
     image.loading = "lazy";
-    element.replaceChildren(image);
+    element.querySelectorAll("img").forEach((existing) => existing.remove());
+    element.prepend(image);
   } catch {
     element.dataset.rendered = "failed";
   }
@@ -2941,6 +2943,11 @@ window.PDFScope = {
     }
 
     for (const target of targets) {
+      const number = Number(target.dataset.page);
+      const size = pageSizes[number - 1];
+      if (size?.width > 0 && size?.height > 0) {
+        target.style.setProperty("--thumb-aspect", `${size.width} / ${size.height}`);
+      }
       target.dataset.queued = "1";
       thumbnailObserver.observe(target);
     }
@@ -3285,10 +3292,13 @@ window.PDFScope = {
             typeof node.dest === "string" ? await document_.getDestination(node.dest) : node.dest;
           const reference = destination?.[0];
           if (reference !== undefined) {
+            // PDF.js exposes destinations as page indices, named strings, or page references
+            // ({num, gen}). getPageIndex resolves all three; treating the object as a number
+            // silently turned every outline entry into page 0.
             const index =
-              typeof reference === "string"
-                ? await document_.getPageIndex(reference)
-                : reference;
+              typeof reference === "number"
+                ? reference
+                : await document_.getPageIndex(reference);
             page = Number(index) + 1;
           }
         } catch {
