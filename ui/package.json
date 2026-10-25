@@ -1,0 +1,18 @@
+{
+  "name": "pdfscope-ui",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Build tooling for the PDFScope ProseMirror composer",
+  "scripts": {
+    "build:composer": "node scripts/build-composer.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "prosemirror-commands": "^1.6.2",
+    "prosemirror-history": "^1.4.1",
+    "prosemirror-keymap": "^1.2.2",
+    "prosemirror-model": "^1.25.0",
+    "prosemirror-state": "^1.4.3",
+    "prosemirror-view": "^1.37.0"
+  }
+}

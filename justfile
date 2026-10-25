@@ -62,7 +62,11 @@ run:  # Run the web server on the default port.
     cargo run -p pdfscope-server
 
 ui:  # Build the UI bundle into ui/dist.
+    @if [ -x ui/node_modules/.bin/esbuild ]; then (cd ui && npm run build:composer); fi
     cd ui && trunk build
+
+composer:  # Rebuild the ProseMirror composer bundle.
+    cd ui && npm run build:composer
 
 ui-dev:  # Serve the UI with hot reload on :8080.
     cd ui && trunk serve --port 8080

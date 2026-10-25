@@ -67,7 +67,6 @@ no longer lifts, so the badge cannot jump). If the reader sends with red pills:
    the composer immediately after the first red pill. The X has the same effect as 修改.
 3. The dialog disappears when all red pills are deleted.
 
-The composer does **not** use zero-width characters around pills. It uses one-pixel editable boundary
-elements on each side; clicking the left/right half puts the native caret in that boundary, outside the
-pill. Backspace or Delete adjacent to a pill removes the pill instead of letting the caret enter it. The field also nudges its scroll/paint pass after opening the @ picker so a
-long, scrolled message does not leave a stale blank run beside the @.
+The composer is now a ProseMirror editor (spec 0037): an `@` pill is an inline atom node, so there is
+no document position inside it. Clicking left/right selects the boundary; Backspace/Delete removes
+the pill whole. No zero-width characters or boundary elements are used.

@@ -864,7 +864,8 @@ body {
   border-radius: var(--radius-sm);
 }
 
-.ask:focus {
+.ask:focus,
+.ask:focus-within {
   outline: none;
   border-color: var(--border-strong);
   background: var(--surface);
@@ -2679,17 +2680,30 @@ body.selection-quiet .textLayer :is(span, br)::selection {
   background: transparent;
 }
 
-/* The question field is a contenteditable editor; the placeholder is CSS, the pills are DOM. */
+/* The question field is a ProseMirror editor; the placeholder is CSS, the pills are atom DOM. */
 .ask.editor {
+  position: relative;
   height: auto;
   min-height: 72px;  /* size */
-  white-space: pre-wrap;
   cursor: text;
+}
+
+.ask.editor .ProseMirror {
+  min-height: 56px;  /* size */
+  white-space: pre-wrap;
+  outline: none;
   overflow-wrap: anywhere;
 }
 
-.ask.editor:empty::before {
+.ask.editor .ProseMirror p {
+  margin: 0;
+}
+
+.ask.editor.is-editor-empty::before {
   content: attr(data-placeholder);
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
   color: var(--ink-muted);
   pointer-events: none;
 }
@@ -4711,12 +4725,21 @@ body.panel-dragging .panel-resize::after {
 
 .send-warning {
   position: absolute;
-  right: -5px;  /* size */
-  bottom: -5px;  /* size */
+  right: -2pt;
+  bottom: 0;
   display: flex;
+  width: 18px;  /* size */
   color: var(--danger);
   pointer-events: none;
   filter: drop-shadow(0 1px 1px rgb(255 255 255 / 80%));  /* size */
+  transition: none;
+  transform: none !important;
+}
+
+.send-warning svg {
+  display: block;
+  width: 100%;
+  height: auto;
 }
 
 .orphan-warning-overlay {
@@ -4791,14 +4814,6 @@ body.panel-dragging .panel-resize::after {
   border: 1px solid var(--border-strong);
 }
 
-.send-warning {
-  right: 2px;  /* size */
-  bottom: 2px;  /* size */
-}
-
-.send-warning svg {
-  display: block;
-}
 
 
 
@@ -4812,29 +4827,4 @@ body.panel-dragging .panel-resize::after {
 .question-refs-badge.open svg,
 .question-refs-badge.open span {
   color: #ffffff;
-}
-
-
-/* A one-pixel editable gap outside each pill; not a character, but a native caret slot. */
-.mention-boundary {
-  display: inline-block;
-  width: 1px;  /* size */
-  min-height: 1em;
-  vertical-align: middle;
-}
-
-
-/* Final warning badge: 50% of the previous icon and 2pt further right. */
-.send-warning {
-  right: -2pt;
-  bottom: 1px;  /* size */
-  width: 18px;  /* size */
-  transition: none;
-  transform: none !important;
-}
-
-.send-warning svg {
-  display: block;
-  width: 100%;
-  height: auto;
 }

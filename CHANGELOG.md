@@ -10,6 +10,11 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Changed
 
+- Replaced the hand-written contenteditable composer with a ProseMirror editor whose `@` pills are
+  inline atom nodes. The public Composer API and `@{key}` serialisation are unchanged; source lives
+  in `ui/composer-src` and builds to `ui/public/composer.js`.
+
+
 - The context budget trims page context to fit before refusing; only oversized references/attachments
   stop a request.
 

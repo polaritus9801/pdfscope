@@ -4468,39 +4468,7 @@ pub fn AiPanel(
                             node_ref=editor_ref
                             id="ask-editor"
                             class="ask editor"
-                            contenteditable="true"
-                            role="textbox"
-                            aria-label="问题"
                             data-placeholder="问点什么…"
-                            on:dragover=move |event: web_sys::DragEvent| {
-                                event.prevent_default();
-                                if let Some(data) = event.data_transfer() {
-                                    data.set_drop_effect("copy");
-                                }
-                            }
-                            on:drop=move |event: web_sys::DragEvent| {
-                                event.prevent_default();
-                                let Some(data) = event.data_transfer() else {
-                                    return;
-                                };
-                                let Ok(payload) = data.get_data("text/plain") else {
-                                    return;
-                                };
-                                let mut parts = payload.splitn(2, '\n');
-                                let Some(key) = parts.next() else {
-                                    return;
-                                };
-                                let label = parts.next().unwrap_or(key);
-                                let _ = composer(
-                                    "insertTokenAt",
-                                    &[
-                                        JsValue::from_f64(f64::from(event.client_x())),
-                                        JsValue::from_f64(f64::from(event.client_y())),
-                                        JsValue::from_str(key),
-                                        JsValue::from_str(label),
-                                    ],
-                                );
-                            }
                             on:keydown=move |event: web_sys::KeyboardEvent| {
                                 if event.is_composing() {
                                     return;
