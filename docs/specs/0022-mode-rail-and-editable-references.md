@@ -776,3 +776,31 @@ used on manager cards.
 
 **Navigation scrollbars.** 目录 and 缩略图 now use exactly the AI panel's scrollbar recipe: 4 px,
 transparent track, `--border-strong` rounded thumb, no hover variant or accent styling.
+
+## 2026-10-26 — long-document page actions and document-scoped previews
+
+**Preview cache.** Page-ruler hover previews and reference popovers share
+`referencePreviewCache`. Its key now includes a monotonically increasing `documentEpoch`, the cache is
+cleared on every `PDFViewer.load()`, and an in-flight render whose document changed returns `""`
+instead of writing into the new document's cache. `thumbnailCache`/`renderThumbnail` have the same
+epoch + `isConnected` guard. Loading a new PDF hides/resets the existing ruler preview, marks and
+section token, so a page preview from the previous file can never be shown or cached for the new one.
+
+**Page actions.** The old design mounted both left/right action columns, three buttons and three SVG
+paths for every page. It now mounts:
+
+- one transparent hit column per side per page, containing three empty buttons for the
+  start/single/end thirds (no SVG, no reactive state);
+- exactly one SVG visual for the hovered page/side/kind, rendered through a `Show`;
+- one memoized `PageVisual` per page shared by the page class, bar and visual;
+- one memoized bar class/style per page instead of recomputing `page_visual` four or five times.
+  Page class directives stay individual so JS-added classes (`range-preview`, `subtract`, `pointer-page`,
+  `flash`) are not wiped by a reactive class string.
+
+On a 400-page fixture this removes all action SVGs from the initial DOM (11,434 → 5,034 nodes); on a
+1000-page fixture the DOM is 12,228 nodes with zero action SVGs until hover, and a release-build
+hover is ~118 ms instead of the previous full per-page column/SVG update. The range preview still
+outlines only affected pages, but no longer pays for thousands of hidden SVG paths.
+
+**Ruler cost.** Page-ruler geometry reads the rendered page rectangles only on render/resize/zoom
+settle; scroll updates move the thumb only. Tick drawing is capped/sampled as documented above.

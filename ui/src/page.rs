@@ -8,7 +8,7 @@ use crate::model::{Passage, Region, Selection, rect_style, truncate};
 use crate::{call, settle};
 
 /// The visible page-state for a page, combining committed pages with the current draft.
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy, Default, PartialEq)]
 struct PageVisual {
     base: bool,
     add: bool,
@@ -131,69 +131,105 @@ fn read_page_repeat() -> String {
 }
 
 #[component]
-fn PageBarActions(
+fn PageActionHits(
     number: u32,
     side: &'static str,
     hover_page: RwSignal<Option<u32>>,
     hover_kind: RwSignal<Option<u8>>,
-    choose_start: Callback<web_sys::MouseEvent>,
-    toggle_page: Callback<web_sys::MouseEvent>,
-    choose_end: Callback<web_sys::MouseEvent>,
+    hover_side: RwSignal<Option<u8>>,
+    choose_start: Callback<()>,
+    toggle_page: Callback<()>,
+    choose_end: Callback<()>,
 ) -> impl IntoView {
+    let side_value = if side == "left" { 0_u8 } else { 1_u8 };
+    let set_hover = Callback::new(move |kind: u8| {
+        hover_page.set(Some(number));
+        hover_kind.set(Some(kind));
+        hover_side.set(Some(side_value));
+    });
+    let clear_hover = move || {
+        if hover_page.get_untracked() == Some(number)
+            && hover_side.get_untracked() == Some(side_value)
+        {
+            hover_page.set(None);
+            hover_kind.set(None);
+            hover_side.set(None);
+        }
+    };
+
     view! {
         <div
-            class=format!("page-bar-actions range-{side}")
-            on:mouseenter=move |_| hover_page.set(Some(number))
-            on:mouseleave=move |_| {
-                hover_page.set(None);
-                hover_kind.set(None);
-            }
+            class=format!("page-action-hits range-{side}")
+            on:mouseleave=move |_| clear_hover()
         >
             <button
-                class="page-bar-btn page-bar-start"
+                class="page-action-hit page-action-hit-start"
                 title="从这里开始"
                 aria-label=format!("{}：从这里开始", page_label(number))
-                on:mouseenter=move |_| {
-                    hover_page.set(Some(number));
-                    hover_kind.set(Some(0));
-                }
-                on:click=move |event| choose_start.run(event)
-            >
-                <svg viewBox="0 0 1024 1024" width="32" height="32" aria-hidden="true">
-                    <path fill="currentColor" d="M855.866698 106.426915c0 23.451108-19.010983 42.463114-42.463114 42.463114L203.435319 148.890029c-23.451108 0-42.463114-19.010983-42.463114-42.463114l0 0c0-23.451108 19.010983-42.463114 42.463114-42.463114l609.968266 0C836.855716 63.963801 855.866698 82.974783 855.866698 106.426915L855.866698 106.426915zM511.826038 264.35069c-23.451108 0-42.463114 19.010983-42.463114 42.463114l0 609.968266c0 23.451108 19.010983 42.463114 42.463114 42.463114l0 0c23.451108 0 42.463114-19.010983 42.463114-42.463114L554.289152 306.812781C554.288129 283.361673 535.277146 264.35069 511.826038 264.35069L511.826038 264.35069zM541.961382 233.023194c-16.582677-16.582677-42.517349-17.534352-57.927317-2.124384L171.253362 543.67849c-15.408945 15.408945-14.458293 41.343617 2.124384 57.926294l0 0c16.582677 16.582677 42.517349 17.534352 57.926294 2.124384L544.085766 290.949488C559.494711 275.540544 558.544059 249.605871 541.961382 233.023194L541.961382 233.023194zM481.696834 233.023194c-16.582677 16.582677-17.534352 42.517349-2.124384 57.926294l312.780703 312.780703c15.408945 15.408945 41.343617 14.458293 57.926294-2.124384l0 0c16.582677-16.582677 17.534352-42.517349 2.124384-57.926294L539.623128 230.897787C524.214183 215.488843 498.27951 216.440517 481.696834 233.023194L481.696834 233.023194z"></path>
-                </svg>
-            </button>
+                on:mouseenter=move |_| set_hover.run(0)
+                on:focus=move |_| set_hover.run(0)
+                on:click=move |_| choose_start.run(())
+            ></button>
             <button
-                class="page-bar-btn page-bar-single"
+                class="page-action-hit page-action-hit-single"
                 title="单独这一页"
                 aria-label=format!("{}：单独这一页", page_label(number))
-                on:mouseenter=move |_| {
-                    hover_page.set(Some(number));
-                    hover_kind.set(Some(2));
-                }
-                on:click=move |event| toggle_page.run(event)
-            >
-                <svg viewBox="0 0 1024 1024" width="32" height="32" aria-hidden="true">
-                    <path fill="currentColor" d="M896 512c0 212.074667-171.925333 384-384 384S128 724.074667 128 512 299.925333 128 512 128s384 171.925333 384 384zM512 853.333333c188.522667 0 341.333333-152.810667 341.333333-341.333333S700.522667 170.666667 512 170.666667 170.666667 323.477333 170.666667 512s152.810667 341.333333 341.333333 341.333333z"></path>
-                    <path fill="currentColor" d="M277.333333 512a21.333333 21.333333 0 0 1 21.333334-21.333333h423.104a21.333333 21.333333 0 1 1 0 42.666666H298.666667a21.333333 21.333333 0 0 1-21.333334-21.333333z"></path>
-                    <path fill="currentColor" d="M510.229333 744.896a21.333333 21.333333 0 0 1-21.333333-21.333333V300.437333a21.333333 21.333333 0 0 1 42.666667 0v423.125334a21.333333 21.333333 0 0 1-21.333334 21.333333z"></path>
-                </svg>
-            </button>
+                on:mouseenter=move |_| set_hover.run(2)
+                on:focus=move |_| set_hover.run(2)
+                on:click=move |_| toggle_page.run(())
+            ></button>
             <button
-                class="page-bar-btn page-bar-end"
+                class="page-action-hit page-action-hit-end"
                 title="到这里结束"
                 aria-label=format!("{}：到这里结束", page_label(number))
-                on:mouseenter=move |_| {
-                    hover_page.set(Some(number));
-                    hover_kind.set(Some(1));
-                }
-                on:click=move |event| choose_end.run(event)
-            >
-                <svg viewBox="0 0 1024 1024" width="32" height="32" aria-hidden="true">
-                    <path fill="currentColor" d="M855.866698 106.426915c0 23.451108-19.010983 42.463114-42.463114 42.463114L203.435319 148.890029c-23.451108 0-42.463114-19.010983-42.463114-42.463114l0 0c0-23.451108 19.010983-42.463114 42.463114-42.463114l609.968266 0C836.855716 63.963801 855.866698 82.974783 855.866698 106.426915L855.866698 106.426915zM511.826038 264.35069c-23.451108 0-42.463114 19.010983-42.463114 42.463114l0 609.968266c0 23.451108 19.010983 42.463114 42.463114 42.463114l0 0c23.451108 0 42.463114-19.010983 42.463114-42.463114L554.289152 306.812781C554.288129 283.361673 535.277146 264.35069 511.826038 264.35069L511.826038 264.35069zM541.961382 233.023194c-16.582677-16.582677-42.517349-17.534352-57.927317-2.124384L171.253362 543.67849c-15.408945 15.408945-14.458293 41.343617 2.124384 57.926294l0 0c16.582677 16.582677 42.517349 17.534352 57.926294 2.124384L544.085766 290.949488C559.494711 275.540544 558.544059 249.605871 541.961382 233.023194L541.961382 233.023194zM481.696834 233.023194c-16.582677 16.582677-17.534352 42.517349-2.124384 57.926294l312.780703 312.780703c15.408945 15.408945 41.343617 14.458293 57.926294-2.124384l0 0c16.582677-16.582677 17.534352-42.517349 2.124384-57.926294L539.623128 230.897787C524.214183 215.488843 498.27951 216.440517 481.696834 233.023194L481.696834 233.023194z"></path>
-                </svg>
-            </button>
+                on:mouseenter=move |_| set_hover.run(1)
+                on:focus=move |_| set_hover.run(1)
+                on:click=move |_| choose_end.run(())
+            ></button>
         </div>
+    }
+}
+
+#[component]
+fn PageActionVisual(
+    number: u32,
+    hover_page: RwSignal<Option<u32>>,
+    hover_kind: RwSignal<Option<u8>>,
+    hover_side: RwSignal<Option<u8>>,
+) -> impl IntoView {
+    view! {
+        <Show when=move || {
+            hover_page.get() == Some(number)
+                && hover_side.get().is_some()
+                && hover_kind.get().is_some()
+        }>
+            <div
+                class=move || {
+                    let side = if hover_side.get() == Some(0) { "left" } else { "right" };
+                    format!("page-bar-actions visual range-{side}")
+                }
+                data-kind=move || hover_kind.get().unwrap_or(0).to_string()
+                aria-hidden="true"
+            >
+                <span class="page-bar-btn page-bar-start">
+                    <svg viewBox="0 0 1024 1024" width="32" height="32">
+                        <path fill="currentColor" d="M855.866698 106.426915c0 23.451108-19.010983 42.463114-42.463114 42.463114L203.435319 148.890029c-23.451108 0-42.463114-19.010983-42.463114-42.463114l0 0c0-23.451108 19.010983-42.463114 42.463114-42.463114l609.968266 0C836.855716 63.963801 855.866698 82.974783 855.866698 106.426915L855.866698 106.426915zM511.826038 264.35069c-23.451108 0-42.463114 19.010983-42.463114 42.463114l0 609.968266c0 23.451108 19.010983 42.463114 42.463114 42.463114l0 0c23.451108 0 42.463114-19.010983 42.463114-42.463114L554.289152 306.812781C554.288129 283.361673 535.277146 264.35069 511.826038 264.35069L511.826038 264.35069zM541.961382 233.023194c-16.582677-16.582677-42.517349-17.534352-57.927317-2.124384L171.253362 543.67849c-15.408945 15.408945-14.458293 41.343617 2.124384 57.926294l0 0c16.582677 16.582677 42.517349 17.534352 57.926294 2.124384L544.085766 290.949488C559.494711 275.540544 558.544059 249.605871 541.961382 233.023194L541.961382 233.023194zM481.696834 233.023194c-16.582677 16.582677-17.534352 42.517349-2.124384 57.926294l312.780703 312.780703c15.408945 15.408945 41.343617 14.458293 57.926294-2.124384l0 0c16.582677-16.582677 17.534352-42.517349 2.124384-57.926294L539.623128 230.897787C524.214183 215.488843 498.27951 216.440517 481.696834 233.023194L481.696834 233.023194z"></path>
+                    </svg>
+                </span>
+                <span class="page-bar-btn page-bar-single">
+                    <svg viewBox="0 0 1024 1024" width="32" height="32">
+                        <path fill="currentColor" d="M896 512c0 212.074667-171.925333 384-384 384S128 724.074667 128 512 299.925333 128 512 128s384 171.925333 384 384zM512 853.333333c188.522667 0 341.333333-152.810667 341.333333-341.333333S700.522667 170.666667 512 170.666667 170.666667 323.477333 170.666667 512s152.810667 341.333333 341.333333 341.333333z"></path>
+                        <path fill="currentColor" d="M277.333333 512a21.333333 21.333333 0 0 1 21.333334-21.333333h423.104a21.333333 21.333333 0 1 1 0 42.666666H298.666667a21.333333 21.333333 0 0 1-21.333334-21.333333z"></path>
+                        <path fill="currentColor" d="M510.229333 744.896a21.333333 21.333333 0 0 1-21.333333-21.333333V300.437333a21.333333 21.333333 0 0 1 42.666667 0v423.125334a21.333333 21.333333 0 0 1-21.333334 21.333333z"></path>
+                    </svg>
+                </span>
+                <span class="page-bar-btn page-bar-end">
+                    <svg viewBox="0 0 1024 1024" width="32" height="32">
+                        <path fill="currentColor" d="M855.866698 106.426915c0 23.451108-19.010983 42.463114-42.463114 42.463114L203.435319 148.890029c-23.451108 0-42.463114-19.010983-42.463114-42.463114l0 0c0-23.451108 19.010983-42.463114 42.463114-42.463114l609.968266 0C836.855716 63.963801 855.866698 82.974783 855.866698 106.426915L855.866698 106.426915zM511.826038 264.35069c-23.451108 0-42.463114 19.010983-42.463114 42.463114l0 609.968266c0 23.451108 19.010983 42.463114 42.463114 42.463114l0 0c23.451108 0 42.463114-19.010983 42.463114-42.463114L554.289152 306.812781C554.288129 283.361673 535.277146 264.35069 511.826038 264.35069L511.826038 264.35069zM541.961382 233.023194c-16.582677-16.582677-42.517349-17.534352-57.927317-2.124384L171.253362 543.67849c-15.408945 15.408945-14.458293 41.343617 2.124384 57.926294l0 0c16.582677 16.582677 42.517349 17.534352 57.926294 2.124384L544.085766 290.949488C559.494711 275.540544 558.544059 249.605871 541.961382 233.023194L541.961382 233.023194zM481.696834 233.023194c-16.582677 16.582677-17.534352 42.517349-2.124384 57.926294l312.780703 312.780703c15.408945 15.408945 41.343617 14.458293 57.926294-2.124384l0 0c16.582677-16.582677 17.534352-42.517349 2.124384-57.926294L539.623128 230.897787C524.214183 215.488843 498.27951 216.440517 481.696834 233.023194L481.696834 233.023194z"></path>
+                    </svg>
+                </span>
+            </div>
+        </Show>
     }
 }
 
@@ -217,6 +253,7 @@ pub(crate) fn PageView(
     anchor: RwSignal<Option<(u8, u32)>>,
     hover_page: RwSignal<Option<u32>>,
     hover_kind: RwSignal<Option<u8>>,
+    hover_side: RwSignal<Option<u8>>,
     total_pages: RwSignal<u32>,
 ) -> impl IntoView {
     // kind, id, start x/y, start rect, page width/height, whether undo was recorded
@@ -429,7 +466,9 @@ pub(crate) fn PageView(
         }
     });
 
-    let in_scope = move || {
+    // One visual memo per page. The class, the bar and the action visual all read this instead of
+    // recomputing page_visual four or five times for every page on every hover.
+    let visual = Memo::new(move |_| {
         page_visual(
             number,
             &page_set.get(),
@@ -437,29 +476,13 @@ pub(crate) fn PageView(
             hover_page.get(),
             hover_kind.get(),
         )
-        .base
-    };
+    });
+    let in_scope = move || visual.get().base;
     let in_preview = move || {
-        let visual = page_visual(
-            number,
-            &page_set.get(),
-            anchor.get(),
-            hover_page.get(),
-            hover_kind.get(),
-        );
+        let visual = visual.get();
         visual.add || (visual.open.is_some() && !visual.base)
     };
-
-    let removing = move || {
-        page_visual(
-            number,
-            &page_set.get(),
-            anchor.get(),
-            hover_page.get(),
-            hover_kind.get(),
-        )
-        .subtract
-    };
+    let removing = move || visual.get().subtract;
 
     let clear_draft = move || {
         anchor.set(None);
@@ -563,10 +586,10 @@ pub(crate) fn PageView(
         }
     };
 
-    let choose_start = Callback::new(move |_: web_sys::MouseEvent| choose_endpoint(0));
-    let choose_end = Callback::new(move |_: web_sys::MouseEvent| choose_endpoint(1));
+    let choose_start = Callback::new(move |_: ()| choose_endpoint(0));
+    let choose_end = Callback::new(move |_: ()| choose_endpoint(1));
 
-    let toggle_page = Callback::new(move |_: web_sys::MouseEvent| {
+    let toggle_page = Callback::new(move |_: ()| {
         let current = page_set.get_untracked();
         let mut next = current.clone();
         pdfscope_core::pages::toggle_page(&mut next, number);
@@ -578,12 +601,12 @@ pub(crate) fn PageView(
         clear_draft();
     });
 
-    let bar = move || -> (String, String) {
+    let bar = Memo::new(move |_| -> (String, String) {
         let set = page_set.get();
         let anchor = anchor.get();
         let hovered = hover_page.get();
         let kind = hover_kind.get();
-        let visual = page_visual(number, &set, anchor, hovered, kind);
+        let visual = visual.get();
         if visual.subtract {
             let first = !page_visual(number - 1, &set, anchor, hovered, kind).subtract;
             let last = !page_visual(number + 1, &set, anchor, hovered, kind).subtract;
@@ -660,7 +683,7 @@ pub(crate) fn PageView(
         }
 
         ("page-range-bar".to_owned(), String::new())
-    };
+    });
 
     let rect_of = move |kind: u8, id: u64| -> Option<(f64, f64, f64, f64)> {
         if kind == 0 {
@@ -839,29 +862,37 @@ pub(crate) fn PageView(
             />
 
             <div
-                class=move || format!("{} range-left", bar().0)
-                style=move || bar().1
+                class=move || format!("{} range-left", bar.get().0)
+                style=move || bar.get().1
                 aria-hidden="true"
             ></div>
             <div
-                class=move || format!("{} range-right", bar().0)
-                style=move || bar().1
+                class=move || format!("{} range-right", bar.get().0)
+                style=move || bar.get().1
                 aria-hidden="true"
             ></div>
-            <PageBarActions
+            <PageActionVisual
+                number=number
+                hover_page=hover_page
+                hover_kind=hover_kind
+                hover_side=hover_side
+            />
+            <PageActionHits
                 number=number
                 side="left"
                 hover_page=hover_page
                 hover_kind=hover_kind
+                hover_side=hover_side
                 choose_start=choose_start
                 toggle_page=toggle_page
                 choose_end=choose_end
             />
-            <PageBarActions
+            <PageActionHits
                 number=number
                 side="right"
                 hover_page=hover_page
                 hover_kind=hover_kind
+                hover_side=hover_side
                 choose_start=choose_start
                 toggle_page=toggle_page
                 choose_end=choose_end

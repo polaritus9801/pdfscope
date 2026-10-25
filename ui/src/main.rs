@@ -177,6 +177,8 @@ fn App() -> impl IntoView {
     let hover_page = RwSignal::new(Option::<u32>::None);
     // kind 0 = start, 1 = end, 2 = single page; which page action is being hovered.
     let hover_kind = RwSignal::new(Option::<u8>::None);
+    // side 0 = left, 1 = right; used so "both" can draw only the hovered action column.
+    let hover_side = RwSignal::new(Option::<u8>::None);
     let active_ref = RwSignal::new(Option::<(u8, u64)>::None);
     let focused_ref = RwSignal::new(Option::<(u8, u64)>::None);
 
@@ -333,6 +335,7 @@ fn App() -> impl IntoView {
         anchor.set(None);
         hover_page.set(None);
         hover_kind.set(None);
+        hover_side.set(None);
     };
 
     let undo_push = Callback::new(move |_: ()| {
@@ -345,6 +348,7 @@ fn App() -> impl IntoView {
             anchor.set(None);
             hover_page.set(None);
             hover_kind.set(None);
+            hover_side.set(None);
             return;
         }
         edit_epoch.update(|epoch| *epoch += 1);
@@ -360,6 +364,7 @@ fn App() -> impl IntoView {
         anchor.set(None);
         hover_page.set(None);
         hover_kind.set(None);
+        hover_side.set(None);
         edit_epoch.update(|epoch| *epoch += 1);
         let current = current_state();
         let mut stack = history.get();
@@ -470,6 +475,7 @@ fn App() -> impl IntoView {
             anchor.set(None);
             hover_page.set(None);
             hover_kind.set(None);
+            hover_side.set(None);
             active_ref.set(None);
             focused_ref.set(None);
 
@@ -768,6 +774,7 @@ fn App() -> impl IntoView {
             anchor.set(None);
             hover_page.set(None);
             hover_kind.set(None);
+            hover_side.set(None);
             choose_tool(0);
             return;
         }
@@ -897,6 +904,7 @@ fn App() -> impl IntoView {
                 anchor.set(None);
                 hover_page.set(None);
                 hover_kind.set(None);
+                hover_side.set(None);
             });
         if let Some(window) = web_sys::window() {
             let _ = js_sys::Reflect::set(
@@ -1584,6 +1592,7 @@ fn App() -> impl IntoView {
                                             anchor=anchor
                                             hover_page=hover_page
                                             hover_kind=hover_kind
+                                            hover_side=hover_side
                                             total_pages=pages
                                         />
                                     }

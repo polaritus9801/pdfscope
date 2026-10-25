@@ -177,21 +177,27 @@ function clamp(value, minimum, maximum) {
 }
 
 let thumbnailObserver = null;
+let documentEpoch = 0;
 const thumbnailCache = new Map();
 const referencePreviewCache = new Map();
 
 async function renderReferencePage(number, width) {
   if (!document_) return "";
-  const key = `${number}:${width}`;
+  const epoch = documentEpoch;
+  const documentAtRequest = document_;
+  const key = `${epoch}:${number}:${width}`;
   const cached = referencePreviewCache.get(key);
   if (cached) return cached;
-  const page = await document_.getPage(number);
+  const page = await documentAtRequest.getPage(number);
   const base = page.getViewport({ scale: 1 });
   const viewport = page.getViewport({ scale: (width * 2) / base.width });
   const canvas = document.createElement("canvas");
   canvas.width = Math.max(1, Math.ceil(viewport.width));
   canvas.height = Math.max(1, Math.ceil(viewport.height));
   await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+  // A preview started for the previous document must never populate the new document's ruler or
+  // reference popover, even when the page number is identical.
+  if (epoch !== documentEpoch || documentAtRequest !== document_) return "";
   const url = canvas.toDataURL("image/png");
   referencePreviewCache.set(key, url);
   return url;
@@ -202,11 +208,13 @@ async function renderThumbnail(element) {
   const number = Number(element.dataset.page);
   if (!number || !document_ || element.dataset.rendered === "true") return;
   element.dataset.rendered = "true";
+  const epoch = documentEpoch;
+  const documentAtRequest = document_;
 
   try {
     let url = thumbnailCache.get(number);
     if (!url) {
-      const page = await document_.getPage(number);
+      const page = await documentAtRequest.getPage(number);
       const base = page.getViewport({ scale: 1 });
       const scale = 200 / base.width;
       const viewport = page.getViewport({ scale });
@@ -216,8 +224,16 @@ async function renderThumbnail(element) {
       canvas.height = Math.max(1, Math.ceil(viewport.height));
       const context = canvas.getContext("2d");
       await page.render({ canvasContext: context, viewport }).promise;
+      if (epoch !== documentEpoch || documentAtRequest !== document_) return;
       url = canvas.toDataURL("image/png");
       thumbnailCache.set(number, url);
+    }
+    if (
+      epoch !== documentEpoch ||
+      documentAtRequest !== document_ ||
+      !element.isConnected
+    ) {
+      return;
     }
     const image = document.createElement("img");
     image.src = url;
@@ -2833,6 +2849,16 @@ window.PDFScope = {
   /** @param {Uint8Array} bytes */
   async load(bytes, name = "") {
     documentName = typeof name === "string" ? name : "";
+    documentEpoch += 1;
+    referencePreviewCache.clear();
+    if (pageRuler) {
+      hidePageRulerHover();
+      pageRuler.sectionToken += 1;
+      pageRuler.sections = [];
+      pageRuler.sectionsDocument = null;
+      pageRuler.marks = [];
+      pageRuler.element.hidden = true;
+    }
     stopZoom();
     releaseAll();
     baseWidth = 0;

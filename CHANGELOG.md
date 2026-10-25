@@ -63,6 +63,13 @@ minor releases may contain breaking changes; they are always called out.
   committed wide ring without a check; subtract previews drop the ring while keeping the check until
   release. Selected cards keep a neutral page pill and only the current page gets the purple pill.
   Manager cards no longer lift or fade their outline on hover.
+- Fixed page-ruler thumbnails/reference previews showing the previous document's page: preview
+  caches are now document-epoch scoped, cleared on load, and in-flight old-document renders are
+  discarded; thumbnail rendering has the same guard.
+- Long documents no longer mount two action columns, six buttons and six SVGs per page. Page actions
+  use three empty hit buttons per side and mount a single SVG visual only for the hovered page/side.
+  `PageVisual` and the page-bar class/style are memoized per page, cutting reactive work and DOM
+  nodes roughly in half at 400 pages with no action SVGs until hover.
 - Page-bar action icons now appear in place with no opacity transition or hover-shadow swap; the old
   0.16s fade plus one-vs-two-layer shadow read as a tiny upward jump on all three buttons.
 - The composer resize handle is now a square-ended border segment shown only while the handle itself
