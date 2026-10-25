@@ -4763,7 +4763,7 @@ body.panel-dragging .panel-resize::after {
 
 .orphan-warning-close:hover {
   color: var(--ink);
-  background: var(--surface-sunken);
+  background: transparent;
 }
 
 .orphan-warning-dialog p {
@@ -4827,7 +4827,7 @@ body.panel-dragging .panel-resize::after {
 .send-warning {
   right: -2pt;
   bottom: 1px;  /* size */
-  width: 7.65px;  /* size */
+  width: 9px;  /* size */
 }
 
 .send-warning svg {

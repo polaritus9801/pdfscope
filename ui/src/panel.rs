@@ -4811,7 +4811,7 @@ pub fn AiPanel(
                                         title="关闭"
                                         on:click=move |_| edit_first_orphan.run(())
                                     >
-                                        {icon("close", 14)}
+                                        {icon("close", 18)}
                                     </button>
                                 </div>
                                 <p>"红色 @ 引用对应的上下文已经删除，是否仍然发送？"</p>
