@@ -707,12 +707,48 @@ trackpad/shift-wheel, and 系统滚动条 restores both. It draws:
   one shallowest bookmark per page;
 - with no bookmarks, page-count majors are 16 px and sampled page ticks are 8 px; the nice-step target
   is ~16 bars (1/2/5×10ⁿ pages);
-- bookmarks are always drawn, while minor page ticks are sampled to at most ~500 / track-height
-  density; this keeps 1000-page documents readable and bounded;
+- bookmarks are always drawn, while minor page ticks are sampled by the exact density rule below;
 - no separate current-page line (the thumb is the only current-position indicator);
 - a modern accent scrollbar thumb (`12 px`, gradient, soft shadow) that always sits above the
   neutral ruler; the hover line sits *below* the canvas, so tick marks and thumb cover it;
 - page ruler marks are neutral `--ink-faint`; purple is reserved for the scrollbar thumb.
+
+**Tick length and density algorithm.** Let `bookmarks` be the deduplicated page map (one shallowest
+entry per page), `dMin`/`dMax` its minimum/maximum depth, and `longest = 16`, `shortest = 8`.
+
+```text
+maxTicks   = max(80, min(500, floor(trackHeight / 2)))
+sampleStep = ceil(pageCount / maxTicks)
+majorStep  = pageMajorStep(pageCount)
+
+for each page mark at index i:
+    bookmark = bookmarks.get(page)
+    major    = not bookmarks and (page == 1 or page % majorStep == 0)
+
+    if bookmark:
+        if dMax == dMin: length = longest
+        else:            length = round(16 - 8 * (depth - dMin) / (dMax - dMin))
+        draw solid bar
+    else if major:
+        draw longest page tick
+    else if i % sampleStep == 0:
+        draw shortest page tick
+```
+
+`pageMajorStep(count)` uses the usual 1/2/5×10ⁿ ladder:
+
+```text
+raw   = count / 16
+power = 10 ^ floor(log10(max(1, raw)))
+norm  = raw / power
+nice  = norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10
+majorStep = max(1, round(nice * power))
+```
+
+Bookmarks and page-count majors are never sampled; only ordinary page ticks are. The current page
+line is not drawn at all. These rules are the implementation in `drawPageRuler()`; the constants
+(`16`, `8`, `16` target, `500` cap, `80` floor) are deliberately local to that function so they can be
+tuned without touching page geometry.
 
 Scrolling only moves the thumb; the canvas redraws only when geometry or sections change. Geometry is rebuilt from
 the rendered page rectangles on render, resize, page-mode change and zoom settle, so mixed page sizes
