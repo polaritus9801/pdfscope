@@ -16,7 +16,8 @@ minor releases may contain breaking changes; they are always called out.
   circular, and only the button under the pointer is visible.
 - Page-range previews use a lighter two-colour pair (`#b49be2` border / `#dccff3` body) and show the
   actual operation: additions preview only newly added pages; fully committed candidate ranges
-  preview the post-subtraction result.
+  preview the post-subtraction split with a low-contrast diagonal ghost, muted dashed outlines and
+  cut marks at the removed edges. Ghost/cut marks fade over 140 ms on commit.
 - Each page action owns a full-width third of the bar: top starts, middle toggles one page, bottom
   ends, and the icons sit at 1/6, 1/2 and 5/6 of the page. The bar sits 12 px off the sheet and the
   page actions' hit area is the full bar width. Endpoint fades are 64 px instead of 18 px.

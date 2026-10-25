@@ -12,6 +12,7 @@ use crate::{call, settle};
 struct PageVisual {
     base: bool,
     add: bool,
+    subtract: bool,
     open: Option<(u8, bool)>, // kind (0 start, 1 end), placed?
 }
 
@@ -68,6 +69,7 @@ fn page_visual(
         if pdfscope_core::pages::range_fully_selected(set, start, end) {
             if page >= start && page <= end {
                 visual.base = false;
+                visual.subtract = true;
             }
         } else {
             visual.add = page >= start && page <= end && !visual.base;
@@ -448,6 +450,17 @@ pub(crate) fn PageView(
         visual.add || (visual.open.is_some() && !visual.base)
     };
 
+    let removing = move || {
+        page_visual(
+            number,
+            &page_set.get(),
+            anchor.get(),
+            hover_page.get(),
+            hover_kind.get(),
+        )
+        .subtract
+    };
+
     let clear_draft = move || {
         anchor.set(None);
         hover_page.set(None);
@@ -571,6 +584,17 @@ pub(crate) fn PageView(
         let hovered = hover_page.get();
         let kind = hover_kind.get();
         let visual = page_visual(number, &set, anchor, hovered, kind);
+        if visual.subtract {
+            let first = !page_visual(number - 1, &set, anchor, hovered, kind).subtract;
+            let last = !page_visual(number + 1, &set, anchor, hovered, kind).subtract;
+            let class = match (first, last) {
+                (true, true) => "page-range-bar visible ghost first last",
+                (true, false) => "page-range-bar visible ghost first",
+                (false, true) => "page-range-bar visible ghost last",
+                (false, false) => "page-range-bar visible ghost",
+            };
+            return (class.to_owned(), String::new());
+        }
         if let Some((open_kind, placed)) = visual.open {
             let cap = if placed {
                 "var(--deep-border)"
@@ -708,6 +732,7 @@ pub(crate) fn PageView(
             class="page"
             class:in-scope=in_scope
             class:preview=in_preview
+            class:removing=removing
             id=id
             data-page=page_attribute
             style=style

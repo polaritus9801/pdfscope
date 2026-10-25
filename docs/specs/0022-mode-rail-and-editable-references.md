@@ -611,10 +611,13 @@ right gutter and reflow the page column; both renders a second independent bar/a
 
 **Add or subtract.** A candidate interval is a subtraction if and only if every page in it is already
 committed; otherwise it is an addition. Addition previews only the newly added pages in the light pair;
-committed pages stay dark. Subtraction previews the final post-subtraction result: removed bars and
-their page outlines disappear, remaining ranges split. Previews never merge with committed ranges;
-only the closing click writes to `page_set`, at which point adjacent ranges merge (1-3, 6-8 + 4-5
-previews as three bars, commits as one 1-8 bar).
+committed pages stay dark. Subtraction previews the final post-subtraction split, but the doomed
+interval is not blanked: it shows a low-contrast diagonal ghost (`light-border` hatch over a faint
+`light-body` wash), the doomed pages keep a muted dashed outline instead of their solid scope outline,
+and 22×3 px cut marks appear at the first/last ghost edge. On commit the ghost and cut marks fade out
+over 140 ms and the split bars remain. Previews never merge with committed ranges; only the closing
+click writes to `page_set`, at which point adjacent ranges merge (1-3, 6-8 + 4-5 previews as three
+bars, commits as one 1-8 bar).
 
 **Endpoint state machine.** First click places Start or End and does not mutate `page_set`. Opposite
 endpoint click closes the range. `start > end` is illegal: discard the first click and keep the second

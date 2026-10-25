@@ -2423,24 +2423,74 @@ mark.find-hit {
   outline: 2px dashed color-mix(in srgb, var(--accent) 70%, transparent);  /* size */
 }
 
+/* Subtraction preview: the page is still visible, but its scope is about to go. */
+.page.removing {
+  outline: 2px dashed color-mix(in srgb, var(--accent) 28%, transparent);  /* size */
+}
+
+.page.in-scope,
+.page.preview,
+.page.removing {
+  transition: outline-color 140ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-range-bar {
+    transition: none;
+  }
+}
+
 .page-range-bar {
   position: absolute;
   top: 0;
   bottom: 0;
   left: calc(-1 * var(--page-range-center) - var(--page-range-width) / 2);
   width: var(--page-range-width);
-  display: none;
+  display: block;
   pointer-events: none;
   border-radius: 0;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 140ms ease, visibility 0s linear 140ms;
   z-index: 4;
 }
 
 .page-range-bar.visible {
-  display: block;
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 140ms ease;
 }
 
 .page-range-bar:not(.last) {
   bottom: calc(-1 * var(--page-gap, var(--space-4)));
+}
+
+.page-range-bar.ghost {
+  background-color: color-mix(in srgb, var(--light-body) 34%, transparent);
+  background-image: repeating-linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--light-border) 58%, transparent) 0 2px,  /* size */
+    transparent 2px 9px  /* size */
+  );
+}
+
+.page-range-bar.ghost.first::before,
+.page-range-bar.ghost.last::after {
+  position: absolute;
+  left: 50%;
+  width: 22px;  /* size */
+  height: 3px;  /* size */
+  background: var(--deep-border);
+  content: "";
+  transform: translateX(-50%);
+}
+
+.page-range-bar.ghost.first::before {
+  top: 0;
+}
+
+.page-range-bar.ghost.last::after {
+  bottom: 0;
 }
 
 .page-range-bar.range-right,
