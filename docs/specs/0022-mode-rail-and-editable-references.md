@@ -688,3 +688,34 @@ native width.
 
 **Navigation scrollbars.** 目录 and 缩略图 lists use a 4 px WebKit scrollbar (thin native scrollbar on
 Firefox), independent of the reader scrollbar. The manager grid keeps its normal scrollbar.
+
+## 2026-10-26 — page ruler, manager drag and native-drag fix
+
+**Page ruler.** 设置 → 阅读 → **PDF 滚动条** defaults to 页面标尺 and can be switched to 系统滚动条 for
+side-by-side comparison. The ruler is a 16 px overlay at the reader's right edge (the native vertical
+scrollbar is hidden in ruler mode; the horizontal scrollbar remains for zoomed pages). It draws:
+
+- a tick for every page boundary, longer every 10 pages;
+- a quiet accent band for every depth-0 outline entry;
+- the current page line;
+- a draggable viewport thumb whose height is `clientHeight / scrollHeight` of the track.
+
+Scrolling only moves the thumb and redraws when the current page changes. Geometry is rebuilt from
+the rendered page rectangles on render, resize, page-mode change and zoom settle, so mixed page sizes
+and panel reflow are correct. Hovering the rail finds the page by its top fraction, shows the page
+number plus the nearest outline title, draws a hover tick, and after 160 ms shows a cached page
+preview. Clicking jumps to that page; the thumb drags; the wheel over the ruler scrolls the reader;
+Arrow/Page/Home/End work when the ruler is focused. The ruler is a scrollbar role with
+`aria-valuemin/max/now`, page-valued text and an accessible focus ring. Ruler mode reads
+`localStorage["pdfscope.scroll-style"]`; `native` shows the platform scrollbar instead.
+
+**Manager drag.** The manager used per-card `pointerup` and did not suppress the browser's native
+image drag. Dragging a card therefore started an HTML5 drag of the thumbnail image, which the app's
+file-drop layer interpreted as an upload; pointerup never reached the card. The grid now owns pointer
+capture, hit-tests `elementFromPoint`, suppresses `dragstart`/pointerdown defaults, and sets
+`draggable=false` plus `pointer-events:none` on thumbnail images. A press/up under 4 px toggles one
+page; a real drag paints a live range preview and commits one add/subtract range, with Alt subtracting.
+No hover translate/shadow is applied to manager cards.
+
+**Navigation scrollbars.** 目录 and 缩略图 now use exactly the AI panel's scrollbar recipe: 4 px,
+transparent track, `--border-strong` rounded thumb, no hover variant or accent styling.

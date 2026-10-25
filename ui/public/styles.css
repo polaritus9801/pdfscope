@@ -279,12 +279,10 @@ body {
   --reader-gutter: 116px;  /* size */
 }
 
-/* Directory/thumbnail scrollbars stay deliberately thin (about 4pt), independent of the reader's
-   native scrollbar. */
+/* Directory and thumbnail lists use exactly the AI panel's quiet scrollbar. */
 .thumb-list,
 .outline-list {
   scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--accent) 38%, transparent) transparent;
 }
 
 .thumb-list::-webkit-scrollbar,
@@ -300,13 +298,8 @@ body {
 
 .thumb-list::-webkit-scrollbar-thumb,
 .outline-list::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--accent) 38%, transparent);
+  background: var(--border-strong);
   border-radius: 999px;  /* size */
-}
-
-.thumb-list::-webkit-scrollbar-thumb:hover,
-.outline-list::-webkit-scrollbar-thumb:hover {
-  background: color-mix(in srgb, var(--accent) 62%, transparent);
 }
 
 /* The hovered page marker rides the reader's scrollbar, not the AI-panel divider. */
@@ -316,11 +309,129 @@ body {
   width: 4px;  /* size */
   height: 12px;  /* size */
   margin-top: -6px;  /* size */
-  z-index: 5;
+  z-index: 7;
   background: var(--accent-strong);
   border-radius: 999px;  /* size */
   box-shadow: 0 0 0 1px rgb(255 255 255 / 72%);  /* size */
   pointer-events: none;
+}
+
+/* ── Page ruler ─────────────────────────────────────────────────────────────────────────────── */
+/* Replaces the platform vertical scrollbar; horizontal scrolling (when zoomed beyond the stage)
+   stays native. The rail sits in the right gutter and never changes the PDF layout. */
+html[data-scroll-style="ruler"].ruler-ready .stage::-webkit-scrollbar:vertical {
+  width: 0;  /* size */
+}
+
+html[data-scroll-style="native"] .page-ruler {
+  display: none;
+}
+
+.page-ruler {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 6;
+  width: 16px;  /* size */
+  height: 100%;
+  outline: none;
+  touch-action: none;
+  cursor: default;
+}
+
+.page-ruler::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 1px;  /* size */
+  background: color-mix(in srgb, var(--border-strong) 55%, transparent);
+  content: "";
+}
+
+.page-ruler canvas {
+  display: block;
+  width: 16px;  /* size */
+  height: 100%;
+}
+
+.page-ruler-thumb {
+  position: absolute;
+  right: 3px;  /* size */
+  width: 8px;  /* size */
+  min-height: 22px;  /* size */
+  background: color-mix(in srgb, var(--accent) 23%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  border-radius: 999px;  /* size */
+  cursor: grab;
+}
+
+.page-ruler-thumb:active {
+  cursor: grabbing;
+}
+
+.page-ruler-hover-line {
+  position: absolute;
+  right: 2px;  /* size */
+  width: 12px;  /* size */
+  height: 2px;  /* size */
+  margin-top: -1px;  /* size */
+  background: var(--accent);
+  border-radius: 1px;  /* size */
+  pointer-events: none;
+}
+
+.page-ruler-tooltip {
+  position: absolute;
+  right: 22px;  /* size */
+  max-width: 240px;  /* size */
+  padding: var(--space-1) var(--space-2);
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-2);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 2;
+}
+
+.page-ruler-tooltip-page {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.page-ruler-tooltip-section {
+  max-width: 220px;  /* size */
+  overflow: hidden;
+  color: var(--ink-muted);
+  text-overflow: ellipsis;
+}
+
+.page-ruler-preview {
+  position: absolute;
+  right: 22px;  /* size */
+  width: 116px;  /* size */
+  padding: 3px;  /* size */
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-2);
+  pointer-events: none;
+}
+
+.page-ruler-preview img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 2px;  /* size */
+}
+
+.page-ruler:focus-visible {
+  outline: 2px solid var(--accent);  /* size */
+  outline-offset: -2px;  /* size */
 }
 
 /* The column is laid out once at the base width. Zoom transforms the whole column; the scaler
@@ -1977,7 +2088,7 @@ body {
   top: var(--space-3);
   right: var(--space-4);
   bottom: calc(var(--space-6) + var(--space-2));
-  z-index: 7;
+  z-index: 8;
   display: flex;
   flex-direction: column;
   width: min(360px, 44%);  /* size */
@@ -2870,6 +2981,30 @@ html[data-range-side="both"] .page-bar-actions.range-right {
 
 .manager-thumb:hover {
   border-color: var(--accent);
+  box-shadow: none;
+  transform: none;
+}
+
+.manager-grid {
+  user-select: none;
+}
+
+.manager-thumb img {
+  -webkit-user-drag: none;
+  user-select: none;
+  pointer-events: none;
+}
+
+.manager-thumb.drag-preview {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent);  /* size */
+}
+
+.manager-thumb.drag-preview.drag-subtract {
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 9%, var(--surface));
+  box-shadow: inset 0 0 0 1px var(--danger);  /* size */
 }
 
 .manager-thumb.selected {

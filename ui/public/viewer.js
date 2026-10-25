@@ -222,6 +222,7 @@ async function renderThumbnail(element) {
     const image = document.createElement("img");
     image.src = url;
     image.alt = `第 ${number} 页`;
+    image.draggable = false;
     image.loading = "lazy";
     element.querySelectorAll("img").forEach((existing) => existing.remove());
     element.prepend(image);
@@ -247,6 +248,7 @@ function applyPageMode() {
   requestAnimationFrame(() => {
     document.querySelector(".stage")?.scrollTo({ top: 0 });
     if (paged) pagedLayout();
+    refreshPageRuler();
   });
 }
 
@@ -510,6 +512,7 @@ function measureBaseLayout(force = false) {
   baseEpoch += 1;
   metricsDirty = true;
   updateScalerSize();
+  schedulePageRulerMeasure();
   return true;
 }
 
@@ -780,6 +783,7 @@ function applyDisplayScale(scale, origin) {
 
   applyPan();
   centerHorizontally();
+  schedulePageRulerViewport();
 
   function centerHorizontally() {
     // Auto margins centre the column while it still fits inside the full stage (including the
@@ -816,6 +820,7 @@ function finishZoom() {
   zooming = false;
   reportZoom(true);
   centerAtRest();
+  refreshPageRuler();
   updateWindow(true).catch(() => {});
   pagesElement()?.classList.remove("zooming");
 }
@@ -3360,10 +3365,12 @@ window.PDFScope = {
       reportZoom(true);
       centerAtRest();
       await updateWindow(true);
+      refreshPageRuler();
       return;
     }
 
     scheduleUpdate(false);
+    refreshPageRuler();
   },
 
   async pageText(pageNumber) {
@@ -3458,9 +3465,476 @@ function stopZoom() {
   pagesElement()?.classList.remove("zooming");
 }
 
+// ── Page ruler ────────────────────────────────────────────────────────────────────────────────
+//
+// A custom vertical scrollbar that shows page boundaries, top-level outline chapters, the current
+// page and the viewport window. Page geometry is read from the already-rendered page elements; ticks
+// are drawn on one canvas, so scrolling only updates the thumb and the current-page line.
+let pageRuler = null;
+
+function initPageRuler() {
+  if (pageRuler) return;
+  const shell = document.querySelector(".stage-shell");
+  if (!shell) {
+    setTimeout(initPageRuler, 50);
+    return;
+  }
+
+  const element = document.createElement("div");
+  element.className = "page-ruler";
+  element.tabIndex = 0;
+  element.setAttribute("role", "scrollbar");
+  element.setAttribute("aria-orientation", "vertical");
+  element.setAttribute("aria-label", "页面标尺");
+  element.setAttribute("aria-valuemin", "1");
+  element.setAttribute("aria-controls", "pages");
+  element.innerHTML = `
+    <canvas aria-hidden="true"></canvas>
+    <div class="page-ruler-thumb" hidden></div>
+    <div class="page-ruler-hover-line" hidden></div>
+    <div class="page-ruler-tooltip" hidden>
+      <div class="page-ruler-tooltip-page"></div>
+      <div class="page-ruler-tooltip-section"></div>
+    </div>
+    <div class="page-ruler-preview" hidden><img alt="" draggable="false"></div>
+  `;
+  shell.append(element);
+
+  pageRuler = {
+    element,
+    canvas: element.querySelector("canvas"),
+    thumb: element.querySelector(".page-ruler-thumb"),
+    hoverLine: element.querySelector(".page-ruler-hover-line"),
+    tooltip: element.querySelector(".page-ruler-tooltip"),
+    tooltipPage: element.querySelector(".page-ruler-tooltip-page"),
+    tooltipSection: element.querySelector(".page-ruler-tooltip-section"),
+    preview: element.querySelector(".page-ruler-preview"),
+    previewImage: element.querySelector(".page-ruler-preview img"),
+    marks: [],
+    sections: [],
+    sectionsDocument: null,
+    sectionToken: 0,
+    trackHeight: 0,
+    total: 1,
+    hoverPage: 0,
+    previewTimer: 0,
+    previewToken: 0,
+    drag: null,
+    stage: null,
+    measureFrame: 0,
+    viewportFrame: 0,
+    drawnCurrent: 0,
+  };
+  pageRuler.ctx = pageRuler.canvas.getContext("2d");
+  document.documentElement.classList.add("ruler-ready");
+
+  element.addEventListener("pointerdown", onPageRulerPointerDown);
+  element.addEventListener("pointermove", onPageRulerPointerMove);
+  element.addEventListener("pointerup", onPageRulerPointerUp);
+  element.addEventListener("pointercancel", onPageRulerPointerUp);
+  element.addEventListener("pointerleave", () => {
+    if (!pageRuler?.drag) hidePageRulerHover();
+  });
+  element.addEventListener("keydown", onPageRulerKeyDown);
+  element.addEventListener(
+    "wheel",
+    (event) => {
+      if (!pageRuler?.stage) return;
+      event.preventDefault();
+      pageRuler.stage.scrollTop += event.deltaY;
+    },
+    { passive: false },
+  );
+
+  if (typeof ResizeObserver === "function") {
+    const observer = new ResizeObserver(() => schedulePageRulerMeasure());
+    observer.observe(shell);
+    const stage = stageElement();
+    const pages = pagesElement();
+    if (stage) observer.observe(stage);
+    if (pages) observer.observe(pages);
+    pageRuler.observer = observer;
+  }
+  window.addEventListener("resize", schedulePageRulerMeasure);
+
+  bindPageRulerStage();
+  refreshPageRuler();
+}
+
+function bindPageRulerStage() {
+  const stage = stageElement();
+  if (!pageRuler || !stage || pageRuler.stage === stage) return;
+  pageRuler.stage = stage;
+  stage.addEventListener("scroll", schedulePageRulerViewport, { passive: true });
+}
+
+function refreshPageRuler() {
+  if (!pageRuler) return;
+  bindPageRulerStage();
+  schedulePageRulerMeasure();
+  if (document_ && pageRuler.sectionsDocument !== document_) {
+    void loadPageRulerSections();
+  }
+}
+
+async function loadPageRulerSections() {
+  if (!pageRuler || !document_ || !window.PDFScope?.outline) return;
+  const documentAtRequest = document_;
+  const token = ++pageRuler.sectionToken;
+  let sections = [];
+  try {
+    sections = (await window.PDFScope.outline()) ?? [];
+  } catch {
+    sections = [];
+  }
+  if (
+    !pageRuler ||
+    document_ !== documentAtRequest ||
+    token !== pageRuler.sectionToken
+  ) {
+    return;
+  }
+  pageRuler.sections = Array.isArray(sections) ? sections : [];
+  pageRuler.sectionsDocument = documentAtRequest;
+  drawPageRuler();
+}
+
+function schedulePageRulerMeasure() {
+  if (!pageRuler || pageRuler.measureFrame) return;
+  pageRuler.measureFrame = requestAnimationFrame(() => {
+    pageRuler.measureFrame = 0;
+    measurePageRuler();
+  });
+}
+
+function measurePageRuler() {
+  const ruler = pageRuler;
+  if (!ruler) return;
+  bindPageRulerStage();
+  const stage = stageElement();
+  const pages = pagesElement();
+  const pageElements = pages ? [...pages.querySelectorAll(".page[data-page]")] : [];
+  if (!stage || !pages || pageElements.length === 0 || !document_) {
+    ruler.element.hidden = true;
+    return;
+  }
+
+  ruler.element.hidden = false;
+  ruler.stage = stage;
+  ruler.trackHeight = Math.max(1, stage.clientHeight);
+  ruler.element.style.height = `${ruler.trackHeight}px`;
+
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  ruler.canvas.width = Math.max(1, Math.round(16 * dpr));
+  ruler.canvas.height = Math.max(1, Math.round(ruler.trackHeight * dpr));
+  ruler.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  const stageRect = stage.getBoundingClientRect();
+  const pagesRect = pages.getBoundingClientRect();
+  const pagesTop = pagesRect.top - stageRect.top + stage.scrollTop;
+  ruler.total = Math.max(1, stage.scrollHeight);
+  ruler.marks = pageElements
+    .map((page) => {
+      const number = Number(page.dataset.page);
+      const rect = page.getBoundingClientRect();
+      const top = pagesTop + (rect.top - pagesRect.top);
+      return {
+        number,
+        top,
+        fraction: clamp(top / ruler.total, 0, 1),
+        height: rect.height,
+      };
+    })
+    .filter((mark) => Number.isFinite(mark.number) && mark.number > 0)
+    .sort((a, b) => a.number - b.number);
+  ruler.element.setAttribute("aria-valuemax", String(document_.numPages || ruler.marks.length));
+  ruler.drawnCurrent = 0;
+  drawPageRuler();
+  updatePageRulerViewport();
+}
+
+function schedulePageRulerViewport() {
+  if (!pageRuler || pageRuler.viewportFrame) return;
+  pageRuler.viewportFrame = requestAnimationFrame(() => {
+    pageRuler.viewportFrame = 0;
+    updatePageRulerViewport();
+  });
+}
+
+function updatePageRulerViewport() {
+  const ruler = pageRuler;
+  if (!ruler || !ruler.stage) return;
+  const stage = ruler.stage;
+  const track = ruler.trackHeight || stage.clientHeight;
+  const scrollHeight = Math.max(1, stage.scrollHeight);
+  const maxScroll = Math.max(0, scrollHeight - stage.clientHeight);
+  const thumbHeight = Math.min(track, Math.max(22, (stage.clientHeight / scrollHeight) * track));
+  const thumbTop =
+    maxScroll > 0 ? (stage.scrollTop / maxScroll) * Math.max(0, track - thumbHeight) : 0;
+  ruler.thumb.style.height = `${thumbHeight}px`;
+  ruler.thumb.style.top = `${thumbTop}px`;
+  ruler.thumb.hidden = maxScroll <= 1;
+  ruler.element.setAttribute("aria-valuenow", String(currentPage));
+  ruler.element.setAttribute("aria-valuetext", `第 ${currentPage} 页`);
+  if (ruler.drawnCurrent !== currentPage) {
+    ruler.drawnCurrent = currentPage;
+    drawPageRuler();
+  }
+}
+
+function rulerSectionFor(page) {
+  if (!pageRuler) return null;
+  let best = null;
+  for (const section of pageRuler.sections) {
+    if (!section || !(section.page > 0) || section.page > page) continue;
+    if (!best || section.page >= best.page) best = section;
+  }
+  return best;
+}
+
+function pageMarkForNumber(number) {
+  return pageRuler?.marks.find((mark) => mark.number === number) ?? null;
+}
+
+function pageMarkAtY(y) {
+  const ruler = pageRuler;
+  if (!ruler || ruler.marks.length === 0) return null;
+  let best = ruler.marks[0];
+  for (const mark of ruler.marks) {
+    if (mark.fraction * ruler.trackHeight <= y) best = mark;
+    else break;
+  }
+  return best;
+}
+
+function pageRulerColors() {
+  const style = getComputedStyle(pageRuler.element);
+  return {
+    border: style.getPropertyValue("--border-strong").trim() || "#cbb8ec",
+    faint: style.getPropertyValue("--ink-faint").trim() || "#8c7aa2",
+    accent: style.getPropertyValue("--accent").trim() || "#7f5cbf",
+  };
+}
+
+function drawPageRuler() {
+  const ruler = pageRuler;
+  if (!ruler?.ctx || ruler.marks.length === 0) return;
+  const height = ruler.trackHeight;
+  if (height <= 0) return;
+  const colors = pageRulerColors();
+  const context = ruler.ctx;
+  context.clearRect(0, 0, 16, height);
+
+  const marks = ruler.marks;
+  const step = Math.max(1, Math.ceil(marks.length / 400));
+  context.strokeStyle = colors.faint;
+  context.lineWidth = 1;
+  for (let index = 0; index < marks.length; index += step) {
+    const y = Math.min(height - 1, Math.max(0, marks[index].fraction * height));
+    context.globalAlpha = index % 10 === 0 ? 0.78 : 0.46;
+    context.beginPath();
+    context.moveTo(index % 10 === 0 ? 5 : 9, y + 0.5);
+    context.lineTo(16, y + 0.5);
+    context.stroke();
+  }
+  context.globalAlpha = 1;
+
+  // Top-level outline entries become quiet chapter bands.
+  const seen = new Set();
+  context.fillStyle = colors.accent;
+  for (const section of ruler.sections) {
+    if (!section || section.depth !== 0 || !(section.page > 0) || seen.has(section.page)) continue;
+    seen.add(section.page);
+    const mark = pageMarkForNumber(section.page);
+    if (!mark) continue;
+    const y = Math.min(height - 2, Math.max(0, mark.fraction * height));
+    context.globalAlpha = 0.42;
+    context.fillRect(0, y, 16, 2);
+  }
+  context.globalAlpha = 1;
+
+  const current = pageMarkForNumber(currentPage);
+  if (current) {
+    const y = Math.min(height - 2, Math.max(0, current.fraction * height));
+    context.fillStyle = colors.accent;
+    context.fillRect(0, y, 16, 2);
+  }
+}
+
+function hidePageRulerHover() {
+  if (!pageRuler) return;
+  pageRuler.hoverPage = 0;
+  pageRuler.previewToken += 1;
+  if (pageRuler.previewTimer) {
+    clearTimeout(pageRuler.previewTimer);
+    pageRuler.previewTimer = 0;
+  }
+  pageRuler.hoverLine.hidden = true;
+  pageRuler.tooltip.hidden = true;
+  pageRuler.preview.hidden = true;
+}
+
+function updatePageRulerHover(event) {
+  const ruler = pageRuler;
+  if (!ruler || ruler.drag || ruler.marks.length === 0) return;
+  const rect = ruler.element.getBoundingClientRect();
+  const y = clamp(event.clientY - rect.top, 0, ruler.trackHeight);
+  const mark = pageMarkAtY(y);
+  if (!mark) {
+    hidePageRulerHover();
+    return;
+  }
+  const tickY = Math.min(ruler.trackHeight - 1, Math.max(0, mark.fraction * ruler.trackHeight));
+  ruler.hoverLine.style.top = `${tickY}px`;
+  ruler.hoverLine.hidden = false;
+
+  if (mark.number === ruler.hoverPage && !ruler.tooltip.hidden) {
+    ruler.tooltip.style.top = `${Math.max(
+      4,
+      Math.min(y + 14, ruler.trackHeight - ruler.tooltip.offsetHeight - 4),
+    )}px`;
+    return;
+  }
+
+  ruler.hoverPage = mark.number;
+  ruler.previewToken += 1;
+  if (ruler.previewTimer) clearTimeout(ruler.previewTimer);
+  ruler.preview.hidden = true;
+
+  const section = rulerSectionFor(mark.number);
+  ruler.tooltipPage.textContent = `第 ${mark.number} 页`;
+  ruler.tooltipSection.textContent = section?.title ?? "";
+  ruler.tooltipSection.hidden = !section?.title;
+  ruler.tooltip.hidden = false;
+  ruler.tooltip.style.top = `${Math.max(
+    4,
+    Math.min(y + 14, ruler.trackHeight - ruler.tooltip.offsetHeight - 4),
+  )}px`;
+
+  const token = ruler.previewToken;
+  ruler.previewTimer = setTimeout(async () => {
+    ruler.previewTimer = 0;
+    const url = await window.PDFScope?.previewPage?.(mark.number, 140);
+    if (!url || token !== ruler.previewToken || ruler.hoverPage !== mark.number) return;
+    ruler.previewImage.src = url;
+    ruler.previewImage.alt = `第 ${mark.number} 页`;
+    ruler.preview.hidden = false;
+    const placePreview = () => {
+      if (
+        token !== ruler.previewToken ||
+        ruler.hoverPage !== mark.number ||
+        ruler.preview.hidden
+      ) {
+        return;
+      }
+      const previewHeight = ruler.preview.offsetHeight;
+      let previewTop = y - previewHeight - 14;
+      if (previewTop < 4) {
+        previewTop = y + 14 + ruler.tooltip.offsetHeight + 8;
+      }
+      ruler.preview.style.top = `${Math.max(
+        4,
+        Math.min(previewTop, ruler.trackHeight - previewHeight - 4),
+      )}px`;
+    };
+    if (ruler.previewImage.decode) {
+      ruler.previewImage.decode().then(placePreview).catch(placePreview);
+    }
+    requestAnimationFrame(placePreview);
+  }, 160);
+}
+
+function rulerScrollToPage(mark) {
+  const stage = pageRuler?.stage;
+  if (!stage || !mark) return;
+  stage.scrollTo({ top: Math.max(0, mark.top - 16), behavior: "auto" });
+}
+
+function onPageRulerPointerDown(event) {
+  const ruler = pageRuler;
+  if (!ruler) return;
+  event.preventDefault();
+  ruler.element.focus({ preventScroll: true });
+  hidePageRulerHover();
+  if (ruler.thumb.contains(event.target)) {
+    const stage = ruler.stage;
+    if (!stage || ruler.thumb.hidden) return;
+    ruler.drag = {
+      pointerId: event.pointerId,
+      startY: event.clientY,
+      startScroll: stage.scrollTop,
+      travel: Math.max(1, ruler.trackHeight - ruler.thumb.offsetHeight),
+      maxScroll: Math.max(1, stage.scrollHeight - stage.clientHeight),
+    };
+    ruler.thumb.setPointerCapture(event.pointerId);
+    return;
+  }
+  const rect = ruler.element.getBoundingClientRect();
+  const mark = pageMarkAtY(clamp(event.clientY - rect.top, 0, ruler.trackHeight));
+  rulerScrollToPage(mark);
+}
+
+function onPageRulerPointerMove(event) {
+  const ruler = pageRuler;
+  if (!ruler) return;
+  if (ruler.drag) {
+    const stage = ruler.stage;
+    if (!stage) return;
+    const delta = event.clientY - ruler.drag.startY;
+    const next =
+      ruler.drag.startScroll + (delta / ruler.drag.travel) * ruler.drag.maxScroll;
+    stage.scrollTop = clamp(next, 0, ruler.drag.maxScroll);
+    return;
+  }
+  updatePageRulerHover(event);
+}
+
+function onPageRulerPointerUp(event) {
+  const ruler = pageRuler;
+  if (!ruler?.drag) return;
+  if (ruler.thumb.hasPointerCapture(event.pointerId)) {
+    ruler.thumb.releasePointerCapture(event.pointerId);
+  }
+  ruler.drag = null;
+}
+
+function onPageRulerKeyDown(event) {
+  const ruler = pageRuler;
+  const stage = ruler?.stage;
+  if (!stage) return;
+  const viewport = stage.clientHeight;
+  let top = null;
+  switch (event.key) {
+    case "ArrowDown":
+      top = stage.scrollTop + 64;
+      break;
+    case "ArrowUp":
+      top = stage.scrollTop - 64;
+      break;
+    case "PageDown":
+      top = stage.scrollTop + viewport * 0.9;
+      break;
+    case "PageUp":
+      top = stage.scrollTop - viewport * 0.9;
+      break;
+    case "Home":
+      top = 0;
+      break;
+    case "End":
+      top = stage.scrollHeight;
+      break;
+    default:
+      return;
+  }
+  event.preventDefault();
+  stage.scrollTo({ top: Math.max(0, top), behavior: "auto" });
+}
+
 initOobePreview();
 
 initFileDrops();
+
+initPageRuler();
 
 // ── Offscreen reference thumbnails ─────────────────────────────────────────────────────────────
 //
