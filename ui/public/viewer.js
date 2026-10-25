@@ -3536,7 +3536,7 @@ initReferencePlacement();
 
 function initReferencePreviews() {
   document.addEventListener("pointerover", (event) => {
-    const row = event.target instanceof Element ? event.target.closest(".refs-row[data-ref-page]") : null;
+    const row = event.target instanceof Element ? event.target.closest(".refs-row[data-ref-page], .mention-item[data-ref-page]") : null;
     if (!row) return;
     hideReferencePreview();
     const number = Number(row.dataset.refPage);
@@ -3548,7 +3548,7 @@ function initReferencePreviews() {
     }, 120);
   });
   document.addEventListener("pointerout", (event) => {
-    const row = event.target instanceof Element ? event.target.closest(".refs-row[data-ref-page]") : null;
+    const row = event.target instanceof Element ? event.target.closest(".refs-row[data-ref-page], .mention-item[data-ref-page]") : null;
     if (!row) return;
     if (event.relatedTarget instanceof Node && row.contains(event.relatedTarget)) return;
     hideReferencePreview();
@@ -3562,3 +3562,48 @@ function initReferencePreviews() {
 }
 
 initReferencePreviews();
+
+// ── @ picker placement ─────────────────────────────────────────────────────────────────────────
+//
+// The picker is fixed above the caret, not above the whole composer. It first tries to centre on
+// the @; at the panel edges it shifts inward instead of escaping the AI column.
+
+function placeMentionPicker() {
+  const picker = document.querySelector(".mention-picker");
+  const panel = document.querySelector(".panel");
+  const editor = document.querySelector("#ask-editor");
+  if (!picker || !panel || !editor) return;
+  const panelBox = panel.getBoundingClientRect();
+  const editorBox = editor.getBoundingClientRect();
+  let caret = null;
+  const selection = window.getSelection();
+  if (selection?.rangeCount && editor.contains(selection.anchorNode)) {
+    const range = selection.getRangeAt(0).cloneRange();
+    range.collapse(true);
+    const rect = range.getBoundingClientRect();
+    if (rect && (rect.width > 0 || rect.height > 0)) caret = rect;
+  }
+  const width = Math.min(300, Math.max(180, panelBox.width - 16));
+  picker.style.width = `${width}px`;
+  const anchorLeft = caret ? caret.left : editorBox.left;
+  const anchorRight = caret ? caret.right : editorBox.left + 1;
+  const anchorTop = caret ? caret.top : editorBox.top;
+  let left = (anchorLeft + anchorRight) / 2 - width / 2;
+  left = Math.max(panelBox.left + 8, Math.min(left, panelBox.right - width - 8));
+  const height = picker.getBoundingClientRect().height;
+  const top = Math.max(8, anchorTop - height - 8);
+  picker.style.left = `${Math.round(left)}px`;
+  picker.style.top = `${Math.round(top)}px`;
+  picker.classList.add("positioned");
+}
+
+function initMentionPickerPlacement() {
+  const observer = new MutationObserver(() => {
+    if (document.querySelector(".mention-picker")) requestAnimationFrame(placeMentionPicker);
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+  window.addEventListener("resize", placeMentionPicker);
+}
+
+initMentionPickerPlacement();
+

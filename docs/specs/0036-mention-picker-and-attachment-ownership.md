@@ -17,9 +17,9 @@ The `@` mention picker is absolutely positioned above the composer:
 ```
 
 Opening it therefore does not change the composer/context-shelf height or push the transcript
-upward. It floats directly above the input card (over the context shelf when present) and scrolls
-internally. It closes when the `@` trigger stops being valid, including deleting the `@` or typing
-another character.
+upward. It is positioned just above the caret, centred on the `@` when possible and shifted inward at the AI
+panel edges; width is capped at 300px. It scrolls internally and closes when the `@` trigger stops
+being valid, including deleting the `@` or typing another character.
 
 ## Token insertion
 
@@ -40,8 +40,9 @@ The context shelf is the owner of references, not the inline token.
   region, page, image, file or answer stays in the context shelf and is still sent.
 - Tokens have no trailing space. The caret is kept outside the non-editable pill; clicking its left
   half places the caret before it, clicking its right half after it.
-- Removing a reference from the shelf explicitly removes its token, so the editor never keeps an
-  orphan.
+- Removing a reference from the shelf keeps its token, marks it red as an orphan and shows a small
+  warning on the send button. The reader can delete the red pill or confirm sending via the centered
+  “是 / 修改” dialog; “修改” focuses just after the first red pill.
 - Clear-context still clears both the shelf and all tokens.
 
 ## Answer time
@@ -50,12 +51,14 @@ The context shelf is the owner of references, not the inline token.
 
 ## Acceptance
 
-- Typing `@` floats the picker without changing composer height.
+- Typing `@` after existing text opens the picker; it floats above the caret, capped at 300px and
+  clamped inside the AI panel.
 - Choosing a picker item inserts a visible `@...` pill.
 - Deleting that pill leaves the shelf count/reference intact.
-- Removing the shelf reference also removes the pill.
-- Hovering an `@` pill or a shelf chip highlights the corresponding PDF location and outlines the
-  shelf chip; clicking either locates it and leaves the chip outlined.
+- Removing the shelf reference turns the pill red, shows the send warning and asks before sending.
+- Hovering an `@` pill, an @ picker row, or a shelf chip highlights the corresponding PDF location and
+  outlines the shelf chip; clicking either the pill or shelf chip locates it and leaves the chip
+  outlined.
 - The capsule has a hover treatment; its popover exposes `+ 全部`, which adds only missing historical
   references or shows the red already-present notice.
 - Answer completion time renders at 11px.

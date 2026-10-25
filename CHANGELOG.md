@@ -172,6 +172,13 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Fixed
 
+- Removing a context reference now clears its PDF hover immediately and leaves its inline @ pill in
+  place as a red orphan. A floating send warning and a centered “是 / 修改” dialog handle sending.
+- The 330px capsule's hover is colour-only (no lift).
+- @ after existing text opens the picker; the picker is 300px, sits above the caret and stays inside
+  the AI panel; its rows share the historical hover/preview path.
+- OOBE rows are 20 per column and metadata is pinned to the right edge.
+
 - The `@` picker floats above the composer instead of pushing the context shelf up.
 - Choosing an `@` reference now inserts a visible pill (the token builder no longer calls itself).
 - Deleting an inline `@` pill no longer deletes the reference from the context shelf; removing the

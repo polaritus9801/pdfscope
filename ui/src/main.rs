@@ -1612,7 +1612,7 @@ fn App() -> impl IntoView {
                                         </div>
                                         <span class="recent-count">
                                             {move || {
-                                                let count = recents.get().len().min(10);
+                                                let count = recents.get().len().min(20);
                                                 if count > 0 { count.to_string() } else { String::new() }
                                             }}
                                         </span>
@@ -1639,7 +1639,7 @@ fn App() -> impl IntoView {
                                                     .into_any();
                                             }
                                             all.into_iter()
-                                                .take(10)
+                                                .take(20)
                                                 .map(|recent| {
                                                     let id = recent.id;
                                                     let name = recent.name;
@@ -1708,7 +1708,7 @@ fn App() -> impl IntoView {
                                                                 name == &item.name && *size == item.size
                                                             })
                                                     })
-                                                    .take(10)
+                                                    .take(20)
                                                     .count();
                                                 if count > 0 { count.to_string() } else { String::new() }
                                             }}
@@ -1741,7 +1741,7 @@ fn App() -> impl IntoView {
                                                             name == &item.name && *size == item.size
                                                         })
                                                 })
-                                                .take(10)
+                                                .take(20)
                                                 .collect();
                                             if all.is_empty() {
                                                 return view! {

@@ -52,3 +52,18 @@ used and the recents entry has no native path.
 - Duplicate reference activation adds nothing and shows the red “已经在上下文里了” notice.
 - Creating a new conversation focuses the composer.
 - `just check` green.
+
+
+## Orphan @ pills
+
+Removing a reference from the context shelf no longer deletes the matching inline `@` pill. The pill
+turns red and the send button gets a small red warning badge at its lower-right corner (absolute, no
+layout change). If the reader sends with red pills:
+
+1. The panel dims and shows a centered confirmation dialog.
+2. `是` (white) sends anyway; `修改` (purple) focuses the composer immediately after the first red pill.
+3. The dialog disappears when all red pills are deleted.
+
+The composer keeps zero-width guards around each pill so the caret has an outside position on both
+sides without a visible space. Clicking the left half of a pill places the caret before it; the right
+half places it after.

@@ -802,6 +802,9 @@ pub fn AiPanel(
     let open_refs = RwSignal::new(Option::<RefTarget>::None);
     let active_reference = RwSignal::new(Option::<String>::None);
     let hover_reference = RwSignal::new(Option::<String>::None);
+    let orphan_refs = RwSignal::new(Vec::<String>::new());
+    let send_warning = RwSignal::new(false);
+    let force_send = RwSignal::new(false);
     let interrupted = RwSignal::new(false);
     let continue_target = RwSignal::new(None::<usize>);
     let reasoning = RwSignal::new(String::new());
@@ -887,10 +890,39 @@ pub fn AiPanel(
         let _ = crate::call("flash", &[JsValue::from(target)]);
     };
 
+    let mark_orphan = move |key: &str| -> bool {
+        let marked = composer("markOrphan", &[JsValue::from_str(key)])
+            .and_then(|value| value.as_bool())
+            .unwrap_or(false);
+        if marked {
+            orphan_refs.update(|list| {
+                if !list.iter().any(|entry| entry == key) {
+                    list.push(key.to_owned());
+                }
+            });
+        }
+        marked
+    };
+    let clear_orphan = move |key: &str| {
+        let _ = composer("unmarkOrphan", &[JsValue::from_str(key)]);
+        orphan_refs.update(|list| list.retain(|entry| entry != key));
+    };
+    let forget_reference = move |key: &str| {
+        if hover_reference.get_untracked().as_deref() == Some(key) {
+            hover_reference.set(None);
+            hovered.set(None);
+        }
+        if active_reference.get_untracked().as_deref() == Some(key) {
+            active_reference.set(None);
+        }
+    };
+
     let activate_passage = Callback::new(move |passage: Passage| {
         let duplicate = passages.get_untracked().iter().any(|item| {
             item.page == passage.page && item.quote == passage.quote && item.rect == passage.rect
         });
+        let key = format!("p:{}", passage.id);
+        clear_orphan(&key);
         if duplicate {
             notice.set(Some("这个引用已经在上下文里了".to_owned()));
         } else {
@@ -905,6 +937,8 @@ pub fn AiPanel(
             .get_untracked()
             .iter()
             .any(|item| item.page == region.page && item.image == region.image);
+        let key = format!("r:{}", region.id);
+        clear_orphan(&key);
         if duplicate {
             notice.set(Some("这个引用已经在上下文里了".to_owned()));
         } else {
@@ -915,6 +949,7 @@ pub fn AiPanel(
         jump(region.page);
     });
     let activate_page = Callback::new(move |page_number: u32| {
+        clear_orphan(&format!("page:{page_number}"));
         if page_set.get_untracked().contains(&page_number) {
             notice.set(Some("这个页面引用已经在上下文里了".to_owned()));
         } else {
@@ -1146,6 +1181,24 @@ pub fn AiPanel(
                 });
             }
         }
+        for passage in &context.passages {
+            clear_orphan(&format!("p:{}", passage.id));
+        }
+        for region in &context.regions {
+            clear_orphan(&format!("r:{}", region.id));
+        }
+        for page_number in &context.pages {
+            clear_orphan(&format!("page:{page_number}"));
+        }
+        for answer in &context.answers {
+            clear_orphan(&format!("a:{}", answer.id));
+        }
+        for image in &context.images {
+            clear_orphan(&format!("img:{}", image.id));
+        }
+        for file in &context.files {
+            clear_orphan(&format!("file:{}", file.id));
+        }
         web.set(true);
         notify.run(format!("已添加 {missing} 项引用"));
     });
@@ -1202,8 +1255,15 @@ pub fn AiPanel(
 
     let focus_reference = Callback::new(move |key: String| {
         active_reference.set(Some(key.clone()));
-        if let Some((page, _)) = reference_location(&key) {
-            jump(page);
+        if let Some((page_number, _)) = reference_location(&key) {
+            // Do not run the reader's global clearSelection here: this path can originate from an
+            // inline @ pill, and clearing the document selection would remove the composer caret.
+            let total = pages.get_untracked();
+            if total > 0 {
+                let target = page_number.clamp(1, total);
+                page.set(target);
+                let _ = crate::call("flash", &[JsValue::from(target)]);
+            }
         }
     });
     let hover_reference_on = Callback::new(move |key: String| {
@@ -1582,6 +1642,7 @@ pub fn AiPanel(
                     .map(|list| list.iter().filter_map(|value| value.as_string()).collect())
                     .unwrap_or_default();
 
+                orphan_refs.update(|list| list.retain(|key| current.contains(key)));
                 known_mentions.set(current.clone());
                 mentions.set(current);
                 question.set(text.clone());
@@ -1852,6 +1913,8 @@ pub fn AiPanel(
         think_seconds.set(0.0);
         streaming.set(true);
         failed.set(false);
+        orphan_refs.set(Vec::new());
+        send_warning.set(false);
         status.set("准备上下文…".to_owned());
         let web_now = web.get();
         sources.set(Vec::new());
@@ -2268,6 +2331,12 @@ pub fn AiPanel(
     };
 
     Effect::new(move |_| {
+        if orphan_refs.get().is_empty() {
+            send_warning.set(false);
+        }
+    });
+
+    Effect::new(move |_| {
         if !manager_open.get() {
             return;
         }
@@ -2345,6 +2414,12 @@ pub fn AiPanel(
         if streaming.get() {
             return;
         }
+        if !orphan_refs.get_untracked().is_empty() && !force_send.get_untracked() {
+            send_warning.set(true);
+            return;
+        }
+        force_send.set(false);
+        send_warning.set(false);
         let mut order = Vec::new();
         for passage in passages.get() {
             order.push(format!("p:{}", passage.id));
@@ -2596,29 +2671,34 @@ pub fn AiPanel(
 
     let remove_passage = move |id: u64| {
         let key = format!("p:{id}");
-        let _ = composer("removeToken", &[JsValue::from_str(&key)]);
+        mark_orphan(&key);
+        forget_reference(&key);
         undo_push.run(());
         passages.update(|list| list.retain(|entry| entry.id != id));
     };
     let remove_region = move |id: u64| {
         let key = format!("r:{id}");
-        let _ = composer("removeToken", &[JsValue::from_str(&key)]);
+        mark_orphan(&key);
+        forget_reference(&key);
         undo_push.run(());
         regions.update(|list| list.retain(|entry| entry.id != id));
     };
     let remove_file = move |id: u64| {
         let key = format!("file:{id}");
-        let _ = composer("removeToken", &[JsValue::from_str(&key)]);
+        mark_orphan(&key);
+        forget_reference(&key);
         files.update(|list| list.retain(|entry| entry.id != id));
     };
     let remove_image = move |id: u64| {
         let key = format!("img:{id}");
-        let _ = composer("removeToken", &[JsValue::from_str(&key)]);
+        mark_orphan(&key);
+        forget_reference(&key);
         images.update(|list| list.retain(|entry| entry.id != id));
     };
     let remove_answer = move |id: u64| {
         let key = format!("a:{id}");
-        let _ = composer("removeToken", &[JsValue::from_str(&key)]);
+        mark_orphan(&key);
+        forget_reference(&key);
         undo_push.run(());
         answers.update(|list| list.retain(|entry| entry.id != id));
     };
@@ -4026,10 +4106,9 @@ pub fn AiPanel(
                                                                 event.stop_propagation();
                                                                 undo_push.run(());
                                                                 for page in start..=end {
-                                                                    let _ = composer(
-                                                                        "removeToken",
-                                                                        &[JsValue::from_str(&format!("page:{page}"))],
-                                                                    );
+                                                                    let key = format!("page:{page}");
+                                                                    mark_orphan(&key);
+                                                                    forget_reference(&key);
                                                                 }
                                                                 page_set.update(|set| set.retain(|page| *page < start || *page > end));
                                                             }
@@ -4141,6 +4220,9 @@ pub fn AiPanel(
                                         class="shelf-clear"
                                         on:click=move |_| {
                                             undo_push.run(());
+                                            hover_reference.set(None);
+                                            active_reference.set(None);
+                                            hovered.set(None);
                                             passages.set(Vec::new());
                                             regions.set(Vec::new());
                                             images.set(Vec::new());
@@ -4203,9 +4285,15 @@ pub fn AiPanel(
                         for passage in passages.get() {
                             let key = format!("p:{}", passage.id);
                             let label = format!("p.{}", passage.page);
+                            let hover_key = key.clone();
+                            let leave_key = key.clone();
+                            let page_number = passage.page;
                             items.push(view! {
                                 <button
                                     class="mention-item"
+                                    data-ref-page=page_number
+                                    on:mouseenter=move |_| hover_reference_on.run(hover_key.clone())
+                                    on:mouseleave=move |_| hover_reference_off.run(leave_key.clone())
                                     on:click=move |_| {
                                         let _ = composer(
                                             "insertToken",
@@ -4222,9 +4310,15 @@ pub fn AiPanel(
                         for region in regions.get() {
                             let key = format!("r:{}", region.id);
                             let label = format!("图 p.{}", region.page);
+                            let hover_key = key.clone();
+                            let leave_key = key.clone();
+                            let page_number = region.page;
                             items.push(view! {
                                 <button
                                     class="mention-item"
+                                    data-ref-page=page_number
+                                    on:mouseenter=move |_| hover_reference_on.run(hover_key.clone())
+                                    on:mouseleave=move |_| hover_reference_off.run(leave_key.clone())
                                     on:click=move |_| {
                                         let _ = composer(
                                             "insertToken",
@@ -4241,9 +4335,14 @@ pub fn AiPanel(
                         for page in page_set.get() {
                             let key = format!("page:{page}");
                             let label = format!("p.{page}");
+                            let hover_key = key.clone();
+                            let leave_key = key.clone();
                             items.push(view! {
                                 <button
                                     class="mention-item"
+                                    data-ref-page=page
+                                    on:mouseenter=move |_| hover_reference_on.run(hover_key.clone())
+                                    on:mouseleave=move |_| hover_reference_off.run(leave_key.clone())
                                     on:click=move |_| {
                                         let _ = composer(
                                             "insertToken",
@@ -4319,6 +4418,13 @@ pub fn AiPanel(
                         items.push(view! {
                             <button
                                 class="mention-item"
+                                data-ref-page=current_page
+                                on:mouseenter=move |_| {
+                                    hover_reference_on.run(format!("page:{current_page}"))
+                                }
+                                on:mouseleave=move |_| {
+                                    hover_reference_off.run(format!("page:{current_page}"))
+                                }
                                 on:click=move |_| {
                                     if !already {
                                         undo_push.run(());
@@ -4617,31 +4723,44 @@ pub fn AiPanel(
                             {icon("book", 17)}
                         </button>
                         <span class="toolbar-grow"></span>
-                        <button
-                            class="send-button"
-                            class:is-stop=move || streaming.get()
-                            title=move || {
-                                if streaming.get() { "停止" } else if failed.get() { "重试" } else { "发送" }
-                            }
-                            disabled=move || !streaming.get() && question.get().trim().is_empty()
-                            on:click=move |_| {
-                                if streaming.get() {
-                                    let _ = bridge("stop", &[]);
-                                } else {
-                                    send(());
+                        <div class="send-wrap">
+                            <button
+                                class="send-button"
+                                class:is-stop=move || streaming.get()
+                                title=move || {
+                                    if streaming.get() { "停止" } else if failed.get() { "重试" } else { "发送" }
                                 }
-                            }
-                        >
+                                disabled=move || !streaming.get() && question.get().trim().is_empty()
+                                on:click=move |_| {
+                                    if streaming.get() {
+                                        let _ = bridge("stop", &[]);
+                                    } else {
+                                        send(());
+                                    }
+                                }
+                            >
+                                {move || {
+                                    if streaming.get() {
+                                        icon("stop", 17)
+                                    } else if failed.get() {
+                                        icon("retry", 17)
+                                    } else {
+                                        icon("send", 17)
+                                    }
+                                }}
+                            </button>
                             {move || {
-                                if streaming.get() {
-                                    icon("stop", 17)
-                                } else if failed.get() {
-                                    icon("retry", 17)
-                                } else {
-                                    icon("send", 17)
-                                }
+                                (!orphan_refs.get().is_empty()).then(|| {
+                                    view! {
+                                        <span class="send-warning" title="有已删除的 @ 引用">
+                                            <svg viewBox="0 0 1034 1024" width="18" height="18" fill="currentColor" aria-hidden="true">
+                                                <path d="M1011.982 842.518 606.673 140.565c-49.575-85.822-130.595-85.822-180.157 0L21.205 842.518c-49.562 85.91-9.015 155.99 90.04 155.99l810.693 0C1020.997 998.507 1061.502 928.423 1011.982 842.518zM460.924 339.737c14.565-15.747 33.082-23.622 55.665-23.622 22.595 0 41.095 7.792 55.675 23.307 14.485 15.55 21.725 34.997 21.725 58.382 0 20.12-30.235 168.07-40.32 275.704l-72.825 0c-8.845-107.635-41.652-255.584-41.652-275.704C439.194 374.774 446.446 355.407 460.924 339.737zM571.244 851.538c-15.32 14.92-33.55 22.355-54.65 22.355-21.095 0-39.33-7.435-54.647-22.355-15.275-14.885-22.867-32.915-22.867-54.09 0-21.065 7.592-39.29 22.867-54.565 15.317-15.28 33.552-22.92 54.647-22.92 21.1 0 39.33 7.64 54.65 22.92 15.265 15.275 22.875 33.5 22.875 54.565C594.119 818.623 586.509 836.653 571.244 851.538z" />
+                                            </svg>
+                                        </span>
+                                    }
+                                })
                             }}
-                        </button>
+                        </div>
                     </div>
                     </div>
                     </div>
@@ -4666,6 +4785,38 @@ pub fn AiPanel(
                     model_choices=model_choices
                     provider_preset=provider_preset
                 />
+
+                <Show when=move || send_warning.get()>
+                    <div class="orphan-warning-overlay">
+                        <div class="orphan-warning-dialog" role="dialog" aria-modal="true">
+                            <h3>"有引用已删除"</h3>
+                            <p>"红色 @ 引用对应的上下文已经删除，是否仍然发送？"</p>
+                            <div class="orphan-warning-actions">
+                                <button
+                                    class="button orphan-warning-keep"
+                                    on:click=move |_| {
+                                        send_warning.set(false);
+                                        force_send.set(true);
+                                        send(());
+                                    }
+                                >
+                                    "是"
+                                </button>
+                                <button
+                                    class="button button-primary"
+                                    on:click=move |_| {
+                                        send_warning.set(false);
+                                        if let Some(key) = orphan_refs.get_untracked().first().cloned() {
+                                            let _ = composer("focusAfterToken", &[JsValue::from_str(&key)]);
+                                        }
+                                    }
+                                >
+                                    "修改"
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </Show>
 
             </aside>
         }

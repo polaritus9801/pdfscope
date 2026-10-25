@@ -34,7 +34,7 @@ function serialise() {
   };
 
   for (const child of root.childNodes) walk(child);
-  return { text: text.replace(/\n{3,}/g, "\n\n"), keys };
+  return { text: text.replace(/\u200B/g, "").replace(/\n{3,}/g, "\n\n"), keys };
 }
 
 function emit() {
@@ -81,9 +81,6 @@ function removeTrailingAt() {
   if (node.nodeType !== Node.TEXT_NODE || range.startOffset === 0) return;
   const before = node.textContent.slice(0, range.startOffset);
   if (!before.endsWith("@")) return;
-  // Only a mention trigger: start of the field, or preceded by whitespace.
-  const preceding = before.slice(0, -1);
-  if (preceding.length > 0 && !/\s$/.test(preceding)) return;
 
   const next = before.slice(0, -1) + node.textContent.slice(range.startOffset);
   node.textContent = next;
@@ -99,11 +96,6 @@ function checkMention() {
   if (!allowMention) return;
   const text = textBeforeCaret();
   if (!text.endsWith("@")) {
-    window.__pdfscopeMentionClose?.();
-    return;
-  }
-  const before = text.slice(0, -1);
-  if (before.length > 0 && !/\s$/.test(before)) {
     window.__pdfscopeMentionClose?.();
     return;
   }
@@ -137,32 +129,49 @@ function makeToken(key, label) {
   return token;
 }
 
+function zeroGuard() {
+  return document.createTextNode("\u200B");
+}
+
+function afterGuard(token) {
+  const next = token?.nextSibling;
+  return next && next.nodeType === Node.TEXT_NODE && next.textContent.startsWith("\u200B")
+    ? next
+    : null;
+}
+
+function beforeGuard(token) {
+  const previous = token?.previousSibling;
+  return previous && previous.nodeType === Node.TEXT_NODE && previous.textContent.endsWith("\u200B")
+    ? previous
+    : null;
+}
+
 function insertToken(key, label) {
   if (!root) return;
   removeTrailingAt();
 
   const token = makeToken(key, label);
+  const before = zeroGuard();
+  const after = zeroGuard();
 
   const range = caretInRoot();
   if (!range) {
-    root.appendChild(token);
+    root.append(before, token, after);
   } else {
     range.deleteContents();
     range.insertNode(token);
-    range.setStartAfter(token);
-    range.collapse(true);
-    const selection = window.getSelection();
-    selection.removeAllRanges();
-    selection.addRange(range);
+    token.before(before);
+    token.after(after);
   }
 
-  // No trailing space: the pill itself is the reference. Keep the caret just outside it.
-  const after = document.createRange();
-  after.setStartAfter(token);
-  after.collapse(true);
+  // Invisible zero-width guards give the caret a position outside the pill without a visible space.
+  const caret = document.createRange();
+  caret.setStart(after, 1);
+  caret.collapse(true);
   const selection = window.getSelection();
   selection.removeAllRanges();
-  selection.addRange(after);
+  selection.addRange(caret);
   root.focus();
   emit();
 }
@@ -189,7 +198,9 @@ document.addEventListener("selectionchange", () => {
   const token = anchor instanceof Element ? anchor.closest(".mention") : null;
   if (!token) return;
   const range = document.createRange();
-  range.setStartAfter(token);
+  const guard = afterGuard(token);
+  if (guard) range.setStart(guard, 1);
+  else range.setStartAfter(token);
   range.collapse(true);
   selection.removeAllRanges();
   selection.addRange(range);
@@ -233,14 +244,33 @@ window.Composer = {
       const token = event.target instanceof Element ? event.target.closest(".mention") : null;
       if (!token) return;
       if (token.dataset.key) window.__pdfscopeMentionClick?.(token.dataset.key);
-      const rect = token.getBoundingClientRect();
-      const range = document.createRange();
-      if (event.clientX < rect.left + rect.width / 2) range.setStartBefore(token);
-      else range.setStartAfter(token);
-      range.collapse(true);
-      const selection = window.getSelection();
-      selection?.removeAllRanges();
-      selection?.addRange(range);
+      const key = token.dataset.key;
+      const place = () => {
+        const live = key ? root.querySelector(`.mention[data-key="${key}"]`) : null;
+        if (!live) return;
+        const liveRect = live.getBoundingClientRect();
+        const range = document.createRange();
+        if (event.clientX < liveRect.left + liveRect.width / 2) {
+          const guard = beforeGuard(live);
+          if (guard) range.setStartBefore(guard);
+          else range.setStartBefore(live);
+        } else {
+          const guard = afterGuard(live);
+          if (guard) range.setStartAfter(guard);
+          else range.setStartAfter(live);
+        }
+        range.collapse(true);
+        const selection = window.getSelection();
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+      };
+      root.focus();
+      place();
+      // The PDF focus/jump triggered by the mention may rerender the panel; reassert after it.
+      requestAnimationFrame(() => {
+        root.focus();
+        place();
+      });
     });
   },
 
@@ -277,10 +307,16 @@ window.Composer = {
     const token = root.querySelector(`.mention[data-key="${key}"]`);
     if (!token) return;
     // Take the following space with it, so two removals do not leave a double gap.
-    const next = token.nextSibling;
+    const before = beforeGuard(token);
+    const after = afterGuard(token);
     token.remove();
-    if (next && next.nodeType === Node.TEXT_NODE && next.textContent.startsWith(" ")) {
-      next.textContent = next.textContent.slice(1);
+    if (before) {
+      before.textContent = before.textContent.slice(0, -1);
+      if (!before.textContent) before.remove();
+    }
+    if (after) {
+      after.textContent = after.textContent.slice(1);
+      if (!after.textContent) after.remove();
     }
     emit();
   },
@@ -294,6 +330,41 @@ window.Composer = {
   },
 
   insertToken,
+
+  markOrphan(key) {
+    const token = root?.querySelector(`.mention[data-key="${key}"]`);
+    if (!token) return false;
+    token.classList.add("orphan");
+    token.title = "对应的上下文引用已删除";
+    return true;
+  },
+
+  unmarkOrphan(key) {
+    const token = root?.querySelector(`.mention[data-key="${key}"]`);
+    token?.classList.remove("orphan");
+    token?.removeAttribute("title");
+  },
+
+  focusAfterToken(key) {
+    if (!root) return;
+    const place = () => {
+      const token = root.querySelector(`.mention[data-key="${key}"]`);
+      if (!token) return;
+      const guard = afterGuard(token);
+      const range = document.createRange();
+      if (guard) range.setStart(guard, 1);
+      else range.setStartAfter(token);
+      range.collapse(true);
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+    };
+    root.focus();
+    place();
+    requestAnimationFrame(place);
+    setTimeout(place, 40);
+    setTimeout(place, 90);
+  },
 
   focus() {
     root?.focus();
@@ -325,7 +396,7 @@ window.Composer = {
     const nodes = [];
     for (const part of parts ?? []) {
       if (part && part.key && part.label) {
-        nodes.push(makeToken(part.key, part.label));
+        nodes.push(zeroGuard(), makeToken(part.key, part.label), zeroGuard());
       } else if (part && typeof part.text === "string" && part.text.length > 0) {
         nodes.push(document.createTextNode(part.text));
       }

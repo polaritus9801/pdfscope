@@ -427,6 +427,7 @@ body {
 /* Compact by design: a twenty-pixel type mark, one name line and one meta line. */
 .file-row {
   display: flex;
+  flex: none;
   align-items: center;
   gap: 6px;  /* size */
   width: 100%;
@@ -466,6 +467,7 @@ body {
 .file-name {
   flex: 1;
   min-width: 0;
+  max-width: none;
   overflow: hidden;
   font-size: var(--text-sm);
   font-weight: 500;
@@ -475,6 +477,7 @@ body {
 
 .file-meta {
   flex: none;
+  margin-left: auto;
   overflow: hidden;
   color: var(--ink-muted);
   font-size: 11px;  /* size */
@@ -2708,20 +2711,25 @@ body.selection-quiet .textLayer :is(span, br)::selection {
 }
 
 .mention-picker {
-  position: absolute;
-  right: 0;
-  bottom: calc(100% + 6px);  /* size */
+  position: fixed;
+  top: 0;
   left: 0;
   z-index: 40;
   display: flex;
   flex-direction: column;
+  width: min(300px, calc(100vw - 32px));  /* size */
   max-height: min(240px, 42vh);  /* size */
+  visibility: hidden;
   overflow-y: auto;
   padding: var(--space-1);
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-2);
+}
+
+.mention-picker.positioned {
+  visibility: visible;
 }
 
 .mention-title {
@@ -4653,14 +4661,12 @@ body.panel-dragging .panel-resize::after {
 .question-refs-badge {
   transition:
     background-color var(--duration) var(--ease),
-    border-color var(--duration) var(--ease),
-    transform var(--duration) var(--ease);
+    border-color var(--duration) var(--ease);
 }
 
 .question-refs-badge:hover {
   background: var(--accent-soft);
   border-color: var(--accent-strong);
-  transform: translateY(-1px);  /* size */
 }
 
 .question-refs-actions {
@@ -4687,4 +4693,72 @@ body.panel-dragging .panel-resize::after {
   color: var(--accent);
   background: var(--accent-soft);
   border-color: var(--accent-strong);
+}
+
+/* A deleted reference leaves its @ pill in place, red, until the reader decides. */
+.mention.orphan {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 12%, var(--surface));
+  outline: 1px solid var(--danger);
+}
+
+.send-wrap {
+  position: relative;
+  display: flex;
+  flex: none;
+}
+
+.send-warning {
+  position: absolute;
+  right: -5px;  /* size */
+  bottom: -5px;  /* size */
+  display: flex;
+  color: var(--danger);
+  pointer-events: none;
+  filter: drop-shadow(0 1px 1px rgb(255 255 255 / 80%));  /* size */
+}
+
+.orphan-warning-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-5);
+  background: rgb(24 20 32 / 42%);
+  backdrop-filter: blur(2px);  /* size */
+}
+
+.orphan-warning-dialog {
+  width: min(400px, 100%);  /* size */
+  padding: var(--space-5);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-3);
+}
+
+.orphan-warning-dialog h3 {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-lg);
+}
+
+.orphan-warning-dialog p {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
+}
+
+.orphan-warning-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.orphan-warning-keep {
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
 }

@@ -18,9 +18,9 @@ Inside that floating panel is a single surface with one internal vertical rule:
   step copy from leaving an orphan line.
 - **Divider** — 1 px `--border`, inset 24 px from the top and bottom; it never reaches the panel edges.
 - **Right** — two equal sections stacked vertically:
-  - **最近打开** — the ten newest opens (scrolls; each half is capped at 50% of the library height).
+  - **最近打开** — the twenty newest opens (scrolls; each half is capped at 50% of the library height).
   - **推荐打开** — a larger scan of the recommended directories, deduplicated by native path and
-    name+size, then the ten newest remaining PDFs (scrolls; capped at 50% height).
+    name+size, then the twenty newest remaining PDFs (scrolls; capped at 50% height).
 - Section subtitles are intentionally absent. Each row is a **single line**: the supplied red PDF type
   mark, name, `size · relative age`, and a chevron. Both sections use the same header, count, row,
   empty and loading styles. Each list owns its scroll and is capped at half the library height.
@@ -39,7 +39,7 @@ Inside that floating panel is a single surface with one internal vertical rule:
 
 - A recent stores the document **bytes**, not a path: the browser file picker exposes no path.
   IndexedDB `pdfscope-recents` / `documents`, keyPath `id`, index `updated`; `id` is
-  `path-or-name::byteLength`. Newest first, capped at 20; ten shown.
+  `path-or-name::byteLength`. Newest first, capped at 20; twenty shown.
 - Native opens also store the path, which feeds the recent-directory set for recommendations. Browser
   opens and the sample have an empty path and still reopen from bytes.
 - The input buffer is copied **before** `PDFScope.load`: PDF.js can transfer/detach it to its worker.
@@ -56,7 +56,7 @@ The desktop shell adds native file access because a file path is required:
   five most recent opens. Duplicates are removed.
 - Only **direct child** `.pdf` files (case-insensitive extension) are considered; hidden files and
   nested folders are skipped. Missing/unreadable directories are ignored.
-- Entries are sorted by modification time descending and capped; the UI shows ten after excluding entries
+- Entries are sorted by modification time descending and capped; the UI shows twenty after excluding entries
   whose path or name+size already appears in 最近打开.
 - A missing file between scan and click: the row is removed immediately and a clear error is shown.
   A file deleted before scanning is simply absent.
@@ -68,8 +68,8 @@ The desktop shell adds native file access because a file path is required:
 
 - One panel, internal vertical rule not touching top/bottom, compressed left guide and right library.
 - Both right sections use the same compact one-line row style and the supplied PDF icon.
-- Ten recent / ten recommended entries at most; both reopen through the normal document path.
-- The recommended list is the newest 10 after removing files already present in the recent list.
+- Twenty recent / twenty recommended entries at most; both reopen through the normal document path.
+- The recommended list is the newest 20 after removing files already present in the recent list.
 - Hovering a row shows the page contact-sheet bubble after the delay; the bubble never blocks clicks.
 - Native scan uses Downloads, Desktop, Documents and recent parent directories, direct PDFs only,
   newest first; missing files never break the shelf.
