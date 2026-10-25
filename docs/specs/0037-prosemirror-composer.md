@@ -48,9 +48,10 @@ the document. Inline delimiters are hidden only for paragraphs whose line is not
 line reveals all of that line's syntax, so `**bold**` and every other marker remain editable without
 per-span cursor flips. The serialized question, draft and prompt history contain the raw Markdown.
 
-The editor's height is held at the larger of the plain and decorated heights while switching the
-mode, so repeated toggles cannot push the AI panel up or make the bottom bar oscillate. The floor is
-released as soon as the document changes or a manual resize starts. While the composer is being
+The composer always takes its natural content height. A previous mode-height floor kept the taller
+of the plain and decorated layouts, which avoided a small jump but left a blank white strip under the
+shorter layout (very visible with stacked display formulas); it was removed. The page bottom stays
+fixed because the PDF.js hidden canvas no longer creates body overflow. While the composer is being
 dragged vertically the body uses an explicit `ns-resize` cursor, never the horizontal panel-resize
 cursor.
 
@@ -91,8 +92,7 @@ PDF.js's hidden measurement canvas is kept out of flow (`position: fixed`, offsc
 flow it added a 19px inline line box to `body`; focusing the composer could scroll `body` by that
 amount and shift the whole app even when the composer itself did not change height.
 
-The mode toggle uses a transient height floor described above. The top edge has an invisible 8px drag
-handle with a hover line. Dragging it changes the editor
+The top edge has an invisible 8px drag handle with a hover line. Dragging it changes the editor
 `--composer-min-height`; the manual height is a **floor**, not a fixed height. Content still
 auto-grows above it and shrinks back only to the floor. Dragging to the current minimum or
 double-clicking the handle returns to auto. The handle is keyboard accessible (↑/↓, Home/Enter).

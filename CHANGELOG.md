@@ -10,6 +10,8 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Fixed
 
+- Removed the mode-height floor that kept the composer at the taller preview height: it left a blank
+  white strip under the shorter plain-text layout, most obvious with stacked display formulas.
 - PDF.js's hidden measurement canvas no longer contributes a 19px line box to `body`. Focusing the
   composer after toggling live preview could scroll `body` by that amount, shifting the whole app and
   exposing the bottom bar/white gap. The canvas is now out of flow.
@@ -20,8 +22,8 @@ minor releases may contain breaking changes; they are always called out.
   syntax reveals on the active line, inline delimiters hide elsewhere, the preference is persisted,
   and the composer supports headings, quotes, hanging-indent lists, fenced code, links and inline
   emphasis.
-- The dot is now a high-contrast ring when off, light-filled on hover and deep-filled when on;
-  toggling no longer changes the composer or AI-panel height.
+- The dot is now a high-contrast ring when off, light-filled on hover and deep-filled when on.
+  The composer follows its natural content height; the page bottom stays fixed.
 - Nested lists render with a per-level hanging indent and Tab/Shift+Tab indent source lines; Tab
   outside a list keeps normal focus navigation. Vertical resize uses an explicit vertical cursor.
 - Structured arrow navigation crosses paragraph boundaries at the block edge, so hidden syntax can

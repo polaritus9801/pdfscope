@@ -32,7 +32,6 @@ const MARKDOWN_KEY = "pdfscope.composer.markdown";
 let markdownEnabled = readMarkdownPreference();
 let markdownDot = null;
 let resizeHandle = null;
-let modeHeightFloor = 0;
 
 function readMarkdownPreference() {
   try {
@@ -218,10 +217,6 @@ function dispatchTransaction(transaction) {
   syncEmpty();
   if (!markdownDot?.isConnected) installMarkdownDot();
   if (!resizeHandle?.isConnected) installComposerHandles();
-  if (transaction.docChanged && !transaction.getMeta("markdownPreview")) {
-    modeHeightFloor = 0;
-    root?.style.removeProperty("--composer-mode-min");
-  }
   if (transaction.docChanged && !transaction.getMeta("silent")) emit();
   syncMention(transaction.docChanged && !transaction.getMeta("programmatic"));
 }
@@ -799,8 +794,6 @@ function setMarkdownEnabled(next) {
   }
   markdownEnabled = Boolean(next);
   writeMarkdownPreference(markdownEnabled);
-  const ask = root;
-  const before = ask?.getBoundingClientRect().height ?? 0;
   if (view) {
     // Force a decoration/plugin pass; the document (and its history) is untouched.
     view.dispatch(
@@ -809,11 +802,6 @@ function setMarkdownEnabled(next) {
         .setMeta("markdownPreview", markdownEnabled),
     );
     view.focus();
-  }
-  if (ask) {
-    const after = ask.getBoundingClientRect().height;
-    modeHeightFloor = Math.ceil(Math.max(before, after, modeHeightFloor));
-    ask.style.setProperty("--composer-mode-min", `${modeHeightFloor}px`);
   }
   updateMarkdownDot();
 }
@@ -841,10 +829,7 @@ function installComposerHandles() {
   const ask = () => card.querySelector(".ask");
   const reset = () => {
     const target = ask();
-    if (target) {
-      target.style.removeProperty("--composer-min-height");
-      target.style.removeProperty("--composer-mode-min");
-    }
+    if (target) target.style.removeProperty("--composer-min-height");
     card.classList.remove("composer-resizing");
     document.body.classList.remove("composer-resizing");
   };
@@ -865,8 +850,6 @@ function installComposerHandles() {
     const startY = event.clientY;
     const startHeight = target.getBoundingClientRect().height;
     let latest = startHeight;
-    modeHeightFloor = 0;
-    target.style.removeProperty("--composer-mode-min");
     card.classList.add("composer-resizing");
     document.body.classList.add("composer-resizing");
     handle.setPointerCapture?.(event.pointerId);
