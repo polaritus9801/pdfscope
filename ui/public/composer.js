@@ -98,9 +98,15 @@ function removeTrailingAt() {
 function checkMention() {
   if (!allowMention) return;
   const text = textBeforeCaret();
-  if (!text.endsWith("@")) return;
+  if (!text.endsWith("@")) {
+    window.__pdfscopeMentionClose?.();
+    return;
+  }
   const before = text.slice(0, -1);
-  if (before.length > 0 && !/\s$/.test(before)) return;
+  if (before.length > 0 && !/\s$/.test(before)) {
+    window.__pdfscopeMentionClose?.();
+    return;
+  }
   window.__pdfscopeMentionOpen?.();
 }
 
@@ -150,16 +156,13 @@ function insertToken(key, label) {
     selection.addRange(range);
   }
 
-  // A plain space after the pill keeps typing natural and keeps the caret out of the token.
-  const space = document.createTextNode(" ");
-  token.after(space);
+  // No trailing space: the pill itself is the reference. Keep the caret just outside it.
   const after = document.createRange();
-  after.setStart(space, 1);
+  after.setStartAfter(token);
   after.collapse(true);
   const selection = window.getSelection();
   selection.removeAllRanges();
   selection.addRange(after);
-
   root.focus();
   emit();
 }
@@ -173,6 +176,24 @@ function attachFiles(files) {
   input.dispatchEvent(new Event("change", { bubbles: true }));
   return true;
 }
+
+// A non-editable pill must never receive the caret inside its label.
+document.addEventListener("selectionchange", () => {
+  if (!root) return;
+  const selection = window.getSelection();
+  if (!selection?.anchorNode || !root.contains(selection.anchorNode)) return;
+  const anchor =
+    selection.anchorNode.nodeType === Node.TEXT_NODE
+      ? selection.anchorNode.parentElement
+      : selection.anchorNode;
+  const token = anchor instanceof Element ? anchor.closest(".mention") : null;
+  if (!token) return;
+  const range = document.createRange();
+  range.setStartAfter(token);
+  range.collapse(true);
+  selection.removeAllRanges();
+  selection.addRange(range);
+});
 
 window.Composer = {
   init(element, callback) {
@@ -197,6 +218,29 @@ window.Composer = {
     });
     root.addEventListener("blur", () => {
       window.__pdfscopeMentionClose?.();
+    });
+    root.addEventListener("pointerover", (event) => {
+      const token = event.target instanceof Element ? event.target.closest(".mention") : null;
+      if (token?.dataset.key) window.__pdfscopeMentionHover?.(token.dataset.key);
+    });
+    root.addEventListener("pointerout", (event) => {
+      const token = event.target instanceof Element ? event.target.closest(".mention") : null;
+      if (!token?.dataset.key) return;
+      if (event.relatedTarget instanceof Node && token.contains(event.relatedTarget)) return;
+      window.__pdfscopeMentionLeave?.(token.dataset.key);
+    });
+    root.addEventListener("click", (event) => {
+      const token = event.target instanceof Element ? event.target.closest(".mention") : null;
+      if (!token) return;
+      if (token.dataset.key) window.__pdfscopeMentionClick?.(token.dataset.key);
+      const rect = token.getBoundingClientRect();
+      const range = document.createRange();
+      if (event.clientX < rect.left + rect.width / 2) range.setStartBefore(token);
+      else range.setStartAfter(token);
+      range.collapse(true);
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(range);
     });
   },
 
@@ -282,7 +326,6 @@ window.Composer = {
     for (const part of parts ?? []) {
       if (part && part.key && part.label) {
         nodes.push(makeToken(part.key, part.label));
-        nodes.push(document.createTextNode(" "));
       } else if (part && typeof part.text === "string" && part.text.length > 0) {
         nodes.push(document.createTextNode(part.text));
       }

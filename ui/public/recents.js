@@ -4,7 +4,7 @@
   const DB_NAME = "pdfscope-recents";
   const STORE = "documents";
   const VERSION = 1;
-  const LIMIT = 8;
+  const LIMIT = 20;
   let dbPromise = null;
 
   function openDb() {

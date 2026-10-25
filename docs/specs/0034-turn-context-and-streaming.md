@@ -71,6 +71,12 @@ with the bubble:
   It never edits the historical turn.
 - A duplicate is never added. The same red notice used by the composer (`range-error`) says the
   reference is already in the context; page-bearing duplicates still jump to the page.
+- The popover header has a `+ 全部` button left of Close. It adds every historical reference not
+  already in the active shelf (pages, text, regions, answers, images, files and web); if all are
+  present it shows `这些历史引用已经在上下文里了`.
+- Context-shelf chips and inline `@` pills share focus/locate callbacks. Hovering either highlights
+  the PDF and outlines the matching shelf chip; clicking either scrolls to the source and leaves a
+  persistent outline on the shelf chip. Clicking a shelf chip never re-adds it.
 - The old "历史引用" list, `Stored`, `redeem` and its send-time bookkeeping were removed. Conversation
   history and prompt history are unaffected.
 

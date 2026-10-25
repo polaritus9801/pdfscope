@@ -55,7 +55,7 @@ window.Bridge = {
 
   async scanRecommended(recentDirs) {
     if (!available) return [];
-    return api.core.invoke("scan_recommended", { recentDirs, limit: 8 });
+    return api.core.invoke("scan_recommended", { recentDirs, limit: 40 });
   },
 
   async ask(question, references, regions, context, history, model, onEvent) {

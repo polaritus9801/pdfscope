@@ -159,6 +159,17 @@ minor releases may contain breaking changes; they are always called out.
 
 - The incomplete "历史引用" list and its `Stored`/`redeem` bookkeeping.
 
+### Changed
+
+- Scope tooltips read 整份文档和引用 / 仅当前页和引用 / 仅引用.
+- OOBE is 920×720, keeps the 330px guide, and shows ten recent + ten recommended rows with two
+  independently scrolling 50% halves. Recommended files are deduplicated by path and name+size.
+- The @ picker floats directly above the input card and closes when the trigger becomes invalid.
+- Context references and inline @ pills share hover highlight and click-to-locate; the shelf chip
+  gets a hover/selected outline. Historical reference popovers gain “全部” to add all missing refs.
+- Inline @ pills no longer leave a trailing space and keep the caret outside the pill; file/image
+  pills are included in the inline citation numbering.
+
 ### Fixed
 
 - The `@` picker floats above the composer instead of pushing the context shelf up.

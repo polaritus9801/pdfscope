@@ -1612,7 +1612,7 @@ fn App() -> impl IntoView {
                                         </div>
                                         <span class="recent-count">
                                             {move || {
-                                                let count = recents.get().len().min(7);
+                                                let count = recents.get().len().min(10);
                                                 if count > 0 { count.to_string() } else { String::new() }
                                             }}
                                         </span>
@@ -1639,7 +1639,7 @@ fn App() -> impl IntoView {
                                                     .into_any();
                                             }
                                             all.into_iter()
-                                                .take(7)
+                                                .take(10)
                                                 .map(|recent| {
                                                     let id = recent.id;
                                                     let name = recent.name;
@@ -1689,17 +1689,26 @@ fn App() -> impl IntoView {
                                         </div>
                                         <span class="recent-count">
                                             {move || {
-                                                let recent_paths: Vec<String> = recents
-                                                    .get()
-                                                    .into_iter()
-                                                    .map(|recent| recent.path)
+                                                let recent_docs = recents.get();
+                                                let recent_paths: Vec<String> = recent_docs
+                                                    .iter()
+                                                    .map(|recent| recent.path.clone())
                                                     .filter(|path| !path.is_empty())
+                                                    .collect();
+                                                let recent_names: Vec<(String, f64)> = recent_docs
+                                                    .iter()
+                                                    .map(|recent| (recent.name.clone(), recent.size))
                                                     .collect();
                                                 let count = recommended
                                                     .get()
                                                     .into_iter()
-                                                    .filter(|item| !recent_paths.contains(&item.path))
-                                                    .take(7)
+                                                    .filter(|item| {
+                                                        !recent_paths.contains(&item.path)
+                                                            && !recent_names.iter().any(|(name, size)| {
+                                                                name == &item.name && *size == item.size
+                                                            })
+                                                    })
+                                                    .take(10)
                                                     .count();
                                                 if count > 0 { count.to_string() } else { String::new() }
                                             }}
@@ -1713,17 +1722,26 @@ fn App() -> impl IntoView {
                                                 }
                                                     .into_any();
                                             }
-                                            let recent_paths: Vec<String> = recents
-                                                .get()
-                                                .into_iter()
-                                                .map(|recent| recent.path)
+                                            let recent_docs = recents.get();
+                                            let recent_paths: Vec<String> = recent_docs
+                                                .iter()
+                                                .map(|recent| recent.path.clone())
                                                 .filter(|path| !path.is_empty())
+                                                .collect();
+                                            let recent_names: Vec<(String, f64)> = recent_docs
+                                                .iter()
+                                                .map(|recent| (recent.name.clone(), recent.size))
                                                 .collect();
                                             let all: Vec<RecommendedDoc> = recommended
                                                 .get()
                                                 .into_iter()
-                                                .filter(|item| !recent_paths.contains(&item.path))
-                                                .take(7)
+                                                .filter(|item| {
+                                                    !recent_paths.contains(&item.path)
+                                                        && !recent_names.iter().any(|(name, size)| {
+                                                            name == &item.name && *size == item.size
+                                                        })
+                                                })
+                                                .take(10)
                                                 .collect();
                                             if all.is_empty() {
                                                 return view! {

@@ -376,6 +376,7 @@ struct ReferenceActions {
     image: Callback<UserImage>,
     file: Callback<UserFile>,
     web: Callback<()>,
+    add_all: Callback<TurnContext>,
     hover: Callback<Option<(u32, (f64, f64, f64, f64))>>,
 }
 
@@ -394,6 +395,7 @@ fn reference_capsule(
     let labels = context.labels();
     let title = format!("{count} 项引用：{}", labels.join(" · "));
     let open = open_refs.get() == Some(target);
+    let all_context = context.clone();
     let popover = open.then(|| {
         let mut rows: Vec<AnyView> = Vec::new();
         for passage in context.passages.iter().cloned() {
@@ -537,14 +539,25 @@ fn reference_capsule(
             <div class="question-refs-popover" role="dialog" on:click=move |event| event.stop_propagation()>
                 <div class="question-refs-head">
                     <span>{format!("引用 · {count}")}</span>
-                    <button
-                        type="button"
-                        class="question-refs-close"
-                        title="关闭"
-                        on:click=move |_| open_refs.set(None)
-                    >
-                        {icon("close", 12)}
-                    </button>
+                    <div class="question-refs-actions">
+                        <button
+                            type="button"
+                            class="question-refs-add-all"
+                            title="添加全部引用"
+                            on:click=move |_| actions.add_all.run(all_context.clone())
+                        >
+                            {icon("plus", 12)}
+                            <span>"全部"</span>
+                        </button>
+                        <button
+                            type="button"
+                            class="question-refs-close"
+                            title="关闭"
+                            on:click=move |_| open_refs.set(None)
+                        >
+                            {icon("close", 12)}
+                        </button>
+                    </div>
                 </div>
                 <div class="question-refs-list">{rows.collect_view()}</div>
             </div>
@@ -787,6 +800,8 @@ pub fn AiPanel(
     let current_context = RwSignal::new(TurnContext::default());
     let current_asked_at = RwSignal::new(0.0_f64);
     let open_refs = RwSignal::new(Option::<RefTarget>::None);
+    let active_reference = RwSignal::new(Option::<String>::None);
+    let hover_reference = RwSignal::new(Option::<String>::None);
     let interrupted = RwSignal::new(false);
     let continue_target = RwSignal::new(None::<usize>);
     let reasoning = RwSignal::new(String::new());
@@ -980,6 +995,161 @@ pub fn AiPanel(
         }
     });
 
+    let add_all_references = Callback::new(move |context: TurnContext| {
+        let passage_missing = context
+            .passages
+            .iter()
+            .filter(|item| {
+                !passages.get_untracked().iter().any(|active| {
+                    active.page == item.page
+                        && active.quote == item.quote
+                        && active.rect == item.rect
+                })
+            })
+            .count();
+        let region_missing = context
+            .regions
+            .iter()
+            .filter(|item| {
+                !regions
+                    .get_untracked()
+                    .iter()
+                    .any(|active| active.page == item.page && active.image == item.image)
+            })
+            .count();
+        let page_missing = context
+            .pages
+            .iter()
+            .filter(|page| !page_set.get_untracked().contains(page))
+            .count();
+        let answer_missing = context
+            .answers
+            .iter()
+            .filter(|item| {
+                !answers
+                    .get_untracked()
+                    .iter()
+                    .any(|active| active.label == item.label && active.quote == item.quote)
+            })
+            .count();
+        let image_missing = context
+            .images
+            .iter()
+            .filter(|item| {
+                !images
+                    .get_untracked()
+                    .iter()
+                    .any(|active| active.name == item.name && active.image == item.image)
+            })
+            .count();
+        let file_missing = context
+            .files
+            .iter()
+            .filter(|item| {
+                !files
+                    .get_untracked()
+                    .iter()
+                    .any(|active| active.name == item.name && active.text == item.text)
+            })
+            .count();
+        let web_missing = usize::from(context.web && !web.get_untracked());
+        let missing = passage_missing
+            + region_missing
+            + page_missing
+            + answer_missing
+            + image_missing
+            + file_missing
+            + web_missing;
+        if missing == 0 {
+            notice.set(Some("这些历史引用已经在上下文里了".to_owned()));
+            return;
+        }
+
+        undo_push.run(());
+        for passage in &context.passages {
+            if !passages.get_untracked().iter().any(|active| {
+                active.page == passage.page
+                    && active.quote == passage.quote
+                    && active.rect == passage.rect
+            }) {
+                next_ref.update(|next| *next = (*next).max(passage.id + 1));
+                passages.update(|list| list.push(passage.clone()));
+            }
+        }
+        for region in &context.regions {
+            if !regions
+                .get_untracked()
+                .iter()
+                .any(|active| active.page == region.page && active.image == region.image)
+            {
+                next_ref.update(|next| *next = (*next).max(region.id + 1));
+                regions.update(|list| list.push(region.clone()));
+            }
+        }
+        for page_number in &context.pages {
+            if !page_set.get_untracked().contains(page_number) {
+                page_set.update(|set| {
+                    set.push(*page_number);
+                    set.sort_unstable();
+                    set.dedup();
+                });
+            }
+        }
+        for answer in &context.answers {
+            if !answers
+                .get_untracked()
+                .iter()
+                .any(|active| active.label == answer.label && active.quote == answer.quote)
+            {
+                let id = next_answer.get_untracked() + 1;
+                next_answer.set(id);
+                answers.update(|list| {
+                    list.push(crate::AnswerRef {
+                        id,
+                        label: answer.label.clone(),
+                        quote: answer.quote.clone(),
+                    });
+                });
+            }
+        }
+        for image in &context.images {
+            if !images
+                .get_untracked()
+                .iter()
+                .any(|active| active.name == image.name && active.image == image.image)
+            {
+                let id = next_image.get_untracked() + 1;
+                next_image.set(id);
+                images.update(|list| {
+                    list.push(UserImage {
+                        id,
+                        name: image.name.clone(),
+                        image: image.image.clone(),
+                    });
+                });
+            }
+        }
+        for file in &context.files {
+            if !files
+                .get_untracked()
+                .iter()
+                .any(|active| active.name == file.name && active.text == file.text)
+            {
+                let id = next_file.get_untracked() + 1;
+                next_file.set(id);
+                files.update(|list| {
+                    list.push(UserFile {
+                        id,
+                        name: file.name.clone(),
+                        text: file.text.clone(),
+                    });
+                });
+            }
+        }
+        web.set(true);
+        notify.run(format!("已添加 {missing} 项引用"));
+    });
+
     let reference_actions = ReferenceActions {
         passage: activate_passage,
         region: activate_region,
@@ -988,6 +1158,7 @@ pub fn AiPanel(
         image: activate_image,
         file: activate_file,
         web: activate_web,
+        add_all: add_all_references,
         hover: Callback::new(move |target| hovered.set(target)),
     };
 
@@ -1004,6 +1175,48 @@ pub fn AiPanel(
         let _ =
             document.add_event_listener_with_callback("keydown", handler.as_ref().unchecked_ref());
         handler.forget();
+    });
+
+    let reference_location = move |key: &str| -> Option<(u32, (f64, f64, f64, f64))> {
+        if let Some(id) = key.strip_prefix("p:").and_then(|id| id.parse::<u64>().ok()) {
+            passages
+                .get_untracked()
+                .iter()
+                .find(|entry| entry.id == id)
+                .map(|entry| (entry.page, entry.rect))
+        } else if let Some(id) = key.strip_prefix("r:").and_then(|id| id.parse::<u64>().ok()) {
+            regions
+                .get_untracked()
+                .iter()
+                .find(|entry| entry.id == id)
+                .map(|entry| (entry.page, entry.rect))
+        } else if let Some(page) = key
+            .strip_prefix("page:")
+            .and_then(|page| page.parse::<u32>().ok())
+        {
+            Some((page, (0.0, 0.0, 1.0, 1.0)))
+        } else {
+            None
+        }
+    };
+
+    let focus_reference = Callback::new(move |key: String| {
+        active_reference.set(Some(key.clone()));
+        if let Some((page, _)) = reference_location(&key) {
+            jump(page);
+        }
+    });
+    let hover_reference_on = Callback::new(move |key: String| {
+        hover_reference.set(Some(key.clone()));
+        if let Some((page, rect)) = reference_location(&key) {
+            hovered.set(Some((page, rect)));
+        }
+    });
+    let hover_reference_off = Callback::new(move |key: String| {
+        if hover_reference.get_untracked().as_deref() == Some(key.as_str()) {
+            hover_reference.set(None);
+            hovered.set(None);
+        }
     });
 
     let manager_open = RwSignal::new(false);
@@ -1401,6 +1614,39 @@ pub fn AiPanel(
         }
         open.forget();
         close.forget();
+    });
+
+    Effect::new(move |_| {
+        let Some(window) = web_sys::window() else {
+            return;
+        };
+        let hover = Closure::<dyn Fn(String)>::new(move |key: String| {
+            hover_reference_on.run(key);
+        });
+        let leave = Closure::<dyn Fn(String)>::new(move |key: String| {
+            hover_reference_off.run(key);
+        });
+        let click = Closure::<dyn Fn(String)>::new(move |key: String| {
+            focus_reference.run(key);
+        });
+        let _ = js_sys::Reflect::set(
+            &window,
+            &JsValue::from_str("__pdfscopeMentionHover"),
+            hover.as_ref(),
+        );
+        let _ = js_sys::Reflect::set(
+            &window,
+            &JsValue::from_str("__pdfscopeMentionLeave"),
+            leave.as_ref(),
+        );
+        let _ = js_sys::Reflect::set(
+            &window,
+            &JsValue::from_str("__pdfscopeMentionClick"),
+            click.as_ref(),
+        );
+        hover.forget();
+        leave.forget();
+        click.forget();
     });
 
     Effect::new(move |_| {
@@ -2111,6 +2357,12 @@ pub fn AiPanel(
         }
         for answer in answers.get() {
             order.push(format!("a:{}", answer.id));
+        }
+        for file in files.get() {
+            order.push(format!("file:{}", file.id));
+        }
+        for image in images.get() {
+            order.push(format!("img:{}", image.id));
         }
 
         let mut text = inline_question(&question.get(), &order);
@@ -3530,13 +3782,22 @@ pub fn AiPanel(
                                             .map(|passage| {
                                                 let page_number = passage.page;
                                                 let id = passage.id;
-                                                let activation = passage.clone();
+                                                let key = format!("p:{id}");
+                                                let hover_key = key.clone();
+                                                let leave_key = key.clone();
+                                                let click_key = key.clone();
+                                                let hover_class = key.clone();
+                                                let selected_class = key.clone();
                                                 view! {
                                                     <div
                                                         class="attach-chip"
+                                                        class:reference-hover=move || hover_reference.get().as_deref() == Some(hover_class.as_str())
+                                                        class:selected=move || active_reference.get().as_deref() == Some(selected_class.as_str())
                                                         draggable="true"
                                                         title=passage.quote.clone()
-                                                        on:click=move |_| activate_passage.run(activation.clone())
+                                                        on:mouseenter=move |_| hover_reference_on.run(hover_key.clone())
+                                                        on:mouseleave=move |_| hover_reference_off.run(leave_key.clone())
+                                                        on:click=move |_| focus_reference.run(click_key.clone())
                                                         on:dragstart=move |event: web_sys::DragEvent| {
                                                             if let Some(data) = event.data_transfer() {
                                                                 let _ = data.set_data(
@@ -3579,13 +3840,22 @@ pub fn AiPanel(
                                             .map(|region| {
                                                 let page_number = region.page;
                                                 let id = region.id;
-                                                let activation = region.clone();
+                                                let key = format!("r:{id}");
+                                                let hover_key = key.clone();
+                                                let leave_key = key.clone();
+                                                let click_key = key.clone();
+                                                let hover_class = key.clone();
+                                                let selected_class = key.clone();
                                                 view! {
                                                     <div
                                                         class="attach-thumb"
+                                                        class:reference-hover=move || hover_reference.get().as_deref() == Some(hover_class.as_str())
+                                                        class:selected=move || active_reference.get().as_deref() == Some(selected_class.as_str())
                                                         draggable="true"
                                                         title=format!("p.{} · 截图", region.page)
-                                                        on:click=move |_| activate_region.run(activation.clone())
+                                                        on:mouseenter=move |_| hover_reference_on.run(hover_key.clone())
+                                                        on:mouseleave=move |_| hover_reference_off.run(leave_key.clone())
+                                                        on:click=move |_| focus_reference.run(click_key.clone())
                                                         on:dragstart=move |event: web_sys::DragEvent| {
                                                             if let Some(data) = event.data_transfer() {
                                                                 let _ = data.set_data(
@@ -3625,8 +3895,22 @@ pub fn AiPanel(
                                             .into_iter()
                                             .map(|picture| {
                                                 let id = picture.id;
+                                                let key = format!("img:{id}");
+                                                let hover_key = key.clone();
+                                                let leave_key = key.clone();
+                                                let click_key = key.clone();
+                                                let hover_class = key.clone();
+                                                let selected_class = key.clone();
                                                 view! {
-                                                    <div class="attach-thumb" title=picture.name.clone()>
+                                                    <div
+                                                        class="attach-thumb"
+                                                        class:reference-hover=move || hover_reference.get().as_deref() == Some(hover_class.as_str())
+                                                        class:selected=move || active_reference.get().as_deref() == Some(selected_class.as_str())
+                                                        title=picture.name.clone()
+                                                        on:mouseenter=move |_| hover_reference_on.run(hover_key.clone())
+                                                        on:mouseleave=move |_| hover_reference_off.run(leave_key.clone())
+                                                        on:click=move |_| focus_reference.run(click_key.clone())
+                                                    >
                                                         <img src=picture.image.clone() alt="" />
                                                         <span
                                                             class="chip-x thumb-x"
@@ -3656,8 +3940,22 @@ pub fn AiPanel(
                                             .into_iter()
                                             .map(|file| {
                                                 let id = file.id;
+                                                let key = format!("file:{id}");
+                                                let hover_key = key.clone();
+                                                let leave_key = key.clone();
+                                                let click_key = key.clone();
+                                                let hover_class = key.clone();
+                                                let selected_class = key.clone();
                                                 view! {
-                                                    <div class="attach-chip" title=file.name.clone()>
+                                                    <div
+                                                        class="attach-chip"
+                                                        class:reference-hover=move || hover_reference.get().as_deref() == Some(hover_class.as_str())
+                                                        class:selected=move || active_reference.get().as_deref() == Some(selected_class.as_str())
+                                                        title=file.name.clone()
+                                                        on:mouseenter=move |_| hover_reference_on.run(hover_key.clone())
+                                                        on:mouseleave=move |_| hover_reference_off.run(leave_key.clone())
+                                                        on:click=move |_| focus_reference.run(click_key.clone())
+                                                    >
                                                         <span class="chip-kind">"件"</span>
                                                         <span class="chip-text">{file.name.clone()}</span>
                                                         <span class="chip-page">
@@ -3697,11 +3995,21 @@ pub fn AiPanel(
                                                     format!("p.{start}–{end}")
                                                 };
                                                 let drag_key = format!("page:{start}\np.{start}");
+                                                let key = format!("page:{start}");
+                                                let hover_key = key.clone();
+                                                let leave_key = key.clone();
+                                                let click_key = key.clone();
+                                                let hover_class = key.clone();
+                                                let selected_class = key.clone();
                                                 view! {
                                                     <div
                                                         class="attach-chip"
+                                                        class:reference-hover=move || hover_reference.get().as_deref() == Some(hover_class.as_str())
+                                                        class:selected=move || active_reference.get().as_deref() == Some(selected_class.as_str())
                                                         draggable="true"
-                                                        on:click=move |_| activate_page.run(start)
+                                                        on:mouseenter=move |_| hover_reference_on.run(hover_key.clone())
+                                                        on:mouseleave=move |_| hover_reference_off.run(leave_key.clone())
+                                                        on:click=move |_| focus_reference.run(click_key.clone())
                                                         on:dragstart=move |event: web_sys::DragEvent| {
                                                             if let Some(data) = event.data_transfer() {
                                                                 let _ = data.set_data("text/plain", &drag_key);
@@ -3778,11 +4086,22 @@ pub fn AiPanel(
                                             .into_iter()
                                             .map(|answer| {
                                                 let id = answer.id;
+                                                let key = format!("a:{id}");
+                                                let hover_key = key.clone();
+                                                let leave_key = key.clone();
+                                                let click_key = key.clone();
+                                                let hover_class = key.clone();
+                                                let selected_class = key.clone();
                                                 view! {
                                                     <div
                                                         class="attach-chip"
+                                                        class:reference-hover=move || hover_reference.get().as_deref() == Some(hover_class.as_str())
+                                                        class:selected=move || active_reference.get().as_deref() == Some(selected_class.as_str())
                                                         draggable="true"
                                                         title=answer.quote.clone()
+                                                        on:mouseenter=move |_| hover_reference_on.run(hover_key.clone())
+                                                        on:mouseleave=move |_| hover_reference_off.run(leave_key.clone())
+                                                        on:click=move |_| focus_reference.run(click_key.clone())
                                                         on:dragstart=move |event: web_sys::DragEvent| {
                                                             if let Some(data) = event.data_transfer() {
                                                                 let _ = data.set_data(
@@ -3875,6 +4194,7 @@ pub fn AiPanel(
                             </button>
                         </div>
                     </Show>
+                    <div class="composer-zone">
                     {move || {
                         if !mention_open.get() {
                             return ().into_any();
@@ -4246,8 +4566,8 @@ pub fn AiPanel(
                             <button
                                 class="scope-icon"
                                 class:active=move || scope_mode.get() == 0
-                                title=move || format!("整份文档 · {} 页", pages.get())
-                                aria-label="整份文档"
+                                title="整份文档和引用"
+                                aria-label="整份文档和引用"
                                 aria-pressed=move || (scope_mode.get() == 0).to_string()
                                 on:click=move |_| {
                                     undo_push.run(());
@@ -4259,8 +4579,8 @@ pub fn AiPanel(
                             <button
                                 class="scope-icon"
                                 class:active=move || scope_mode.get() == 1
-                                title=move || format!("仅当前页 · p.{}", page.get())
-                                aria-label="仅当前页"
+                                title="仅当前页和引用"
+                                aria-label="仅当前页和引用"
                                 aria-pressed=move || (scope_mode.get() == 1).to_string()
                                 on:click=move |_| {
                                     undo_push.run(());
@@ -4272,7 +4592,7 @@ pub fn AiPanel(
                             <button
                                 class="scope-icon"
                                 class:active=move || scope_mode.get() == 2
-                                title=move || format!("仅引用 · {} 项", reference_count())
+                                title="仅引用"
                                 aria-label="仅引用"
                                 aria-pressed=move || (scope_mode.get() == 2).to_string()
                                 on:click=move |_| {
@@ -4322,6 +4642,7 @@ pub fn AiPanel(
                                 }
                             }}
                         </button>
+                    </div>
                     </div>
                     </div>
                 </div>
