@@ -53,9 +53,6 @@ let displayScale = 1;
 let targetScale = 1;
 let zoomOrigin = null;
 let zoomDirect = false;
-// Centre-origin zooms (buttons, fit width, API) keep the page column horizontally centred. Pointer
-// zooms (wheel/pinch) keep the point under the fingers instead.
-let zoomRecenter = false;
 let zoomFrame = 0;
 let zoomLastTime = 0;
 let zooming = false;
@@ -285,8 +282,8 @@ function pagedLayout() {
 
   const gap = 24;
   const columns = shown.length;
-  const availableWidth = stage.clientWidth - 48;
-  const availableHeight = stage.clientHeight - 48;
+  const availableWidth = stageContentWidth(stage);
+  const availableHeight = stageContentHeight(stage);
   const slotWidth = (availableWidth - (columns - 1) * gap) / columns;
 
   for (const element of shown) {
@@ -445,8 +442,10 @@ function stagePadding(stage) {
 }
 
 function stageContentWidth(stage) {
+  const style = getComputedStyle(stage);
   const padding = stagePadding(stage);
-  return Math.max(200, stage.clientWidth - padding.left - padding.right);
+  const gutter = Number.parseFloat(style.getPropertyValue("--reader-gutter")) || 0;
+  return Math.max(200, stage.clientWidth - padding.left - padding.right - gutter * 2);
 }
 
 function stageContentHeight(stage) {
@@ -642,10 +641,8 @@ function readingOrigin() {
   const stage = stageElement();
   if (!stage) return { x: 0, y: 0 };
   const rect = stage.getBoundingClientRect();
-  const padding = stagePadding(stage);
-  // Use the content area, not the stage border box: asymmetric gutters (tool rail, range bar) used
-  // to pull the zoom anchor off the visual centre of the page column.
-  const x = rect.left + padding.left + stageContentWidth(stage) / 2;
+  // The page column is always centred in the whole stage; the permanent gutters are overlays.
+  const x = rect.left + rect.width / 2;
   return { x, y: rect.top + readingOffset() };
 }
 
@@ -675,11 +672,10 @@ function requestZoomFrame() {
   zoomFrame = requestAnimationFrame(zoomStep);
 }
 
-function setZoomTarget(scale, { direct = false, origin = null, recenter = false } = {}) {
+function setZoomTarget(scale, { direct = false, origin = null } = {}) {
   if (!document_) return;
   targetScale = clamp(scale, MIN_SCALE, MAX_SCALE);
   zoomDirect = direct;
-  zoomRecenter = recenter;
   zoomOrigin = resolveOrigin(origin);
   zooming = true;
   clearSettle();
@@ -691,7 +687,6 @@ function requestZoomBy(steps, options = {}) {
   setZoomTarget(targetScale + 0.25 * Number(steps || 0), {
     direct: false,
     origin: options.origin ?? readingOrigin(),
-    recenter: !options.origin,
   });
 }
 
@@ -699,12 +694,11 @@ function requestZoomTo(percent, options = {}) {
   setZoomTarget(Number(percent) / 100, {
     direct: options.animate === false,
     origin: options.origin ?? readingOrigin(),
-    recenter: !options.origin,
   });
 }
 
 function requestFitWidth() {
-  setZoomTarget(1, { direct: false, origin: readingOrigin(), recenter: true });
+  setZoomTarget(1, { direct: false, origin: readingOrigin() });
 }
 
 /// One rAF owns the visual scale. A pinch is direct; wheel/buttons ease toward the target.
@@ -761,10 +755,10 @@ function applyDisplayScale(scale, origin) {
 
   if (Math.abs(scale - displayScale) > 1e-7) {
     const before = pages.getBoundingClientRect();
-    const point = {
-      x: (origin.x - before.left) / displayScale,
-      y: (origin.y - before.top) / displayScale,
-    };
+    // Horizontal zoom is always page-centred. Vertical zoom still follows the reading line/pointer.
+    // Using one owner for scrollLeft avoids the auto-margin→overflow jump (and its one-frame clamp)
+    // that made the page visibly twist as it crossed fit width.
+    const pointY = (origin.y - before.top) / displayScale;
 
     setDisplayScale(scale);
     updateScalerSize();
@@ -781,19 +775,23 @@ function applyDisplayScale(scale, origin) {
     }
 
     const after = pages.getBoundingClientRect();
-    stage.scrollLeft += after.left + point.x * displayScale - origin.x;
-    stage.scrollTop += after.top + point.y * displayScale - origin.y;
+    stage.scrollTop += after.top + pointY * displayScale - origin.y;
   }
 
   applyPan();
+  centerHorizontally();
 
-  // When the column is narrower than the stage, auto margins centre it and scrollLeft must be 0.
-  // Centre-origin zooms also keep a wider column centred; pointer zooms leave the scroll alone.
-  const contentWidth = stageContentWidth(stage);
-  if (scaler.offsetWidth <= contentWidth + 0.5) {
-    stage.scrollLeft = 0;
-  } else if (zoomRecenter) {
-    stage.scrollLeft = (scaler.offsetWidth - contentWidth) / 2;
+  function centerHorizontally() {
+    // Auto margins centre the column while it still fits inside the full stage (including the
+    // gutters). Once it is wider than the stage, scroll the overflow half-and-half instead.
+    // Reading scrollWidth forces the new scroll range to be known before scrollLeft is assigned;
+    // otherwise the first frame past the stage width clamps the correction and jitters.
+    if (scaler.offsetWidth <= stage.clientWidth + 0.5) {
+      stage.scrollLeft = 0;
+    } else {
+      void stage.scrollWidth;
+      stage.scrollLeft = (scaler.offsetWidth - stage.clientWidth) / 2;
+    }
   }
 
   if (!document.body.classList.contains("panel-dragging")) syncCurrentPage();
@@ -818,18 +816,6 @@ function finishZoom() {
   zooming = false;
   reportZoom(true);
   centerAtRest();
-  if (zoomRecenter) {
-    const stage = stageElement();
-    const scaler = scalerElement();
-    if (stage && scaler) {
-      const contentWidth = stageContentWidth(stage);
-      stage.scrollLeft =
-        scaler.offsetWidth > contentWidth + 0.5
-          ? (scaler.offsetWidth - contentWidth) / 2
-          : 0;
-    }
-  }
-  zoomRecenter = false;
   updateWindow(true).catch(() => {});
   pagesElement()?.classList.remove("zooming");
 }
@@ -844,8 +830,11 @@ function centerAtRest() {
   scaler.style.marginTop =
     scaledHeight + 0.5 < available ? `${(available - scaledHeight) / 2}px` : "0px";
 
-  if (scaler.offsetWidth <= stageContentWidth(stage) + 0.5) {
+  if (scaler.offsetWidth <= stage.clientWidth + 0.5) {
     stage.scrollLeft = 0;
+  } else {
+    void stage.scrollWidth;
+    stage.scrollLeft = (scaler.offsetWidth - stage.clientWidth) / 2;
   }
 }
 
@@ -3347,7 +3336,7 @@ window.PDFScope = {
 
   async render(pageNumber) {
     if (pendingDefaultZoom > 0) {
-      setZoomTarget(pendingDefaultZoom / 100, { direct: true, recenter: true });
+      setZoomTarget(pendingDefaultZoom / 100, { direct: true });
       pendingDefaultZoom = 0;
     }
     if (!document_) return;

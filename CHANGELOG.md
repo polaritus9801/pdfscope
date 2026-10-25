@@ -21,9 +21,9 @@ minor releases may contain breaking changes; they are always called out.
 - Each page action owns a full-width third of the bar: top starts, middle toggles one page, bottom
   ends, and the icons sit at 1/6, 1/2 and 5/6 of the page. The bar sits 12 px off the sheet and the
   page actions' hit area is the full bar width. Endpoint fades are 64 px instead of 18 px.
-- New setting 设置 → 阅读 → 页面引用条位置: right (default), left, both or hidden. The right-side
-  default gives the reader symmetric gutters (tool rail left, range bar right), keeps the PDF centred
-  at fit width and keeps centre-origin zooms anchored on the page centre.
+- New setting 设置 → 阅读 → 页面引用条位置: right (default), left, both or hidden. The gutter lanes
+  are permanently symmetric and inset from the scrollable page area; every choice keeps the PDF
+  centred at fit width and leaves the bar a pure overlay.
 - Adding a page range and removing one share one rule: a candidate interval entirely inside the
   committed set subtracts, otherwise it adds. Invalid start-after-end clicks discard the first click.
 - Repeated endpoint clicks can adjust the nearest range (default) or cancel, configurable under
@@ -43,8 +43,9 @@ minor releases may contain breaking changes; they are always called out.
 - The hovered-page marker moved from the AI-panel divider to the reader's right scrollbar edge
   (4×12 px tick), so the divider no longer shows a stray purple dot. The reader scrollbar keeps its
   native width; the 目录 and 缩略图 lists get a 4 px scrollbar of their own.
-- Zoom centring now uses the stage content box and recentres centre-origin zooms to
-  `(scalerWidth - contentWidth) / 2`, so asymmetric gutters no longer pull the page off-centre.
+- Zoom is horizontally page-centred at every frame. The gutter lanes no longer act as stage padding,
+  removing the dead zone where a page exceeded the content inset but not the stage: the page now
+  grows symmetrically into the gutters and only starts scrolling when it exceeds the stage itself.
 - The composer resize handle is now a square-ended border segment shown only while the handle itself
   is hovered/focused/dragged; its colour follows the input border state.
 

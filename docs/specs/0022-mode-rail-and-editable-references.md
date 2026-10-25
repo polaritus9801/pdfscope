@@ -591,9 +591,10 @@ This supersedes the thin per-page bar and the old dashed page-outline preview.
 **Geometry.** One committed contiguous range draws one continuous vertical bar from the top of its
 first page to the bottom of its last page; page-gap space is filled so adjacent pages read as one bar.
 The bar is `1.8 ×` the original 24 px action diameter = 43.2 px wide, square-ended, and scales with the
-PDF. It sits 12 px away from the page edge. By default the stage reserves symmetric 116 px gutters:
-the tool rail lives on the left and the range bar on the right, so the PDF column and the zoom anchor
-stay horizontally centred. Choosing 左侧/不显示 releases the right gutter.
+PDF. It sits 12 px away from the page edge. The stage always keeps symmetric 116 px gutter lanes:
+the tool rail and optional left bar use the left lane, the range bar uses the right lane. The lanes are
+an inset, not stage padding; the PDF column is laid out in the full stage width and auto-centred, so
+the bar's side preference never moves or scales the document.
 
 **Colours.** Committed: `--deep-border: #7f5cbf` end caps and `--deep-body: #cbb8ec` body,
 with a 64 px `--range-end-fade` transition. Preview: `--light-border: #b49be2` ends and
@@ -607,8 +608,9 @@ bar: top 1/3 starts a range, middle 1/3 toggles one page, bottom 1/3 ends it. Th
 in those thirds, i.e. start at 1/6, single at 1/2 and end at 5/6 of the page height.
 
 **Side preference.** 设置 → 阅读 → **页面引用条位置** offers 右侧 (default), 左侧, 两侧 and 不显示.
-It is stored in `localStorage["pdfscope.page-bar-side"]` and applied immediately. Right/both keep the
-symmetric gutters; both renders a second independent bar/action column.
+It is stored in `localStorage["pdfscope.page-bar-side"]` and applied immediately. All four choices keep
+the same symmetric gutters and PDF geometry; both renders a second independent bar/action column.
+The bar is a pure overlay and never participates in reader layout.
 
 **Add or subtract.** A candidate interval is a subtraction if and only if every page in it is already
 committed; otherwise it is an addition. Addition previews only the newly added pages in the light pair;
@@ -665,14 +667,19 @@ made the whole TOC appear disabled and page numbers blank.
 
 ## 2026-10-26 — scrollbar hint, centred reader and thin navigation scrollbars
 
-**Default side.** The page-range bar now defaults to the right. The stage reserves 116 px on both
-sides by default (tool rail left, bar right), which restores a horizontally centred PDF at fit width
-and keeps the zoom anchor at the centre of the page column. 左侧 and 不显示 release the right gutter.
+**Default side.** The page-range bar now defaults to the right, but all side choices share the same
+116 px left/right inset lanes. The lanes are not stage padding: the page/scaler is laid out in the
+full stage width with auto margins, so the PDF remains horizontally centred at fit width. Horizontal
+scrolling begins only when the page itself is wider than the stage, not when it merely outgrows the
+824 px content inset. This removes the old auto-margin→overflow dead zone that made the page jump
+sideways while crossing fit width.
 
-**Zoom anchor.** `readingOrigin` measures the stage content box (excluding both gutters), and
-centre-origin zooms (buttons, fit width, API, initial default zoom) recenter `scrollLeft` to
-`(scalerWidth - contentWidth) / 2` on every frame and at settle. Pointer zooms (wheel/pinch) still
-preserve the point under the pointer.
+**Zoom anchor.** `readingOrigin` is the stage centre. Horizontal zoom is always page-centred: the
+apply loop sets `scrollLeft = 0` while the scaler fits inside the stage (auto margins centre it), and
+`(scalerWidth - stageWidth) / 2` once it is wider. Vertical zoom still tracks the reading line or
+pointer. Reading `scrollWidth` before assigning `scrollLeft` forces the new range to be known, so
+there is no first-frame clamp or twist. The page bar's side preference is not consulted anywhere in
+this path.
 
 **Scrollbar hint.** The purple page marker moved off the AI-panel divider. It is now a 4×12 px tick
 at `right: 3px` inside the reader shell, riding the native reader scrollbar and positioned by
