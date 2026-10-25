@@ -861,7 +861,7 @@ function installComposerHandles() {
     handle.setAttribute("role", "separator");
     handle.setAttribute("aria-orientation", "horizontal");
     handle.setAttribute("aria-label", "调整输入框高度");
-    handle.title = "上下拖动设置最大高度；双击恢复自动高度";
+    handle.title = "上下拖动调整高度；双击恢复自动高度";
     card.append(handle);
   }
   resizeHandle = handle;
@@ -887,10 +887,7 @@ function installComposerHandles() {
 
   const reset = () => {
     const target = ask();
-    if (target) {
-      target.style.removeProperty("--composer-manual-max");
-      target.style.removeProperty("--composer-min-height");
-    }
+    if (target) target.style.removeProperty("--composer-min-height");
     card.classList.remove("composer-resizing");
     document.body.classList.remove("composer-resizing");
   };
@@ -899,7 +896,7 @@ function installComposerHandles() {
     if (!target) return;
     const max = Math.max(56, window.innerHeight * 0.6);
     const next = Math.min(max, Math.max(56, Math.round(value)));
-    target.style.setProperty("--composer-manual-max", `${next}px`);
+    target.style.setProperty("--composer-min-height", `${next}px`);
     return next;
   };
 

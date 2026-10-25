@@ -102,12 +102,11 @@ cap; above it the input scrolls internally instead of pushing the answer away. A
 the end of a long draft is scrolled into view.
 
 The top edge has an invisible 8px drag handle with a hover line. Dragging it sets
-`--composer-manual-max`, which replaces the automatic 40% cap. It is a **maximum**, never a minimum:
-short content still collapses to its natural height, so a previously dragged height cannot preserve
-a blank white block. Long content can be given more room with a manual drag and scrolls if it exceeds
-that allowance. Double-clicking the handle removes the manual maximum and returns to the automatic
-cap. The handle is keyboard accessible (↑/↓, Home/Enter). The baseline minimum stays the current
-56px content area.
+`--composer-min-height`, a genuine floor: the user can make the input taller even when the content is
+short. Automatic growth is still capped at the 40% panel allowance, but a manual floor raises the CSS
+maximum to `max(--composer-auto-max, --composer-min-height)` so the chosen height is respected.
+Double-clicking the handle removes the manual floor and returns to automatic height. The handle is
+keyboard accessible (↑/↓, Home/Enter). The baseline minimum stays the current 56px content area.
 
 ## Behaviour
 
