@@ -22,6 +22,9 @@ minor releases may contain breaking changes; they are always called out.
   never make Left/Right jump mid-word.
 - The composer's top edge can be dragged to set a manual height floor while content still
   auto-grows; double-click restores automatic height.
+- Live KaTeX formulas: inline `$...$` / `\(...\)` and single-paragraph `$$...$$` / `\[...\]`.
+  Raw LaTeX stays editable; inactive lines render the formula and clicking it restores the source.
+  This reuses the existing KaTeX assets and adds no package.
 
 ### Changed
 

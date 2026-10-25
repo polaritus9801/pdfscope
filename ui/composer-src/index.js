@@ -328,6 +328,88 @@ function moveAcrossMention(direction) {
   };
 }
 
+const mathCache = new Map();
+
+function renderFormula(latex, display) {
+  const key = `${display ? "D" : "I"}:${latex}`;
+  if (mathCache.has(key)) return mathCache.get(key);
+  let html = "";
+  if (latex.trim() && window.katex?.renderToString) {
+    try {
+      html = window.katex.renderToString(latex, {
+        displayMode: display,
+        throwOnError: false,
+        strict: "ignore",
+        trust: false,
+        output: "html",
+      });
+    } catch {
+      html = "";
+    }
+  }
+  mathCache.set(key, html);
+  return html;
+}
+
+class FormulaWidget {
+  constructor(latex, display, from) {
+    this.latex = latex;
+    this.display = display;
+    this.from = from;
+  }
+
+  eq(other) {
+    return other.latex === this.latex && other.display === this.display && other.from === this.from;
+  }
+
+  toDOM() {
+    const span = document.createElement("span");
+    span.className = this.display ? "md-math md-math-display" : "md-math md-math-inline";
+    span.title = "点击编辑 LaTeX";
+    const html = renderFormula(this.latex, this.display);
+    if (html) {
+      span.innerHTML = html;
+    } else {
+      span.classList.add("md-math-error");
+      span.textContent = this.display ? `$$${this.latex}$$` : `$${this.latex}$`;
+    }
+    span.addEventListener("mousedown", (event) => {
+      if (!view) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const pos = Math.min(this.from, view.state.doc.content.size - 1);
+      view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, pos)).scrollIntoView());
+      view.focus();
+    });
+    return span;
+  }
+
+  ignoreEvent() {
+    return false;
+  }
+}
+
+function addFormula(latex, display, absoluteFrom, absoluteTo, lineActive, decorations) {
+  if (!latex.trim()) return false;
+  if (lineActive) {
+    decorations.push(
+      Decoration.inline(absoluteFrom, absoluteTo, { class: "md-math-source" }),
+    );
+  } else {
+    decorations.push(
+      Decoration.inline(absoluteFrom, absoluteTo, { class: "md-math-source-hidden" }),
+    );
+    decorations.push(
+      Decoration.widget(
+        absoluteFrom,
+        () => new FormulaWidget(latex.trim(), display, absoluteFrom).toDOM(),
+        { side: 1 },
+      ),
+    );
+  }
+  return true;
+}
+
 function syntaxDecoration(from, to, active) {
   if (to <= from) return null;
   return Decoration.inline(from, to, {
@@ -340,6 +422,10 @@ function addInlineMarkdown(text, base, lineActive, decorations) {
   const overlaps = (from, to) => claimed.some(([start, end]) => from < end && to > start);
   const patterns = [
     { pattern: /`([^`\n]+)`/g, className: "md-code", before: 1, after: 1 },
+    { pattern: /\$\$([^$\n]+)\$\$/g, formula: true, display: true },
+    { pattern: /\\\[([^\n]+?)\\\]/g, formula: true, display: true },
+    { pattern: /\$([^$\n]+?)\$/g, formula: true, display: false },
+    { pattern: /\\\(([^\n]+?)\\\)/g, formula: true, display: false },
     { pattern: /\[([^\]\n]+)\]\(([^)\n]+)\)/g, className: "md-link", link: true },
     { pattern: /\*\*([^*\n]+)\*\*/g, className: "md-strong", before: 2, after: 2 },
     { pattern: /__([^_\n]+)__/g, className: "md-strong", before: 2, after: 2 },
@@ -356,6 +442,12 @@ function addInlineMarkdown(text, base, lineActive, decorations) {
       const end = start + match[0].length;
       if (overlaps(start, end)) {
         rule.pattern.lastIndex = start + 1;
+        continue;
+      }
+      if (rule.formula) {
+        if (addFormula(match[1], rule.display, base + start, base + end, lineActive, decorations)) {
+          claimed.push([start, end]);
+        }
         continue;
       }
       const contentStart = rule.link ? start + 1 : start + rule.before;

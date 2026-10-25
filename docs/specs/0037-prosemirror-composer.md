@@ -57,9 +57,9 @@ cursor.
 Supported now:
 
 - inline: `**strong**`, `__strong__`, `*em*`, `_em_`, `~~strike~~`, `` `code` ``,
-  `[label](url)`
+  `[label](url)`, `$...$` and `\(...\)` formulas
 - blocks: `#`–`######`, `>` block quotes, nested `-`/`*`/`+` and `1.` lists (Tab/Shift+Tab), fenced
-  ``` code blocks
+  ``` code blocks, single-paragraph `$$...$$` / `\[...\]` display formulas
 
 List markers stay visible and use a fixed hanging indent, so `1.`/`2.` lines and wrapped lines keep
 the same text column. Nested lists carry their leading-space depth as `--md-list-indent`; Tab inserts
@@ -67,10 +67,20 @@ two spaces in a list (Shift+Tab removes up to two), while Tab outside a list kee
 navigation. Paragraph-level arrow movement jumps between block ends instead of mapping through
 hidden marker widths.
 
-Not supported: tables, images, task checkboxes, footnotes and math. Those are document-level GFM
-features; pretending to support them with regex spans would recreate exactly the cursor/layout bugs
-this pass fixes. Full parity needs a dedicated Markdown editor (CodeMirror + Lezer/Obsidian-style
-renderer), not a chat-input decoration layer.
+Not supported: tables, images, task checkboxes, footnotes, multi-paragraph display formulas and
+nested emphasis. Those are document-level GFM features; pretending to support them with regex spans
+would recreate exactly the cursor/layout bugs this pass fixes. Full parity needs a dedicated Markdown
+editor (CodeMirror + Lezer/Obsidian-style renderer), not a chat-input decoration layer.
+
+## Formulas
+
+The composer reuses the existing KaTeX bundle (already loaded for transcript answers); no new
+dependency is added. On an inactive line, `$...$` / `\(...\)` is replaced by a cached KaTeX widget and
+`$$...$$` / `\[...\]` gets a display widget. The raw LaTeX remains the document text and is shown
+again as soon as the line is active; clicking a formula moves the caret to its source. Code spans and
+fences suppress formula parsing. Invalid LaTeX is rendered by KaTeX with `throwOnError: false` rather
+than blocking input. Currency false positives are acceptable because the reader can turn live preview
+off with the dot.
 
 Mod-B/Mod-I/Mod-E wrap/unwrap the source selection in `**`, `*` or backticks by inserting literal
 markers. The placeholder is inset 12px, matching the editor content padding.
