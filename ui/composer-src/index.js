@@ -227,14 +227,18 @@ function anchorPage() {
   if (window.scrollY !== 0 || window.scrollX !== 0) window.scrollTo(0, 0);
   if (document.documentElement.scrollTop !== 0) document.documentElement.scrollTop = 0;
   if (document.body.scrollTop !== 0) document.body.scrollTop = 0;
+  for (const selector of [".app", ".workspace", ".panel"]) {
+    const element = document.querySelector(selector);
+    if (element && element.scrollTop !== 0) element.scrollTop = 0;
+  }
 }
 
 function installPageAnchor() {
   if (pageAnchorBound) return;
   pageAnchorBound = true;
   document.addEventListener("focusin", () => requestAnimationFrame(anchorPage), true);
+  document.addEventListener("scroll", anchorPage, { capture: true, passive: true });
   window.addEventListener("scroll", anchorPage, { passive: true });
-  document.body.addEventListener("scroll", anchorPage, { passive: true });
   anchorPage();
 }
 

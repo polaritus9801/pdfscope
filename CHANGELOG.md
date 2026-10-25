@@ -10,9 +10,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Fixed
 
-- Locked page scrolling with `overflow: clip`, a viewport-fixed `body`, plus focus/scroll anchoring.
-  Even if another element overflows `body`, focusing or toggling the composer can no longer scroll the
-  whole AI panel upward and put the history/new-session buttons out of reach.
+- Locked page scrolling with `overflow: clip`, a viewport-fixed `body`, clipped `.app`/`.panel`, and
+  focus/scroll anchoring for body, document, app, workspace and panel. Even if another element
+  overflows, focusing or toggling the composer can no longer scroll any shell container and put the
+  history/new-session buttons out of reach.
 
 - Removed the mode-height floor that kept the composer at the taller preview height: it left a blank
   white strip under the shorter plain-text layout, most obvious with stacked display formulas.
