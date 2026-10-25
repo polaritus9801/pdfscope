@@ -91,9 +91,9 @@ markers. The placeholder is inset 12px, matching the editor content padding.
 PDF.js's hidden measurement canvas is kept out of flow (`position: fixed`, offscreen). In normal
 flow it added a 19px inline line box to `body`; focusing the composer could scroll `body` by that
 amount and shift the whole app even when the composer itself did not change height. As a second line
-of defence, `html`/`body` use `overflow: clip`, and the composer anchors the page on `focusin` and
-scroll events. Any residual body overflow therefore cannot push the panel header or expose the bottom
-bar.
+of defence, `html`/`body` use `overflow: clip`, `body` is fixed to the viewport, and the composer
+anchors the page on `focusin` and scroll events. Any residual body overflow therefore cannot push the
+panel header or expose the bottom bar.
 
 There is one enforced automatic height cap: `--composer-auto-max`, computed as 40% of the AI panel's
 height and refreshed by a `ResizeObserver` (CSS fallback `40vh`). Content grows naturally up to that
