@@ -700,15 +700,21 @@ trackpad/shift-wheel, and 系统滚动条 restores both. It draws:
 
 - page ticks at each page's *centred* scroll position, so the tick lines up with the middle of the
   viewport thumb, not its top; the thumb centre tracks `scrollTop + clientHeight / 2`;
-- bookmark bars whose horizontal length follows outline depth (`16 - 3 × depth`, clamped): top-level
-  entries longest, nested entries shorter; one shallowest bookmark per page;
-- with no bookmarks, page-count majors via a nice-step target of ~16 bars (1/2/5×10ⁿ pages), with
-  a shorter tick for every sampled page;
+- neutral bookmark bars whose horizontal length follows outline depth. The longest is 16 px and the
+  shortest is exactly 8 px (50%): depths are normalised against the shallowest *existing* bookmark
+  (`8 + 8 × (maxDepth - depth) / (maxDepth - minDepth)`), so a document whose outline starts at depth 1
+  still gets 16 px for its top-level entries and 8 px for its deepest. Nested entries shrink linearly;
+  one shallowest bookmark per page;
+- with no bookmarks, page-count majors are 16 px and sampled page ticks are 8 px; the nice-step target
+  is ~16 bars (1/2/5×10ⁿ pages);
 - bookmarks are always drawn, while minor page ticks are sampled to at most ~500 / track-height
   density; this keeps 1000-page documents readable and bounded;
-- the current page line and a draggable viewport thumb (`clientHeight / scrollHeight`).
+- no separate current-page line (the thumb is the only current-position indicator);
+- a modern accent scrollbar thumb (`12 px`, gradient, soft shadow) that always sits above the
+  neutral ruler; the hover line sits *below* the canvas, so tick marks and thumb cover it;
+- page ruler marks are neutral `--ink-faint`; purple is reserved for the scrollbar thumb.
 
-Scrolling only moves the thumb and redraws when the current page changes. Geometry is rebuilt from
+Scrolling only moves the thumb; the canvas redraws only when geometry or sections change. Geometry is rebuilt from
 the rendered page rectangles on render, resize, page-mode change and zoom settle, so mixed page sizes
 and panel reflow are correct. Clicking a page tick centres that page; dragging the thumb centres the
 content under the pointer. Hovering the rail finds the page by its centred tick, shows the page

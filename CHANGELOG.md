@@ -49,10 +49,11 @@ minor releases may contain breaking changes; they are always called out.
 - The 目录/缩略图 scrollbars now match the AI panel exactly: 4 px, transparent track and the same
   `--border-strong` thumb, with no custom accent/hover styling.
 - Added a complete page ruler, enabled by default under 设置 → 阅读 → PDF 滚动条 (switch to 系统滚动条
-  to compare). It shows page-centred ticks aligned with the thumb centre, hierarchy-scaled bookmark
-  bars, smart page-count majors when there is no outline, density sampling for very long documents,
-  the current page, a draggable viewport thumb, hover page/section tooltips, cached page previews,
-  click/drag/keyboard/wheel navigation and ARIA scrollbar state.
+  to compare). Page marks are neutral; the accent is reserved for a larger, modern scrollbar thumb.
+  Ticks sit at page-centred scroll positions so they align with the thumb centre, bookmark bars span
+  16/8 px by outline depth (shortest exactly 50% of longest), and no-bookmark documents use smart
+  page-count majors plus density sampling for very long PDFs. There is no separate current-page line;
+  scrollbar thumb > ruler marks > hover line, and ruler mode hides the platform scrollbars.
 - Page manager drags no longer start a native image drag. Pointer capture on the grid, blocked
   dragstart, non-draggable images and pointerdown default prevention make drag select a live range
   (Shift add, Ctrl/Command subtract, or add/subtract chosen by the starting page's current state)

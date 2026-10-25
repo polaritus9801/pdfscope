@@ -356,6 +356,8 @@ html[data-scroll-style="native"] .page-ruler {
 }
 
 .page-ruler canvas {
+  position: relative;
+  z-index: 1;
   display: block;
   width: 16px;  /* size */
   height: 100%;
@@ -363,13 +365,22 @@ html[data-scroll-style="native"] .page-ruler {
 
 .page-ruler-thumb {
   position: absolute;
-  right: 3px;  /* size */
-  width: 8px;  /* size */
-  min-height: 22px;  /* size */
-  background: color-mix(in srgb, var(--accent) 28%, var(--surface));
-  border: 1px solid color-mix(in srgb, var(--accent) 68%, transparent);
+  right: 2px;  /* size */
+  z-index: 3;
+  width: 12px;  /* size */
+  min-height: 32px;  /* size */
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent) 58%, var(--surface)),
+    color-mix(in srgb, var(--accent) 88%, var(--surface))
+  );
+  border: 1px solid color-mix(in srgb, var(--surface) 84%, transparent);
   border-radius: 999px;  /* size */
+  box-shadow:
+    0 2px 7px rgb(60 44 94 / 22%),  /* size */
+    inset 0 1px 0 rgb(255 255 255 / 48%);  /* size */
   cursor: grab;
+  transition: filter var(--duration) var(--ease);
 }
 
 .page-ruler-thumb:active {
@@ -378,11 +389,12 @@ html[data-scroll-style="native"] .page-ruler {
 
 .page-ruler-hover-line {
   position: absolute;
-  right: 2px;  /* size */
-  width: 12px;  /* size */
+  right: 0;
+  z-index: 0;
+  width: 16px;  /* size */
   height: 2px;  /* size */
   margin-top: -1px;  /* size */
-  background: var(--accent);
+  background: color-mix(in srgb, var(--ink-muted) 58%, transparent);
   border-radius: 1px;  /* size */
   pointer-events: none;
 }
@@ -401,7 +413,7 @@ html[data-scroll-style="native"] .page-ruler {
   line-height: 1.45;
   pointer-events: none;
   white-space: nowrap;
-  z-index: 2;
+  z-index: 4;
 }
 
 .page-ruler-tooltip-page {
@@ -426,6 +438,7 @@ html[data-scroll-style="native"] .page-ruler {
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow-2);
   pointer-events: none;
+  z-index: 4;
 }
 
 .page-ruler-preview img {

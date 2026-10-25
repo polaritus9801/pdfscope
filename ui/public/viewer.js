@@ -3523,7 +3523,6 @@ function initPageRuler() {
     stage: null,
     measureFrame: 0,
     viewportFrame: 0,
-    drawnCurrent: 0,
   };
   pageRuler.ctx = pageRuler.canvas.getContext("2d");
   document.documentElement.classList.add("ruler-ready");
@@ -3661,7 +3660,6 @@ function measurePageRuler() {
     .filter((mark) => Number.isFinite(mark.number) && mark.number > 0)
     .sort((a, b) => a.number - b.number);
   ruler.element.setAttribute("aria-valuemax", String(document_.numPages || ruler.marks.length));
-  ruler.drawnCurrent = 0;
   drawPageRuler();
   updatePageRulerViewport();
 }
@@ -3691,10 +3689,6 @@ function updatePageRulerViewport() {
   ruler.thumb.hidden = maxScroll <= 1;
   ruler.element.setAttribute("aria-valuenow", String(currentPage));
   ruler.element.setAttribute("aria-valuetext", `第 ${currentPage} 页`);
-  if (ruler.drawnCurrent !== currentPage) {
-    ruler.drawnCurrent = currentPage;
-    drawPageRuler();
-  }
 }
 
 function rulerSectionFor(page) {
@@ -3705,10 +3699,6 @@ function rulerSectionFor(page) {
     if (!best || section.page >= best.page) best = section;
   }
   return best;
-}
-
-function pageMarkForNumber(number) {
-  return pageRuler?.marks.find((mark) => mark.number === number) ?? null;
 }
 
 function pageMarkAtY(y) {
@@ -3727,7 +3717,6 @@ function pageRulerColors() {
   return {
     border: style.getPropertyValue("--border-strong").trim() || "#cbb8ec",
     faint: style.getPropertyValue("--ink-faint").trim() || "#8c7aa2",
-    accent: style.getPropertyValue("--accent").trim() || "#7f5cbf",
   };
 }
 
@@ -3762,11 +3751,19 @@ function drawPageRuler() {
     }
   }
   const hasBookmarks = bookmarks.size > 0;
+  const depths = [...bookmarks.values()].map((bookmark) => bookmark.depth);
+  const depthMin = hasBookmarks ? Math.min(...depths) : 0;
+  const depthMax = hasBookmarks ? Math.max(...depths) : 0;
+  const depthSpan = Math.max(1, depthMax - depthMin);
   const majorStep = pageMajorStep(ruler.marks.length);
   const maxTicks = Math.max(80, Math.min(500, Math.floor(height / 2)));
   const sampleStep = Math.max(1, Math.ceil(ruler.marks.length / maxTicks));
+  const longest = 16;
+  const shortest = 8;
 
   context.lineWidth = 1;
+  context.strokeStyle = colors.faint;
+  context.fillStyle = colors.faint;
   for (let index = 0; index < ruler.marks.length; index += 1) {
     const mark = ruler.marks[index];
     const bookmark = bookmarks.get(mark.number);
@@ -3774,15 +3771,13 @@ function drawPageRuler() {
     if (!bookmark && !major && index % sampleStep !== 0) continue;
     const y = Math.min(height - 1, Math.max(0, mark.centerFraction * height));
     if (bookmark) {
-      const depth = Math.min(Math.max(0, bookmark.depth), 4);
-      const length = Math.max(7, 16 - depth * 3);
-      context.globalAlpha = 0.78;
-      context.fillStyle = colors.accent;
+      const ratio = Math.min(1, Math.max(0, (bookmark.depth - depthMin) / depthSpan));
+      const length = Math.round(longest - ratio * (longest - shortest));
+      context.globalAlpha = 0.62;
       context.fillRect(16 - length, y - 1, length, 2);
     } else {
-      const length = major ? 11 : 5;
-      context.globalAlpha = major ? 0.72 : 0.46;
-      context.strokeStyle = colors.faint;
+      const length = major ? longest : shortest;
+      context.globalAlpha = major ? 0.58 : 0.34;
       context.beginPath();
       context.moveTo(16 - length, y + 0.5);
       context.lineTo(16, y + 0.5);
@@ -3790,13 +3785,6 @@ function drawPageRuler() {
     }
   }
   context.globalAlpha = 1;
-
-  const current = pageMarkForNumber(currentPage);
-  if (current) {
-    const y = Math.min(height - 2, Math.max(0, current.centerFraction * height));
-    context.fillStyle = colors.accent;
-    context.fillRect(0, y, 16, 2);
-  }
 }
 
 function hidePageRulerHover() {
