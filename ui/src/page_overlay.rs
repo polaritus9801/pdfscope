@@ -368,10 +368,10 @@ fn PageRangeToolbar(
     hover_kind: RwSignal<Option<u8>>,
     hover_side: RwSignal<Option<u8>>,
     action_page: Memo<u32>,
-    activate: Callback<(u32, u8)>,
+    activate: Callback<(u32, u8, u8)>,
 ) -> impl IntoView {
     let click = Callback::new(move |kind: u8| {
-        activate.run((action_page.get_untracked(), kind));
+        activate.run((action_page.get_untracked(), kind, side_value));
     });
     view! {
         <div
@@ -640,16 +640,26 @@ pub(crate) fn PageRangeOverlay(
             .unwrap_or(1)
     });
 
-    let activate = Callback::new(move |(page, kind): (u32, u8)| match kind {
-        0 => choose_endpoint(
-            page, 0, page_set, anchor, hover_page, hover_kind, hover_side, undo_push, scope_mode,
-        ),
-        1 => choose_endpoint(
-            page, 1, page_set, anchor, hover_page, hover_kind, hover_side, undo_push, scope_mode,
-        ),
-        _ => toggle_page(
-            page, page_set, anchor, hover_page, hover_kind, hover_side, undo_push, scope_mode,
-        ),
+    // After a click the hover state is cleared. The old per-page buttons only re-appeared on a new
+    // `mouseenter`; the global strip would otherwise reacquire on the next pointermove inside the
+    // same third. Suppress the clicked page/kind/side until the pointer changes zone or leaves.
+    let suppressed_action = RwSignal::new(Option::<(u32, u8, u8)>::None);
+
+    let activate = Callback::new(move |(page, kind, side): (u32, u8, u8)| {
+        suppressed_action.set(Some((page, kind, side)));
+        match kind {
+            0 => choose_endpoint(
+                page, 0, page_set, anchor, hover_page, hover_kind, hover_side, undo_push,
+                scope_mode,
+            ),
+            1 => choose_endpoint(
+                page, 1, page_set, anchor, hover_page, hover_kind, hover_side, undo_push,
+                scope_mode,
+            ),
+            _ => toggle_page(
+                page, page_set, anchor, hover_page, hover_kind, hover_side, undo_push, scope_mode,
+            ),
+        }
     });
 
     let clear_for_side = Callback::new(move |side: u8| {
@@ -658,9 +668,14 @@ pub(crate) fn PageRangeOverlay(
             hover_kind.set(None);
             hover_side.set(None);
         }
+        suppressed_action.set(None);
     });
 
     let set_pointer = Callback::new(move |(page, kind, side): (u32, u8, u8)| {
+        if suppressed_action.get_untracked() == Some((page, kind, side)) {
+            return;
+        }
+        suppressed_action.set(None);
         let changed = hover_page.get_untracked() != Some(page)
             || hover_kind.get_untracked() != Some(kind)
             || hover_side.get_untracked() != Some(side);
@@ -769,7 +784,7 @@ pub(crate) fn PageRangeOverlay(
                             let layout = layout.get_untracked();
                             if let Some((page, kind)) = page_at_pointer(event.unchecked_ref::<web_sys::MouseEvent>(), &layout) {
                                 set_pointer.run((page, kind, 0));
-                                activate.run((page, kind));
+                                activate.run((page, kind, 0));
                             }
                         }
                     ></div>
@@ -789,7 +804,7 @@ pub(crate) fn PageRangeOverlay(
                             let layout = layout.get_untracked();
                             if let Some((page, kind)) = page_at_pointer(event.unchecked_ref::<web_sys::MouseEvent>(), &layout) {
                                 set_pointer.run((page, kind, 1));
-                                activate.run((page, kind));
+                                activate.run((page, kind, 1));
                             }
                         }
                     ></div>

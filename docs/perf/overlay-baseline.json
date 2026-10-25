@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-25T20:57:20.106Z",
-  "app": "http://127.0.0.1:49682/",
+  "generatedAt": "2026-10-25T21:09:47.032Z",
+  "app": "http://127.0.0.1:49845/",
   "browser": "headless Chrome (CDP)",
   "viewport": "1440x950",
   "counts": [
@@ -10,7 +10,7 @@
   "results": [
     {
       "pages": 1000,
-      "loadMs": 726,
+      "loadMs": 728,
       "dom": {
         "pageShells": 1000,
         "domNodes": 2270,
@@ -23,7 +23,21 @@
         "errors": []
       },
       "hover": {
-        "ms": 18,
+        "ms": 32.799999952316284,
+        "samples": [
+          7.299999952316284,
+          32.799999952316284,
+          32.799999952316284,
+          33.200000047683716,
+          33.200000047683716
+        ],
+        "suppression": {
+          "afterClickActive": 0,
+          "afterClickPreview": 0,
+          "sameZoneActive": 0,
+          "sameZonePreview": 0,
+          "selectedAfterCleanup": 0
+        },
         "activeActions": 1,
         "previewOutlines": 1,
         "visibleBars": 2,
@@ -31,21 +45,21 @@
         "elementAtPointer": "page-overlay-hit range-right"
       },
       "preview": {
-        "ms": 32.40000009536743,
+        "ms": 33.299999952316284,
         "targetPage": 500,
         "previewOutlines": 500,
         "visibleBars": 2
       },
       "commit": {
-        "ms": 32.5,
+        "ms": 32.200000047683716,
         "selectionOutlines": 500,
         "visibleBars": 2
       },
-      "heapUsedMb": 6.3
+      "heapUsedMb": 6.4
     },
     {
       "pages": 3000,
-      "loadMs": 1441,
+      "loadMs": 1437,
       "dom": {
         "pageShells": 3000,
         "domNodes": 6285,
@@ -58,7 +72,21 @@
         "errors": []
       },
       "hover": {
-        "ms": 11.700000047683716,
+        "ms": 33.39999985694885,
+        "samples": [
+          18.800000190734863,
+          33.30000019073486,
+          33.39999985694885,
+          33.40000009536743,
+          34.09999990463257
+        ],
+        "suppression": {
+          "afterClickActive": 0,
+          "afterClickPreview": 0,
+          "sameZoneActive": 0,
+          "sameZonePreview": 0,
+          "selectedAfterCleanup": 0
+        },
         "activeActions": 1,
         "previewOutlines": 1,
         "visibleBars": 2,
@@ -66,17 +94,17 @@
         "elementAtPointer": "page-overlay-hit range-right"
       },
       "preview": {
-        "ms": 32.5,
+        "ms": 33.59999990463257,
         "targetPage": 500,
         "previewOutlines": 500,
         "visibleBars": 2
       },
       "commit": {
-        "ms": 37.39999985694885,
+        "ms": 34.59999990463257,
         "selectionOutlines": 500,
         "visibleBars": 2
       },
-      "heapUsedMb": 16.9
+      "heapUsedMb": 17.1
     }
   ]
 }

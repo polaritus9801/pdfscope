@@ -15,20 +15,24 @@ Raw output: [overlay-baseline.json](overlay-baseline.json).
 - 1440 × 950 viewport, headless Chrome, release WASM.
 - `loadMs`: file input dispatch → all page shells mounted and page 1 rendered. The final 500 ms settle
   is included; fixture generation and PDF fetch happen inside the timed window.
-- `hover`: one pointer move over the right action strip at page 1, followed by two animation frames.
+- `hover`: five pointer moves over the right action strip at page 1; each is timed until two animation
+  frames have completed and the median is reported. The two-frame wait is a fixed floor, not overlay
+  work.
 - `preview`: start at page 1, scroll to page 500, hover its bottom third, followed by two animation
   frames. This is a 500-page addition preview.
 - `commit`: `__pdfscopePageRange(1, 500, 0)` followed by two animation frames.
 - `heapUsedMb`: `Runtime.getHeapUsage` after the commit.
 - The harness also asserts the active toolbar has `pointer-events: none` and the element under the
   pointer is `.page-overlay-hit`, so the hit-strip/toolbar flicker cannot silently return.
+- It toggles page 1, then moves 1 px inside the same third and asserts the action and preview stay
+  hidden; this guards the post-click `mouseenter` feel.
 
 ## Results
 
 | Pages | Load (ms) | DOM nodes | Page shells | Hover (ms) | 500-page preview (ms) | 500-page commit (ms) | Heap (MB) |
 |---:|---:|---:|---:|---:|---:|---:|---:|
-| 1000 | 726 | 2,270 | 1,000 | 18.0 | 32.4 | 32.5 | 6.3 |
-| 3000 | 1,441 | 6,285 | 3,000 | 11.7 | 32.5 | 37.4 | 16.9 |
+| 1000 | 728 | 2,270 | 1,000 | 32.8 | 33.3 | 32.2 | 6.4 |
+| 3000 | 1,437 | 6,285 | 3,000 | 33.4 | 33.6 | 34.6 | 17.1 |
 
 All action/bar/overlay counts are O(1) at rest:
 
@@ -42,7 +46,9 @@ old page bars      0
 page shells        1000 / 3000
 ```
 
-Hover stays roughly in the low-teens milliseconds and does not grow between 1000 and 3000 pages. The preview and
+Hover is measured until two animation frames have completed; the two-frame wait dominates the
+~33 ms figure. It is flat between 1000 and 3000 pages, which is the property that matters. The raw
+five-sample arrays are in the JSON. The preview and
 commit costs come from rendering the 500 dashed outlines / 500 solid outlines, not from scanning the
 document. Heap varies with Chrome's GC timing; the JSON is the source of truth.
 

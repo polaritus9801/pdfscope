@@ -806,13 +806,15 @@ start/single/end toolbar:
   revealed for the hovered page; the same buttons are the keyboard path at the current page, so there
   are three global tab stops rather than three per page. Toolbars are always pointer-transparent:
   the hit strips own all mouse input, so a toolbar appearing under the pointer cannot fire
-  `pointerleave` on the strip and then disappear (the start→page-2 start flicker). Page tool gestures
-  still use `.in-scope` and `.range-preview` directly and are unchanged.
+  `pointerleave` on the strip and then disappear (the start→page-2 start flicker). After an action,
+  the clicked page/kind/side is suppressed until the pointer changes zone or leaves the strip, so
+  wiggling inside the same third no longer makes the button and its hover preview reappear. Page tool
+  gestures still use `.in-scope` and `.range-preview` directly and are unchanged.
 
 The page shells no longer mount `PageVisual`, per-page bars, action columns or per-page hit
 buttons. A 1000-page fixture drops from ~12,228 DOM nodes to 2,270; 3000 pages is 6,285 nodes.
-Release headless-Chrome measurements: hover is low-teens milliseconds at both 1000 and 3000 pages;
-a 500-page preview is about 32 ms and a 500-page commit 32–37 ms. The
+Release headless-Chrome measurements: the hover path is flat at ~33 ms measured through two animation
+frames (the frame wait dominates), while a 500-page preview and commit are about 32–35 ms. The
 reproducible measurement is [`docs/perf/overlay-baseline.md`](../perf/overlay-baseline.md).
 
 **Ruler cost.** Page-ruler geometry reads the rendered page rectangles only on render/resize/zoom
