@@ -14,4 +14,5 @@ npm run build:composer
 ```
 
 Dependencies: ProseMirror (`prosemirror-model`, `-state`, `-view`, `-keymap`, `-history`,
-`-commands`, `-inputrules`) and esbuild, all MIT.
+`-commands`) and esbuild, all MIT. Markdown live preview is implemented with ProseMirror
+decorations over the raw source, not by converting syntax into marks.

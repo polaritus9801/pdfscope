@@ -5,8 +5,8 @@
 // compatible with the old contenteditable implementation.
 
 import { Schema } from "prosemirror-model";
-import { EditorState, NodeSelection, Selection, TextSelection } from "prosemirror-state";
-import { EditorView } from "prosemirror-view";
+import { EditorState, NodeSelection, Plugin, Selection, TextSelection } from "prosemirror-state";
+import { Decoration, DecorationSet, EditorView } from "prosemirror-view";
 import { keymap } from "prosemirror-keymap";
 import { closeHistory, history, undo, redo } from "prosemirror-history";
 import {
@@ -15,9 +15,7 @@ import {
   joinBackward,
   joinForward,
   splitBlock,
-  toggleMark,
 } from "prosemirror-commands";
-import { InputRule, inputRules } from "prosemirror-inputrules";
 
 let root = null;
 let view = null;
@@ -33,6 +31,7 @@ const MARKDOWN_KEY = "pdfscope.composer.markdown";
 
 let markdownEnabled = readMarkdownPreference();
 let markdownDot = null;
+let resizeHandle = null;
 
 function readMarkdownPreference() {
   try {
@@ -89,29 +88,6 @@ const schema = new Schema({
       },
     },
   },
-  marks: {
-    strong: {
-      inclusive: false,
-      parseDOM: [{ tag: "strong" }, { tag: "b" }],
-      toDOM: () => ["strong", 0],
-    },
-    em: {
-      inclusive: false,
-      parseDOM: [{ tag: "em" }, { tag: "i" }],
-      toDOM: () => ["em", 0],
-    },
-    code: {
-      inclusive: false,
-      code: true,
-      parseDOM: [{ tag: "code" }],
-      toDOM: () => ["code", 0],
-    },
-    strike: {
-      inclusive: false,
-      parseDOM: [{ tag: "s" }, { tag: "del" }],
-      toDOM: () => ["s", 0],
-    },
-  },
 });
 
 function emptyDoc() {
@@ -122,100 +98,12 @@ function paragraph(nodes) {
   return schema.node("paragraph", null, nodes);
 }
 
-const INLINE_MARKDOWN = [
-  { pattern: /^`([^`\n]+)`/, mark: "code" },
-  { pattern: /^\*\*([^*\n]+)\*\*/, mark: "strong" },
-  { pattern: /^__([^_\n]+)__/, mark: "strong" },
-  { pattern: /^~~([^~\n]+)~~/, mark: "strike" },
-  { pattern: /^\*([^*\n]+)\*/, mark: "em" },
-  { pattern: /^_([^_\n]+)_/, mark: "em" },
-];
-
-function parseInlineMarkdown(text, baseMarks = [], depth = 0) {
-  if (!text) return [];
-  const nodes = [];
-  let plain = "";
-  let index = 0;
-
-  const flush = () => {
-    if (!plain) return;
-    nodes.push(schema.text(plain, baseMarks));
-    plain = "";
-  };
-
-  while (index < text.length) {
-    let matched = null;
-    if (depth < 2) {
-      for (const rule of INLINE_MARKDOWN) {
-        const match = rule.pattern.exec(text.slice(index));
-        if (!match) continue;
-        matched = { rule, match };
-        break;
-      }
-    }
-    if (!matched) {
-      plain += text[index];
-      index += 1;
-      continue;
-    }
-    flush();
-    const { rule, match } = matched;
-    const marks = [...baseMarks, schema.marks[rule.mark].create()];
-    if (rule.mark === "code") {
-      nodes.push(schema.text(match[1], marks));
-    } else {
-      nodes.push(...parseInlineMarkdown(match[1], marks, depth + 1));
-    }
-    index += match[0].length;
-  }
-  flush();
-  return nodes;
-}
-
-function markdownText(node) {
-  let text = node.text;
-  const marks = new Set(node.marks.map((mark) => mark.type.name));
-  if (marks.has("code")) return `\`${text}\``;
-  if (marks.has("strike")) text = `~~${text}~~`;
-  if (marks.has("em")) text = `*${text}*`;
-  if (marks.has("strong")) text = `**${text}**`;
-  return text;
-}
-
-function plainDoc(doc) {
-  const blocks = [];
-  doc.forEach((block) => {
-    const inline = [];
-    block.forEach((node) => {
-      if (node.type.name === "mention") inline.push(node);
-      else if (node.isText) inline.push(schema.text(node.text));
-    });
-    blocks.push(paragraph(inline));
-  });
-  return schema.node("doc", null, blocks);
-}
-
-function markdownDoc(doc) {
-  const blocks = [];
-  doc.forEach((block) => {
-    const inline = [];
-    block.forEach((node) => {
-      if (node.type.name === "mention") inline.push(node);
-      else if (node.isText) inline.push(...parseInlineMarkdown(node.text));
-    });
-    blocks.push(paragraph(inline));
-  });
-  return schema.node("doc", null, blocks);
-}
-
 function docFromText(text) {
   const lines = String(text ?? "").replace(/\u200B/g, "").replace(/\r\n?/g, "\n").split("\n");
   return schema.node(
     "doc",
     null,
-    lines.map((line) =>
-      paragraph(line ? (markdownEnabled ? parseInlineMarkdown(line) : [schema.text(line)]) : []),
-    ),
+    lines.map((line) => paragraph(line ? [schema.text(line)] : [])),
   );
 }
 
@@ -230,10 +118,7 @@ function docFromParts(parts) {
         blocks.push(paragraph(inline));
         inline = [];
       }
-      if (line) {
-        if (markdownEnabled) inline.push(...parseInlineMarkdown(line));
-        else inline.push(schema.text(line));
-      }
+      if (line) inline.push(schema.text(line));
     });
   };
 
@@ -261,7 +146,7 @@ function serialiseDoc(doc) {
     if (index > 0) text += "\n";
     block.forEach((node) => {
       if (node.isText) {
-        text += markdownText(node).replace(/\u00a0/g, " ");
+        text += node.text.replace(/\u00a0/g, " ");
       } else if (node.type.name === "mention") {
         text += `@{${node.attrs.key}}`;
         keys.push(node.attrs.key);
@@ -331,6 +216,7 @@ function dispatchTransaction(transaction) {
   view.updateState(next);
   syncEmpty();
   if (!markdownDot?.isConnected) installMarkdownDot();
+  if (!resizeHandle?.isConnected) installComposerHandles();
   if (transaction.docChanged && !transaction.getMeta("silent")) emit();
   syncMention(transaction.docChanged && !transaction.getMeta("programmatic"));
 }
@@ -349,28 +235,6 @@ function replaceDoc(doc, silent = false) {
   tr.setMeta("programmatic", true);
   if (silent) tr.setMeta("silent", true);
   view.dispatch(tr.scrollIntoView());
-}
-
-function replaceEditorState(doc) {
-  if (!view) return;
-  const previous = view.state.selection.from;
-  let selection;
-  try {
-    selection = TextSelection.near(doc.resolve(Math.min(previous, doc.content.size - 1)));
-  } catch {
-    selection = Selection.atEnd(doc);
-  }
-  const state = EditorState.create({
-    schema,
-    doc,
-    selection,
-    plugins: [history(), keymapPlugin, markdownRulesPlugin],
-  });
-  view.updateState(state);
-  syncEmpty();
-  emit();
-  syncMention(false);
-  view.focus();
 }
 
 function insertPlainText(text) {
@@ -459,40 +323,170 @@ function moveAcrossMention(direction) {
   };
 }
 
-function markdownRule(pattern, markName, group, guard) {
-  return new InputRule(pattern, (state, match, start, end) => {
-    if (!markdownEnabled) return null;
-    if (guard && !guard(state, start, end, match)) return null;
-    const content = match[group];
-    if (!content) return null;
-    let tr = state.tr.delete(start, end);
-    tr = tr.insertText(content, start);
-    return tr.addMark(start, start + content.length, schema.marks[markName].create());
+function syntaxDecoration(from, to, active) {
+  if (to <= from) return null;
+  return Decoration.inline(from, to, {
+    class: active ? "md-syntax" : "md-syntax md-syntax-hidden",
   });
 }
 
-function notInsideDoubleMarker(marker) {
-  return (state, start) => {
-    if (start <= 1) return true;
-    return state.doc.textBetween(start - 1, start, "", "") !== marker;
-  };
+function addInlineMarkdown(text, base, selection, decorations) {
+  const claimed = [];
+  const overlaps = (from, to) => claimed.some(([start, end]) => from < end && to > start);
+  const patterns = [
+    { pattern: /`([^`\n]+)`/g, className: "md-code", before: 1, after: 1 },
+    { pattern: /\[([^\]\n]+)\]\(([^)\n]+)\)/g, className: "md-link", link: true },
+    { pattern: /\*\*([^*\n]+)\*\*/g, className: "md-strong", before: 2, after: 2 },
+    { pattern: /__([^_\n]+)__/g, className: "md-strong", before: 2, after: 2 },
+    { pattern: /~~([^~\n]+)~~/g, className: "md-strike", before: 2, after: 2 },
+    { pattern: /\*([^*\n]+)\*/g, className: "md-em", before: 1, after: 1 },
+    { pattern: /_([^_\n]+)_/g, className: "md-em", before: 1, after: 1 },
+  ];
+
+  for (const rule of patterns) {
+    rule.pattern.lastIndex = 0;
+    let match;
+    while ((match = rule.pattern.exec(text))) {
+      const start = match.index;
+      const end = start + match[0].length;
+      if (overlaps(start, end)) {
+        rule.pattern.lastIndex = start + 1;
+        continue;
+      }
+      const contentStart = rule.link ? start + 1 : start + rule.before;
+      const contentEnd = rule.link ? start + 1 + match[1].length : end - rule.after;
+      if (contentEnd <= contentStart) continue;
+      const active = selection.from <= base + end && selection.to >= base + start;
+      decorations.push(
+        Decoration.inline(base + contentStart, base + contentEnd, { class: rule.className }),
+      );
+      const open = syntaxDecoration(base + start, base + contentStart, active);
+      const close = syntaxDecoration(base + contentEnd, base + end, active);
+      if (open) decorations.push(open);
+      if (close) decorations.push(close);
+      claimed.push([start, end]);
+    }
+  }
 }
 
-const markdownRulesPlugin = inputRules({
-  rules: [
-    markdownRule(/(`)([^`\n]+)`$/, "code", 2),
-    markdownRule(/(\*\*)([^*\n]+)\*\*$/, "strong", 2),
-    markdownRule(/(__)([^_\n]+)__$/, "strong", 2),
-    markdownRule(/(~~)([^~\n]+)~~$/, "strike", 2),
-    markdownRule(/(\*)([^*\n]+)\*$/, "em", 2, notInsideDoubleMarker("*")),
-    markdownRule(/(_)([^_\n]+)_$/, "em", 2, notInsideDoubleMarker("_")),
-  ],
+function buildMarkdownDecorations(state) {
+  const decorations = [];
+  const selection = state.selection;
+  let inFence = false;
+
+  state.doc.forEach((block, pos) => {
+    const text = block.textContent;
+    const from = pos;
+    const to = pos + block.nodeSize;
+    const active = selection.to > from && selection.from < to;
+    const classes = [];
+    const attrs = {};
+    let prefixEnd = 0;
+    let code = false;
+    const fence = /^```/.test(text);
+
+    if (inFence || fence) {
+      code = true;
+      classes.push("md-code-block");
+      if (fence) {
+        classes.push("md-code-fence");
+        if (inFence) inFence = false;
+        else inFence = true;
+        if (text.length > 0) {
+          decorations.push(
+            Decoration.inline(from + 1, from + 1 + text.length, { class: "md-syntax" }),
+          );
+        }
+      }
+    } else {
+      const heading = /^(#{1,6})\s+/.exec(text);
+      if (heading) {
+        classes.push("md-heading", `md-h${heading[1].length}`);
+        prefixEnd = heading[0].length;
+      } else {
+        const quote = /^>\s?/.exec(text);
+        if (quote) {
+          classes.push("md-quote");
+          prefixEnd = quote[0].length;
+        } else {
+          const list = /^(\s*)([-*+]|\d+\.)\s+/.exec(text);
+          if (list) {
+            classes.push("md-list", /^\d/.test(list[2]) ? "md-list-ol" : "md-list-ul");
+            classes.push(active ? "md-list-active" : "md-list-idle");
+            attrs["data-md-marker"] = list[2];
+            prefixEnd = list[0].length;
+          }
+        }
+      }
+
+      if (prefixEnd) {
+        const marker = syntaxDecoration(from + 1, from + 1 + prefixEnd, active);
+        if (marker) decorations.push(marker);
+      }
+    }
+
+    if (classes.length > 0 || Object.keys(attrs).length > 0) {
+      decorations.push(
+        Decoration.node(from, to, {
+          class: classes.join(" "),
+          ...attrs,
+        }),
+      );
+    }
+
+    if (!code) {
+      let offset = 0;
+      block.forEach((child) => {
+        if (child.isText) addInlineMarkdown(child.text, from + 1 + offset, selection, decorations);
+        offset += child.nodeSize;
+      });
+    }
+  });
+
+  return DecorationSet.create(state.doc, decorations);
+}
+
+const markdownPreviewPlugin = new Plugin({
+  props: {
+    decorations(state) {
+      return markdownEnabled ? buildMarkdownDecorations(state) : null;
+    },
+  },
 });
 
-function richToggleMark(name) {
+function wrapMarkdown(prefix, suffix = prefix) {
   return (state, dispatch) => {
     if (!markdownEnabled) return true;
-    return toggleMark(schema.marks[name])(state, dispatch);
+    const { from, to, empty } = state.selection;
+    if (empty) {
+      if (dispatch) {
+        const tr = state.tr.insertText(prefix + suffix, from);
+        tr.setSelection(TextSelection.create(tr.doc, from + prefix.length));
+        dispatch(tr);
+      }
+      return true;
+    }
+    const before =
+      from >= prefix.length ? state.doc.textBetween(from - prefix.length, from, "", "") : "";
+    const after =
+      to + suffix.length <= state.doc.content.size
+        ? state.doc.textBetween(to, to + suffix.length, "", "")
+        : "";
+    if (before === prefix && after === suffix) {
+      if (dispatch) {
+        let tr = state.tr.delete(to, to + suffix.length);
+        tr = tr.delete(from - prefix.length, from);
+        dispatch(tr);
+      }
+      return true;
+    }
+    if (dispatch) {
+      let tr = state.tr.insertText(suffix, to);
+      tr = tr.insertText(prefix, from);
+      tr.setSelection(TextSelection.create(tr.doc, from + prefix.length, to + prefix.length));
+      dispatch(tr);
+    }
+    return true;
   };
 }
 
@@ -501,9 +495,9 @@ const keymapPlugin = keymap({
   ArrowRight: moveAcrossMention(1),
   Backspace: chainCommands(deleteAdjacentMention(-1), deleteSelection, joinBackward),
   Delete: chainCommands(deleteAdjacentMention(1), deleteSelection, joinForward),
-  "Mod-b": richToggleMark("strong"),
-  "Mod-i": richToggleMark("em"),
-  "Mod-e": richToggleMark("code"),
+  "Mod-b": wrapMarkdown("**"),
+  "Mod-i": wrapMarkdown("*"),
+  "Mod-e": wrapMarkdown("`"),
   "Mod-z": undo,
   "Shift-Mod-z": redo,
   "Mod-y": redo,
@@ -606,7 +600,7 @@ function updateMarkdownDot() {
   if (!markdownDot) return;
   markdownDot.classList.toggle("active", markdownEnabled);
   markdownDot.setAttribute("aria-pressed", String(markdownEnabled));
-  markdownDot.title = markdownEnabled ? "Markdown 富文本：开" : "Markdown 富文本：关";
+  markdownDot.title = markdownEnabled ? "Markdown 实时预览：开" : "Markdown 实时预览：关";
 }
 
 function setMarkdownEnabled(next) {
@@ -617,12 +611,99 @@ function setMarkdownEnabled(next) {
   markdownEnabled = Boolean(next);
   writeMarkdownPreference(markdownEnabled);
   if (view) {
-    const target = markdownEnabled ? markdownDoc(view.state.doc) : plainDoc(view.state.doc);
-    // A mode change clears the editor history so undo cannot restore marks that no longer match
-    // the active mode.
-    replaceEditorState(target);
+    // Force a decoration/plugin pass; the document (and its history) is untouched.
+    view.dispatch(
+      view.state.tr
+        .setSelection(view.state.selection)
+        .setMeta("markdownPreview", markdownEnabled),
+    );
+    view.focus();
   }
   updateMarkdownDot();
+}
+
+function installComposerHandles() {
+  if (!root) return;
+  const card = root.closest(".composer-card");
+  if (!card) return;
+  let handle = card.querySelector(".composer-resize-handle");
+  if (!handle) {
+    handle = document.createElement("button");
+    handle.type = "button";
+    handle.className = "composer-resize-handle";
+    handle.tabIndex = 0;
+    handle.setAttribute("role", "separator");
+    handle.setAttribute("aria-orientation", "horizontal");
+    handle.setAttribute("aria-label", "调整输入框高度");
+    handle.title = "上下拖动调整高度；双击恢复自动高度";
+    card.append(handle);
+  }
+  resizeHandle = handle;
+  if (handle.dataset.bound === "1") return;
+  handle.dataset.bound = "1";
+
+  const ask = () => card.querySelector(".ask");
+  const reset = () => {
+    const target = ask();
+    if (target) target.style.removeProperty("--composer-min-height");
+    card.classList.remove("resizing");
+  };
+  const setHeight = (value) => {
+    const target = ask();
+    if (!target) return;
+    const max = Math.max(56, window.innerHeight * 0.6);
+    const next = Math.min(max, Math.max(56, Math.round(value)));
+    target.style.setProperty("--composer-min-height", `${next}px`);
+    return next;
+  };
+
+  handle.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0) return;
+    const target = ask();
+    if (!target) return;
+    event.preventDefault();
+    const startY = event.clientY;
+    const startHeight = target.getBoundingClientRect().height;
+    let latest = startHeight;
+    card.classList.add("resizing");
+    handle.setPointerCapture?.(event.pointerId);
+
+    const move = (moveEvent) => {
+      latest = setHeight(startHeight + (startY - moveEvent.clientY));
+    };
+    const finish = () => {
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", finish);
+      handle.removeEventListener("pointercancel", finish);
+      card.classList.remove("resizing");
+      if (latest === undefined || latest <= 57) reset();
+    };
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", finish);
+    handle.addEventListener("pointercancel", finish);
+  });
+
+  handle.addEventListener("dblclick", (event) => {
+    event.preventDefault();
+    reset();
+  });
+
+  handle.addEventListener("keydown", (event) => {
+    const target = ask();
+    if (!target) return;
+    if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+      event.preventDefault();
+      const current = target.getBoundingClientRect().height;
+      if (event.key === "ArrowDown" && current <= 57) {
+        reset();
+        return;
+      }
+      setHeight(current + (event.key === "ArrowUp" ? 16 : -16));
+    } else if (event.key === "Home" || event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      reset();
+    }
+  });
 }
 
 function installMarkdownDot() {
@@ -634,7 +715,7 @@ function installMarkdownDot() {
     dot = document.createElement("button");
     dot.type = "button";
     dot.className = "markdown-dot";
-    dot.setAttribute("aria-label", "Markdown 富文本");
+    dot.setAttribute("aria-label", "Markdown 实时预览");
     zone.append(dot);
   }
   markdownDot = dot;
@@ -701,7 +782,7 @@ window.Composer = {
     const state = EditorState.create({
       schema,
       doc: emptyDoc(),
-      plugins: [history(), keymapPlugin, markdownRulesPlugin],
+      plugins: [history(), keymapPlugin, markdownPreviewPlugin],
     });
     view = installView(root, state);
     view.dom.addEventListener("mousedown", handleMouseDown, true);
@@ -737,6 +818,7 @@ window.Composer = {
       }
     });
     installMarkdownDot();
+    installComposerHandles();
     if (pendingAction) {
       const action = pendingAction;
       pendingAction = null;

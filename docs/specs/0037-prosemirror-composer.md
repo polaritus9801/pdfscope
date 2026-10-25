@@ -14,10 +14,9 @@ model instead of patching the browser selection.
 ```text
 doc       paragraph+
 paragraph inline*
-text      (plain)
+text      (plain Markdown source)
 mention   inline, atom, selectable, group inline
           attrs: key, label, orphan
-marks     strong, em, code, strike
 ```
 
 A mention is an **atom**: ProseMirror has no valid document position inside it. Clicking its left or
@@ -35,20 +34,39 @@ are handled by editor commands, so a pill is removed or skipped as a whole.
 - Serialisation remains `@{key}` plus the ordered `keys` array. The Rust-side prompt and AI payload
   do not change.
 
-## Markdown rich mode
+## Markdown live source mode
 
-A 7px dot sits in the top-right corner of the composer card, tangent to its top and right edges.
-Clicking it toggles Markdown rich mode; the choice is stored in
-`localStorage["pdfscope.composer.markdown"]` and restored on the next load (first run defaults to
-plain). The dot is filled with the accent colour while rich mode is on.
+A small dot sits in the top-right corner of the composer card, tangent to its top and right edges.
+Its default state is an accent ring; when live Markdown is on it becomes filled. Clicking toggles
+live Markdown and stores the choice in `localStorage["pdfscope.composer.markdown"]` (first run is
+plain). The mode only changes decorations: the document is always the raw Markdown source, so
+turning it off/on never rewrites or loses anything.
 
-Rich mode enables inline Markdown input rules for `**strong**`, `*em*`, `_em_`, `__strong__`,
-`~~strike~~` and `` `code` `` plus Mod-B/I/E shortcuts. The document keeps ProseMirror marks; the
-serialized question uses Markdown syntax so the model receives the formatting. Turning rich mode off
-flattens marks to plain text, and turning it on parses simple inline Markdown already present in the
-field or restored from a draft. `setPlainText`/`setRich` parse Markdown when rich mode is on.
+In live mode ProseMirror decorations render Markdown in place while the source characters stay in
+the document. Delimiters are hidden only while the cursor/selection is outside that span; moving the
+caret into the text (or onto a heading/quote/list line) reveals the delimiters again, so `**bold**`
+and every other marker remain editable, Obsidian-Live-Preview style. The serialized question, draft
+and prompt history contain the raw Markdown.
 
-The placeholder is inset 12px, matching the editor's content padding.
+Supported now:
+
+- inline: `**strong**`, `__strong__`, `*em*`, `_em_`, `~~strike~~`, `` `code` ``,
+  `[label](url)`
+- blocks: `#`–`######`, `>` block quotes, `-`/`*`/`+` and `1.` lists, fenced ``` code blocks
+
+Not yet supported: tables, images, task checkboxes, footnotes, math and nested emphasis. Code fences
+stay visible (rather than hidden) so they remain easy to edit.
+
+Mod-B/Mod-I/Mod-E wrap/unwrap the source selection in `**`, `*` or backticks by inserting literal
+markers. The placeholder is inset 12px, matching the editor content padding.
+
+## Resizing
+
+The top edge has an invisible 8px drag handle with a hover line. Dragging it changes the editor
+`--composer-min-height`; the manual height is a **floor**, not a fixed height. Content still
+auto-grows above it and shrinks back only to the floor. Dragging to the current minimum or
+double-clicking the handle returns to auto. The handle is keyboard accessible (↑/↓, Home/Enter).
+The baseline minimum stays the current 56px content area.
 
 ## Behaviour
 
@@ -61,8 +79,8 @@ The placeholder is inset 12px, matching the editor's content padding.
 - Programmatic restores (`setPlainText`, `setRich`, clear) are excluded from undo history and do not
   open the mention picker.
 - Paste is plain text; file paste attaches files; dropping an attachment chip inserts a mention node.
-- Markdown mode is a preference, not a per-draft flag. Draft text is serialized as Markdown, so a
-  restored draft keeps its formatting while rich mode is on.
+- Markdown mode is a render preference, not a document conversion; raw Markdown is always the
+  stored/restored form.
 
 ## Build
 
@@ -83,3 +101,5 @@ Run the command after changing `composer-src/index.js`.
 - Clicking a pill cannot produce a document selection inside it.
 - Backspace/Delete removes a pill whole; undo restores it; redo removes it again.
 - @ picker, hover previews, orphan warning, file paste/drop and drafts still work.
+- Typing `**bold**`, moving away and back never removes the markers; they can be edited directly.
+- The top-edge drag sets a floor, auto-growth still works, and double-click restores auto height.

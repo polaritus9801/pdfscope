@@ -2689,6 +2689,7 @@ body.selection-quiet .textLayer :is(span, br)::selection {
 }
 
 .ask.editor .ProseMirror {
+  flex: 1 1 auto;
   min-height: 56px;  /* size */
   white-space: pre-wrap;
   outline: none;
@@ -2708,15 +2709,19 @@ body.selection-quiet .textLayer :is(span, br)::selection {
   pointer-events: none;
 }
 
-.ask.editor .ProseMirror strong {
+.ask.editor .ProseMirror .md-strong {
   font-weight: 700;
 }
 
-.ask.editor .ProseMirror em {
+.ask.editor .ProseMirror .md-em {
   font-style: italic;
 }
 
-.ask.editor .ProseMirror code {
+.ask.editor .ProseMirror .md-strike {
+  text-decoration: line-through;
+}
+
+.ask.editor .ProseMirror .md-code {
   padding: 1px 3px;  /* size */
   font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace);
   font-size: 0.92em;
@@ -2724,8 +2729,74 @@ body.selection-quiet .textLayer :is(span, br)::selection {
   border-radius: 3px;  /* size */
 }
 
-.ask.editor .ProseMirror s {
-  text-decoration: line-through;
+.ask.editor .ProseMirror .md-link {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;  /* size */
+}
+
+.ask.editor .ProseMirror .md-syntax {
+  color: var(--ink-faint);
+}
+
+.ask.editor .ProseMirror .md-syntax-hidden {
+  display: none;
+}
+
+.ask.editor .ProseMirror p.md-heading {
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.ask.editor .ProseMirror p.md-h1 {
+  font-size: 1.5em;
+}
+
+.ask.editor .ProseMirror p.md-h2 {
+  font-size: 1.32em;
+}
+
+.ask.editor .ProseMirror p.md-h3 {
+  font-size: 1.18em;
+}
+
+.ask.editor .ProseMirror p.md-h4,
+.ask.editor .ProseMirror p.md-h5,
+.ask.editor .ProseMirror p.md-h6 {
+  font-size: 1.06em;
+}
+
+.ask.editor .ProseMirror p.md-quote {
+  padding-left: var(--space-3);
+  color: var(--ink-muted);
+  border-left: 2px solid var(--border-strong);  /* size */
+}
+
+.ask.editor .ProseMirror p.md-list {
+  position: relative;
+  padding-left: 18px;  /* size */
+}
+
+.ask.editor .ProseMirror p.md-list::before {
+  position: absolute;
+  left: 2px;  /* size */
+  color: var(--ink-faint);
+  content: attr(data-md-marker);
+}
+
+.ask.editor .ProseMirror p.md-list-active::before {
+  display: none;
+}
+
+.ask.editor .ProseMirror p.md-code-block {
+  padding: 1px var(--space-2);
+  font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.92em;
+  background: var(--surface-sunken);
+}
+
+.ask.editor .ProseMirror p.md-code-fence {
+  color: var(--ink-faint);
 }
 
 .markdown-dot {
@@ -2733,13 +2804,14 @@ body.selection-quiet .textLayer :is(span, br)::selection {
   top: 0;
   right: 0;
   z-index: 8;
-  width: 7px;  /* size */
-  height: 7px;  /* size */
+  width: 8px;  /* size */
+  height: 8px;  /* size */
   padding: 0;
-  background: var(--ink-faint);
-  border: 0;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
   border-radius: 50%;
-  opacity: 0.45;
+  box-shadow: 0 0 0 1px var(--surface);
+  opacity: 0.9;
   cursor: pointer;
 }
 
@@ -2751,13 +2823,52 @@ body.selection-quiet .textLayer :is(span, br)::selection {
 
 .markdown-dot.active {
   background: var(--accent);
+  border-color: var(--accent);
   opacity: 1;
-  box-shadow: 0 0 0 1px var(--surface);
 }
 
 .markdown-dot:focus-visible {
   outline: 2px solid var(--accent);  /* size */
   outline-offset: 2px;  /* size */
+}
+
+.composer-resize-handle {
+  position: absolute;
+  top: 0;
+  right: 16px;  /* size */
+  left: 16px;  /* size */
+  z-index: 7;
+  height: 8px;  /* size */
+  padding: 0;
+  background: transparent;
+  border: 0;
+  cursor: ns-resize;
+  touch-action: none;
+}
+
+.composer-resize-handle::after {
+  position: absolute;
+  top: 2px;  /* size */
+  left: 50%;
+  width: 28px;  /* size */
+  height: 2px;  /* size */
+  background: var(--border-strong);
+  border-radius: 2px;  /* size */
+  content: "";
+  opacity: 0;
+  transform: translateX(-50%);
+  transition: opacity 120ms ease, background 120ms ease;
+}
+
+.composer-card:hover .composer-resize-handle::after,
+.composer-resize-handle:focus-visible::after,
+.composer-card.resizing .composer-resize-handle::after {
+  background: var(--accent);
+  opacity: 0.85;
+}
+
+.composer-card.resizing {
+  cursor: ns-resize;
 }
 
 .mention {
@@ -3483,6 +3594,7 @@ body.selection-quiet .textLayer :is(span, br)::selection {
 }
 
 .composer-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -3513,9 +3625,11 @@ body.selection-quiet .textLayer :is(span, br)::selection {
 }
 
 .composer-card .ask {
+  display: flex;
+  flex-direction: column;
   width: 100%;
-  min-height: 56px;  /* size */
-  max-height: 180px;  /* size */
+  min-height: var(--composer-min-height, 56px);  /* size */
+  max-height: 60vh;
   height: auto;
   padding: var(--space-2) var(--space-3) 0;
   background: transparent;

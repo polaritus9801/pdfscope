@@ -10,8 +10,11 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
-- A tiny top-right dot toggles Markdown rich mode (bold/italic/code/strike input rules and
-  Mod-B/I/E); the preference is persisted locally and drafts keep Markdown formatting.
+- A tiny top-right dot toggles Obsidian-style live Markdown preview. Raw Markdown remains the
+  document (delimiters reveal while editing), the preference is persisted locally, and the composer
+  now supports headings, quotes, lists, fenced code, links and inline emphasis.
+- The composer's top edge can be dragged to set a manual height floor while content still
+  auto-grows; double-click restores automatic height.
 
 ### Changed
 
