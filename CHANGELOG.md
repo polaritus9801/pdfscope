@@ -10,7 +10,7 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Fixed
 
-- Locked shell scrolling with `overflow: clip` on `html`/`body` and clipped `.app`/`.panel`, plus
+- Locked shell scrolling with `overflow: hidden` fallbacks plus `overflow: clip` on `html`/`body` and `.app`/`.panel`, plus
   composer-focus and mode-toggle anchoring. Even if another element overflows, focusing or toggling
   the composer can no longer scroll a shell container and put the history/new-session buttons out of
   reach. Removed the heavier viewport-fixed body and global scroll listener; they were unnecessary
