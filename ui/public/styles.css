@@ -3647,9 +3647,10 @@ body.composer-resizing * {
   flex-direction: column;
   width: 100%;
   min-height: max(56px, var(--composer-min-height, 56px));  /* size */
-  /* Automatic growth is capped at 40% of the AI panel. A manual drag is a real floor: the user
-     can deliberately make the input taller even when the content is short. */
-  max-height: max(var(--composer-auto-max, 40vh), var(--composer-min-height, 0px));
+  /* Automatic growth is capped at 30% of the AI panel. A manual drag is a real floor: the user
+     can deliberately make the input taller even when the content is short. The 56-pixel fallback
+     keeps max-height from ever fighting the minimum before JS measures the panel. */
+  max-height: max(var(--composer-auto-max, 30vh), var(--composer-min-height, 56px));
   height: auto;
   overflow-x: hidden;
   overflow-y: auto;

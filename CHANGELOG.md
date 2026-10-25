@@ -17,7 +17,7 @@ minor releases may contain breaking changes; they are always called out.
 
 - Removed the mode-height floor that kept the composer at the taller preview height: it left a blank
   white strip under the shorter plain-text layout, most obvious with stacked display formulas.
-- Capped automatic composer growth at 40% of the AI panel height. Long content scrolls inside the
+- Capped automatic composer growth at 30% of the AI panel height. Long content scrolls inside the
   input instead of hiding the answer; a manual top-edge drag is a floor that can raise it above the
   cap. Restored drafts scroll the caret into view.
 - PDF.js's hidden measurement canvas no longer contributes a 19px line box to `body`. Focusing the
@@ -37,7 +37,7 @@ minor releases may contain breaking changes; they are always called out.
 - Structured arrow navigation crosses paragraph boundaries at the block edge, so hidden syntax can
   never make Left/Right jump mid-word.
 - The composer's top edge can be dragged to set a manual height floor. Automatic growth is capped at
-  40% of the AI panel height; taller content scrolls inside the input. A manual drag can deliberately
+  30% of the AI panel height; taller content scrolls inside the input. A manual drag can deliberately
   exceed that cap. Double-click restores the automatic height.
 - Live KaTeX formulas: inline `$...$` / `\(...\)` and single-paragraph `$$...$$` / `\[...\]`.
   Raw LaTeX stays editable; inactive lines render the formula and clicking it restores the source.

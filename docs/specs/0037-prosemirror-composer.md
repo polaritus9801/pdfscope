@@ -96,14 +96,14 @@ clipped, and the composer anchors body, document, app, workspace and panel scrol
 scroll events. Any residual overflow therefore cannot push the panel header or expose the bottom
 bar.
 
-There is one enforced automatic height cap: `--composer-auto-max`, computed as 40% of the AI panel's
-height and refreshed by a `ResizeObserver` (CSS fallback `40vh`). Content grows naturally up to that
+There is one enforced automatic height cap: `--composer-auto-max`, computed as 30% of the AI panel's
+height and refreshed by a `ResizeObserver` (CSS fallback `30vh`, clamped to at least the 56px content floor). Content grows naturally up to that
 cap; above it the input scrolls internally instead of pushing the answer away. A caret restored at
 the end of a long draft is scrolled into view.
 
 The top edge has an invisible 8px drag handle with a hover line. Dragging it sets
 `--composer-min-height`, a genuine floor: the user can make the input taller even when the content is
-short. Automatic growth is still capped at the 40% panel allowance, but a manual floor raises the CSS
+short. Automatic growth is still capped at the 30% panel allowance, but a manual floor raises the CSS
 maximum to `max(--composer-auto-max, --composer-min-height)` so the chosen height is respected.
 Double-clicking the handle removes the manual floor and returns to automatic height. The handle is
 keyboard accessible (↑/↓, Home/Enter). The baseline minimum stays the current 56px content area.
