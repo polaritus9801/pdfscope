@@ -20,13 +20,15 @@ Raw output: [overlay-baseline.json](overlay-baseline.json).
   frames. This is a 500-page addition preview.
 - `commit`: `__pdfscopePageRange(1, 500, 0)` followed by two animation frames.
 - `heapUsedMb`: `Runtime.getHeapUsage` after the commit.
+- The harness also asserts the active toolbar has `pointer-events: none` and the element under the
+  pointer is `.page-overlay-hit`, so the hit-strip/toolbar flicker cannot silently return.
 
 ## Results
 
 | Pages | Load (ms) | DOM nodes | Page shells | Hover (ms) | 500-page preview (ms) | 500-page commit (ms) | Heap (MB) |
 |---:|---:|---:|---:|---:|---:|---:|---:|
-| 1000 | 716 | 2,270 | 1,000 | 9.0 | 33.3 | 32.1 | 6.4 |
-| 3000 | 1,662 | 6,285 | 3,000 | 5.5 | 30.3 | 38.4 | 17.5 |
+| 1000 | 726 | 2,270 | 1,000 | 18.0 | 32.4 | 32.5 | 6.3 |
+| 3000 | 1,441 | 6,285 | 3,000 | 11.7 | 32.5 | 37.4 | 16.9 |
 
 All action/bar/overlay counts are O(1) at rest:
 
@@ -40,8 +42,7 @@ old page bars      0
 page shells        1000 / 3000
 ```
 
-Hover stays in the single-digit-to-high-teens millisecond range and does not grow between 1000 and
-3000 pages. The preview and
+Hover stays roughly in the low-teens milliseconds and does not grow between 1000 and 3000 pages. The preview and
 commit costs come from rendering the 500 dashed outlines / 500 solid outlines, not from scanning the
 document. Heap varies with Chrome's GC timing; the JSON is the source of truth.
 

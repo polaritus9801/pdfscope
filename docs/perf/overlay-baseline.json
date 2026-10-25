@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-25T20:42:44.609Z",
-  "app": "http://127.0.0.1:49486/",
+  "generatedAt": "2026-10-25T20:57:20.106Z",
+  "app": "http://127.0.0.1:49682/",
   "browser": "headless Chrome (CDP)",
   "viewport": "1440x950",
   "counts": [
@@ -10,7 +10,7 @@
   "results": [
     {
       "pages": 1000,
-      "loadMs": 716,
+      "loadMs": 726,
       "dom": {
         "pageShells": 1000,
         "domNodes": 2270,
@@ -23,27 +23,29 @@
         "errors": []
       },
       "hover": {
-        "ms": 9,
+        "ms": 18,
         "activeActions": 1,
         "previewOutlines": 1,
-        "visibleBars": 2
+        "visibleBars": 2,
+        "toolbarPointerEvents": "none",
+        "elementAtPointer": "page-overlay-hit range-right"
       },
       "preview": {
-        "ms": 33.299999952316284,
+        "ms": 32.40000009536743,
         "targetPage": 500,
         "previewOutlines": 500,
         "visibleBars": 2
       },
       "commit": {
-        "ms": 32.09999990463257,
+        "ms": 32.5,
         "selectionOutlines": 500,
         "visibleBars": 2
       },
-      "heapUsedMb": 6.4
+      "heapUsedMb": 6.3
     },
     {
       "pages": 3000,
-      "loadMs": 1662,
+      "loadMs": 1441,
       "dom": {
         "pageShells": 3000,
         "domNodes": 6285,
@@ -56,23 +58,25 @@
         "errors": []
       },
       "hover": {
-        "ms": 5.5,
+        "ms": 11.700000047683716,
         "activeActions": 1,
         "previewOutlines": 1,
-        "visibleBars": 2
+        "visibleBars": 2,
+        "toolbarPointerEvents": "none",
+        "elementAtPointer": "page-overlay-hit range-right"
       },
       "preview": {
-        "ms": 30.299999952316284,
+        "ms": 32.5,
         "targetPage": 500,
         "previewOutlines": 500,
         "visibleBars": 2
       },
       "commit": {
-        "ms": 38.39999985694885,
+        "ms": 37.39999985694885,
         "selectionOutlines": 500,
         "visibleBars": 2
       },
-      "heapUsedMb": 17.5
+      "heapUsedMb": 16.9
     }
   ]
 }

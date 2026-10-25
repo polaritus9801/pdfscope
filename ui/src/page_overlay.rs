@@ -370,11 +370,6 @@ fn PageRangeToolbar(
     action_page: Memo<u32>,
     activate: Callback<(u32, u8)>,
 ) -> impl IntoView {
-    let set_hover = Callback::new(move |kind: u8| {
-        hover_page.set(Some(page));
-        hover_kind.set(Some(kind));
-        hover_side.set(Some(side_value));
-    });
     let click = Callback::new(move |kind: u8| {
         activate.run((action_page.get_untracked(), kind));
     });
@@ -392,19 +387,11 @@ fn PageRangeToolbar(
                 }
             }
             aria-label=format!("{}的页面引用操作", page_label(page))
-            on:mouseleave=move |_| {
-                if hover_side.get_untracked() == Some(side_value) {
-                    hover_page.set(None);
-                    hover_kind.set(None);
-                    hover_side.set(None);
-                }
-            }
         >
             <button
                 class="page-bar-btn page-bar-start"
                 title="从这里开始"
                 aria-label=format!("{}：从这里开始", page_label(page))
-                on:mouseenter=move |_| set_hover.run(0)
                 on:click=move |_| click.run(0)
             >
                 {action_icon(0)}
@@ -413,7 +400,6 @@ fn PageRangeToolbar(
                 class="page-bar-btn page-bar-single"
                 title="单独这一页"
                 aria-label=format!("{}：单独这一页", page_label(page))
-                on:mouseenter=move |_| set_hover.run(2)
                 on:click=move |_| click.run(2)
             >
                 {action_icon(2)}
@@ -422,7 +408,6 @@ fn PageRangeToolbar(
                 class="page-bar-btn page-bar-end"
                 title="到这里结束"
                 aria-label=format!("{}：到这里结束", page_label(page))
-                on:mouseenter=move |_| set_hover.run(1)
                 on:click=move |_| click.run(1)
             >
                 {action_icon(1)}

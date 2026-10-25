@@ -210,6 +210,11 @@ try {
         activeActions: document.querySelectorAll(".page-overlay-actions.active").length,
         previewOutlines: document.querySelectorAll(".page-overlay-preview").length,
         visibleBars: document.querySelectorAll(".page-range-bar.global.visible").length,
+        toolbarPointerEvents: (() => {
+          const toolbar = document.querySelector(".page-overlay-actions.active");
+          return toolbar ? getComputedStyle(toolbar).pointerEvents : "";
+        })(),
+        elementAtPointer: document.elementFromPoint(x, y)?.className ?? "",
       };
     })()`);
     await evaluate(`document.querySelector(".page-overlay-hit.range-right")
@@ -274,6 +279,12 @@ try {
     if (dom.errors.length) failures.push(`${count}: ${dom.errors.join("; ")}`);
     if (hover.activeActions < 1 || hover.previewOutlines < 1) {
       failures.push(`${count}: hover did not reveal the action/preview`);
+    }
+    if (hover.toolbarPointerEvents !== "none") {
+      failures.push(`${count}: active toolbar captures pointer (${hover.toolbarPointerEvents})`);
+    }
+    if (!hover.elementAtPointer.includes("page-overlay-hit")) {
+      failures.push(`${count}: hit strip is not the pointer target (${hover.elementAtPointer})`);
     }
     if (preview.previewOutlines !== preview.targetPage) {
       failures.push(`${count}: preview outlined ${preview.previewOutlines}/${preview.targetPage}`);

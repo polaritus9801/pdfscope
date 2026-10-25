@@ -73,11 +73,14 @@ minor releases may contain breaking changes; they are always called out.
   caches are now document-epoch scoped, cleared on load, and in-flight old-document renders are
   discarded; thumbnail rendering has the same guard.
 - Page-range bars, preview outlines and page actions now live in one global overlay instead of every
-  `PageView`. A 1000-page fixture drops from ~12,228 to 2,270 DOM nodes; hover is single-digit to
-  high-teens milliseconds at 1000 and 3000 pages in the release headless-Chrome baseline, with a
-  500-page preview around 30 ms. Page shells keep only content and the `.in-scope` gesture class.
+  `PageView`. A 1000-page fixture drops from ~12,228 to 2,270 DOM nodes; hover is low-teens
+  milliseconds at 1000 and 3000 pages in the release headless-Chrome baseline, with a 500-page
+  preview around 32 ms. Page shells keep only content and the `.in-scope` gesture class.
 - Added `just perf-baseline`: deterministic 1000/3000-page PDFs generated in memory, release UI,
   headless Chrome, and raw results in `docs/perf/overlay-baseline.json`.
+- Fixed the page-bar flicker while sliding from a page-1 start anchor onto another page's start:
+  action toolbars are now pointer-transparent and the hit strips own mouse input, so an appearing
+  toolbar cannot trigger `pointerleave` → hide → `pointerenter` oscillation.
 - Page-bar action icons now appear in place with no opacity transition or hover-shadow swap; the old
   0.16s fade plus one-vs-two-layer shadow read as a tiny upward jump on all three buttons.
 - The composer resize handle is now a square-ended border segment shown only while the handle itself
