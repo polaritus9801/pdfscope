@@ -8,6 +8,11 @@ minor releases may contain breaking changes; they are always called out.
 
 ## [Unreleased]
 
+### Added
+
+- A tiny top-right dot toggles Markdown rich mode (bold/italic/code/strike input rules and
+  Mod-B/I/E); the preference is persisted locally and drafts keep Markdown formatting.
+
 ### Changed
 
 - Replaced the hand-written contenteditable composer with a ProseMirror editor whose `@` pills are

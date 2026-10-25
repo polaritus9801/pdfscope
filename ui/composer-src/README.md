@@ -14,4 +14,4 @@ npm run build:composer
 ```
 
 Dependencies: ProseMirror (`prosemirror-model`, `-state`, `-view`, `-keymap`, `-history`,
-`-commands`) and esbuild, all MIT.
+`-commands`, `-inputrules`) and esbuild, all MIT.

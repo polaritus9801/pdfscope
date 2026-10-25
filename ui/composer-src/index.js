@@ -15,7 +15,9 @@ import {
   joinBackward,
   joinForward,
   splitBlock,
+  toggleMark,
 } from "prosemirror-commands";
+import { InputRule, inputRules } from "prosemirror-inputrules";
 
 let root = null;
 let view = null;
@@ -27,6 +29,26 @@ let partialTimer = null;
 let mentionIndex = -1;
 let selectionListenerInstalled = false;
 let pendingAction = null;
+const MARKDOWN_KEY = "pdfscope.composer.markdown";
+
+let markdownEnabled = readMarkdownPreference();
+let markdownDot = null;
+
+function readMarkdownPreference() {
+  try {
+    return window.localStorage.getItem(MARKDOWN_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeMarkdownPreference(value) {
+  try {
+    window.localStorage.setItem(MARKDOWN_KEY, value ? "1" : "0");
+  } catch {
+    // The preference is a convenience; the editor still works without it.
+  }
+}
 
 const schema = new Schema({
   nodes: {
@@ -67,7 +89,29 @@ const schema = new Schema({
       },
     },
   },
-  marks: {},
+  marks: {
+    strong: {
+      inclusive: false,
+      parseDOM: [{ tag: "strong" }, { tag: "b" }],
+      toDOM: () => ["strong", 0],
+    },
+    em: {
+      inclusive: false,
+      parseDOM: [{ tag: "em" }, { tag: "i" }],
+      toDOM: () => ["em", 0],
+    },
+    code: {
+      inclusive: false,
+      code: true,
+      parseDOM: [{ tag: "code" }],
+      toDOM: () => ["code", 0],
+    },
+    strike: {
+      inclusive: false,
+      parseDOM: [{ tag: "s" }, { tag: "del" }],
+      toDOM: () => ["s", 0],
+    },
+  },
 });
 
 function emptyDoc() {
@@ -78,12 +122,100 @@ function paragraph(nodes) {
   return schema.node("paragraph", null, nodes);
 }
 
+const INLINE_MARKDOWN = [
+  { pattern: /^`([^`\n]+)`/, mark: "code" },
+  { pattern: /^\*\*([^*\n]+)\*\*/, mark: "strong" },
+  { pattern: /^__([^_\n]+)__/, mark: "strong" },
+  { pattern: /^~~([^~\n]+)~~/, mark: "strike" },
+  { pattern: /^\*([^*\n]+)\*/, mark: "em" },
+  { pattern: /^_([^_\n]+)_/, mark: "em" },
+];
+
+function parseInlineMarkdown(text, baseMarks = [], depth = 0) {
+  if (!text) return [];
+  const nodes = [];
+  let plain = "";
+  let index = 0;
+
+  const flush = () => {
+    if (!plain) return;
+    nodes.push(schema.text(plain, baseMarks));
+    plain = "";
+  };
+
+  while (index < text.length) {
+    let matched = null;
+    if (depth < 2) {
+      for (const rule of INLINE_MARKDOWN) {
+        const match = rule.pattern.exec(text.slice(index));
+        if (!match) continue;
+        matched = { rule, match };
+        break;
+      }
+    }
+    if (!matched) {
+      plain += text[index];
+      index += 1;
+      continue;
+    }
+    flush();
+    const { rule, match } = matched;
+    const marks = [...baseMarks, schema.marks[rule.mark].create()];
+    if (rule.mark === "code") {
+      nodes.push(schema.text(match[1], marks));
+    } else {
+      nodes.push(...parseInlineMarkdown(match[1], marks, depth + 1));
+    }
+    index += match[0].length;
+  }
+  flush();
+  return nodes;
+}
+
+function markdownText(node) {
+  let text = node.text;
+  const marks = new Set(node.marks.map((mark) => mark.type.name));
+  if (marks.has("code")) return `\`${text}\``;
+  if (marks.has("strike")) text = `~~${text}~~`;
+  if (marks.has("em")) text = `*${text}*`;
+  if (marks.has("strong")) text = `**${text}**`;
+  return text;
+}
+
+function plainDoc(doc) {
+  const blocks = [];
+  doc.forEach((block) => {
+    const inline = [];
+    block.forEach((node) => {
+      if (node.type.name === "mention") inline.push(node);
+      else if (node.isText) inline.push(schema.text(node.text));
+    });
+    blocks.push(paragraph(inline));
+  });
+  return schema.node("doc", null, blocks);
+}
+
+function markdownDoc(doc) {
+  const blocks = [];
+  doc.forEach((block) => {
+    const inline = [];
+    block.forEach((node) => {
+      if (node.type.name === "mention") inline.push(node);
+      else if (node.isText) inline.push(...parseInlineMarkdown(node.text));
+    });
+    blocks.push(paragraph(inline));
+  });
+  return schema.node("doc", null, blocks);
+}
+
 function docFromText(text) {
   const lines = String(text ?? "").replace(/\u200B/g, "").replace(/\r\n?/g, "\n").split("\n");
   return schema.node(
     "doc",
     null,
-    lines.map((line) => paragraph(line ? [schema.text(line)] : [])),
+    lines.map((line) =>
+      paragraph(line ? (markdownEnabled ? parseInlineMarkdown(line) : [schema.text(line)]) : []),
+    ),
   );
 }
 
@@ -98,7 +230,10 @@ function docFromParts(parts) {
         blocks.push(paragraph(inline));
         inline = [];
       }
-      if (line) inline.push(schema.text(line));
+      if (line) {
+        if (markdownEnabled) inline.push(...parseInlineMarkdown(line));
+        else inline.push(schema.text(line));
+      }
     });
   };
 
@@ -126,7 +261,7 @@ function serialiseDoc(doc) {
     if (index > 0) text += "\n";
     block.forEach((node) => {
       if (node.isText) {
-        text += node.text.replace(/\u00a0/g, " ");
+        text += markdownText(node).replace(/\u00a0/g, " ");
       } else if (node.type.name === "mention") {
         text += `@{${node.attrs.key}}`;
         keys.push(node.attrs.key);
@@ -195,6 +330,7 @@ function dispatchTransaction(transaction) {
   const next = view.state.apply(transaction);
   view.updateState(next);
   syncEmpty();
+  if (!markdownDot?.isConnected) installMarkdownDot();
   if (transaction.docChanged && !transaction.getMeta("silent")) emit();
   syncMention(transaction.docChanged && !transaction.getMeta("programmatic"));
 }
@@ -213,6 +349,28 @@ function replaceDoc(doc, silent = false) {
   tr.setMeta("programmatic", true);
   if (silent) tr.setMeta("silent", true);
   view.dispatch(tr.scrollIntoView());
+}
+
+function replaceEditorState(doc) {
+  if (!view) return;
+  const previous = view.state.selection.from;
+  let selection;
+  try {
+    selection = TextSelection.near(doc.resolve(Math.min(previous, doc.content.size - 1)));
+  } catch {
+    selection = Selection.atEnd(doc);
+  }
+  const state = EditorState.create({
+    schema,
+    doc,
+    selection,
+    plugins: [history(), keymapPlugin, markdownRulesPlugin],
+  });
+  view.updateState(state);
+  syncEmpty();
+  emit();
+  syncMention(false);
+  view.focus();
 }
 
 function insertPlainText(text) {
@@ -301,11 +459,51 @@ function moveAcrossMention(direction) {
   };
 }
 
+function markdownRule(pattern, markName, group, guard) {
+  return new InputRule(pattern, (state, match, start, end) => {
+    if (!markdownEnabled) return null;
+    if (guard && !guard(state, start, end, match)) return null;
+    const content = match[group];
+    if (!content) return null;
+    let tr = state.tr.delete(start, end);
+    tr = tr.insertText(content, start);
+    return tr.addMark(start, start + content.length, schema.marks[markName].create());
+  });
+}
+
+function notInsideDoubleMarker(marker) {
+  return (state, start) => {
+    if (start <= 1) return true;
+    return state.doc.textBetween(start - 1, start, "", "") !== marker;
+  };
+}
+
+const markdownRulesPlugin = inputRules({
+  rules: [
+    markdownRule(/(`)([^`\n]+)`$/, "code", 2),
+    markdownRule(/(\*\*)([^*\n]+)\*\*$/, "strong", 2),
+    markdownRule(/(__)([^_\n]+)__$/, "strong", 2),
+    markdownRule(/(~~)([^~\n]+)~~$/, "strike", 2),
+    markdownRule(/(\*)([^*\n]+)\*$/, "em", 2, notInsideDoubleMarker("*")),
+    markdownRule(/(_)([^_\n]+)_$/, "em", 2, notInsideDoubleMarker("_")),
+  ],
+});
+
+function richToggleMark(name) {
+  return (state, dispatch) => {
+    if (!markdownEnabled) return true;
+    return toggleMark(schema.marks[name])(state, dispatch);
+  };
+}
+
 const keymapPlugin = keymap({
   ArrowLeft: moveAcrossMention(-1),
   ArrowRight: moveAcrossMention(1),
   Backspace: chainCommands(deleteAdjacentMention(-1), deleteSelection, joinBackward),
   Delete: chainCommands(deleteAdjacentMention(1), deleteSelection, joinForward),
+  "Mod-b": richToggleMark("strong"),
+  "Mod-i": richToggleMark("em"),
+  "Mod-e": richToggleMark("code"),
   "Mod-z": undo,
   "Shift-Mod-z": redo,
   "Mod-y": redo,
@@ -404,6 +602,54 @@ function handlePointerOut(event) {
   window.__pdfscopeMentionLeave?.(target.dataset.key);
 }
 
+function updateMarkdownDot() {
+  if (!markdownDot) return;
+  markdownDot.classList.toggle("active", markdownEnabled);
+  markdownDot.setAttribute("aria-pressed", String(markdownEnabled));
+  markdownDot.title = markdownEnabled ? "Markdown 富文本：开" : "Markdown 富文本：关";
+}
+
+function setMarkdownEnabled(next) {
+  if (next === markdownEnabled) {
+    updateMarkdownDot();
+    return;
+  }
+  markdownEnabled = Boolean(next);
+  writeMarkdownPreference(markdownEnabled);
+  if (view) {
+    const target = markdownEnabled ? markdownDoc(view.state.doc) : plainDoc(view.state.doc);
+    // A mode change clears the editor history so undo cannot restore marks that no longer match
+    // the active mode.
+    replaceEditorState(target);
+  }
+  updateMarkdownDot();
+}
+
+function installMarkdownDot() {
+  if (!root) return;
+  const zone = root.closest(".composer-zone");
+  if (!zone) return;
+  let dot = zone.querySelector(".markdown-dot");
+  if (!dot) {
+    dot = document.createElement("button");
+    dot.type = "button";
+    dot.className = "markdown-dot";
+    dot.setAttribute("aria-label", "Markdown 富文本");
+    zone.append(dot);
+  }
+  markdownDot = dot;
+  if (dot.dataset.bound !== "1") {
+    dot.dataset.bound = "1";
+    dot.addEventListener("mousedown", (event) => event.preventDefault());
+    dot.addEventListener("click", (event) => {
+      event.preventDefault();
+      setMarkdownEnabled(!markdownEnabled);
+      view?.focus();
+    });
+  }
+  updateMarkdownDot();
+}
+
 function installView(element, state) {
   return new EditorView(element, {
     state,
@@ -455,7 +701,7 @@ window.Composer = {
     const state = EditorState.create({
       schema,
       doc: emptyDoc(),
-      plugins: [history(), keymapPlugin],
+      plugins: [history(), keymapPlugin, markdownRulesPlugin],
     });
     view = installView(root, state);
     view.dom.addEventListener("mousedown", handleMouseDown, true);
@@ -490,6 +736,7 @@ window.Composer = {
         view?.focus();
       }
     });
+    installMarkdownDot();
     if (pendingAction) {
       const action = pendingAction;
       pendingAction = null;

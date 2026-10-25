@@ -2703,9 +2703,61 @@ body.selection-quiet .textLayer :is(span, br)::selection {
   content: attr(data-placeholder);
   position: absolute;
   top: var(--space-2);
-  left: var(--space-2);
+  left: var(--space-3);
   color: var(--ink-muted);
   pointer-events: none;
+}
+
+.ask.editor .ProseMirror strong {
+  font-weight: 700;
+}
+
+.ask.editor .ProseMirror em {
+  font-style: italic;
+}
+
+.ask.editor .ProseMirror code {
+  padding: 1px 3px;  /* size */
+  font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.92em;
+  background: var(--surface-sunken);
+  border-radius: 3px;  /* size */
+}
+
+.ask.editor .ProseMirror s {
+  text-decoration: line-through;
+}
+
+.markdown-dot {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 8;
+  width: 7px;  /* size */
+  height: 7px;  /* size */
+  padding: 0;
+  background: var(--ink-faint);
+  border: 0;
+  border-radius: 50%;
+  opacity: 0.45;
+  cursor: pointer;
+}
+
+.markdown-dot:hover,
+.markdown-dot:focus-visible {
+  background: var(--accent);
+  opacity: 1;
+}
+
+.markdown-dot.active {
+  background: var(--accent);
+  opacity: 1;
+  box-shadow: 0 0 0 1px var(--surface);
+}
+
+.markdown-dot:focus-visible {
+  outline: 2px solid var(--accent);  /* size */
+  outline-offset: 2px;  /* size */
 }
 
 .mention {

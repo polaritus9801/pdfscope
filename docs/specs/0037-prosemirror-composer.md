@@ -17,6 +17,7 @@ paragraph inline*
 text      (plain)
 mention   inline, atom, selectable, group inline
           attrs: key, label, orphan
+marks     strong, em, code, strike
 ```
 
 A mention is an **atom**: ProseMirror has no valid document position inside it. Clicking its left or
@@ -34,6 +35,21 @@ are handled by editor commands, so a pill is removed or skipped as a whole.
 - Serialisation remains `@{key}` plus the ordered `keys` array. The Rust-side prompt and AI payload
   do not change.
 
+## Markdown rich mode
+
+A 7px dot sits in the top-right corner of the composer card, tangent to its top and right edges.
+Clicking it toggles Markdown rich mode; the choice is stored in
+`localStorage["pdfscope.composer.markdown"]` and restored on the next load (first run defaults to
+plain). The dot is filled with the accent colour while rich mode is on.
+
+Rich mode enables inline Markdown input rules for `**strong**`, `*em*`, `_em_`, `__strong__`,
+`~~strike~~` and `` `code` `` plus Mod-B/I/E shortcuts. The document keeps ProseMirror marks; the
+serialized question uses Markdown syntax so the model receives the formatting. Turning rich mode off
+flattens marks to plain text, and turning it on parses simple inline Markdown already present in the
+field or restored from a draft. `setPlainText`/`setRich` parse Markdown when rich mode is on.
+
+The placeholder is inset 12px, matching the editor's content padding.
+
 ## Behaviour
 
 - `@` opens the picker; it closes when the trigger disappears.
@@ -45,6 +61,8 @@ are handled by editor commands, so a pill is removed or skipped as a whole.
 - Programmatic restores (`setPlainText`, `setRich`, clear) are excluded from undo history and do not
   open the mention picker.
 - Paste is plain text; file paste attaches files; dropping an attachment chip inserts a mention node.
+- Markdown mode is a preference, not a per-draft flag. Draft text is serialized as Markdown, so a
+  restored draft keeps its formatting while rich mode is on.
 
 ## Build
 
