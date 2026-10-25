@@ -57,8 +57,8 @@ used and the recents entry has no native path.
 ## Orphan @ pills
 
 Removing a reference from the context shelf no longer deletes the matching inline `@` pill. The pill
-turns red and the send button gets a small red warning badge at its lower-right corner (absolute, no
-layout change). If the reader sends with red pills:
+turns red and the send button gets the supplied red/white warning SVG at its lower-right corner
+(15.3px, right/bottom aligned, absolute, no layout change). If the reader sends with red pills:
 
 1. The panel dims and shows a centered confirmation dialog.
 2. `是` (white) sends anyway; `修改` (purple) focuses the composer immediately after the first red pill.

@@ -172,6 +172,11 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Fixed
 
+- The send warning uses the supplied SVG with a white exclamation, 85% of the old size and right/
+  bottom aligned to the send button.
+- The open reference capsule is #7f5cbf with white icon/count; layout is unchanged.
+- The rail's page icon has a little more breathing room between the rounded page and the L corner.
+
 - Removing a context reference now clears its PDF hover immediately and leaves its inline @ pill in
   place as a red orphan. A floating send warning and a centered “是 / 修改” dialog handle sending.
 - The 330px capsule's hover is colour-only (no lift).

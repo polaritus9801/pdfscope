@@ -1484,7 +1484,7 @@ fn App() -> impl IntoView {
                             >
                                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
                                     <rect x="5" y="3" width="12" height="16" rx="1.5" />
-                                    <path d="M9 21h8a2 2 0 0 0 2-2V8" />
+                                    <path d="M10 22h8a2 2 0 0 0 2-2V9" />
                                 </svg>
                             </button>
                         </div>

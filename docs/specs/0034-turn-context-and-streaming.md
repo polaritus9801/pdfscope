@@ -49,7 +49,8 @@ with the bubble:
 - Count = passages + regions + pages + previous answers + images + files + web — every attached
   context item, not just the visible text.
 - The capsule uses the surface background (white in light mode), a thin light-purple border and a
-  full pill radius. The paperclip is followed by the number.
+  full pill radius. The paperclip is followed by the number. While its popover is open the capsule
+  becomes #7f5cbf with white icon/count; only colours change, so nothing shifts.
 - Hovering the capsule exposes the full list, including the count, through the native title.
 - No capsule for a question with no references; the bubble keeps its normal right alignment.
 - The live question uses the same capsule from `current_context`, so references are visible while the
