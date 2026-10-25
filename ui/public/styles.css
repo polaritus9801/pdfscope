@@ -272,6 +272,8 @@ body {
   /* We own scroll anchoring during zoom; the browser must not adjust it as the scaler resizes. */
   overflow-anchor: none;
   padding: var(--space-5);
+  /* Reserve the left gutter for the wide page-range bar and its direct SVG actions. */
+  padding-left: calc(var(--space-5) * 4 + var(--space-2));
   padding-right: 0;
 }
 
@@ -626,6 +628,9 @@ body {
   background: #ffffff;
   box-shadow: var(--shadow-panel);
   border-radius: 2px;  /* size */
+  --page-range-width: 43.2px;  /* size */
+  --page-action-size: 32.4px;  /* size */
+  --page-range-center: 26px;  /* size */
 }
 
 .page-layer {
@@ -2408,33 +2413,37 @@ mark.find-hit {
   outline: 2px dashed color-mix(in srgb, var(--accent) 70%, transparent);  /* size */
 }
 
-.page-bar {
+.page-range-bar {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: -10px;  /* size */
-  width: 3px;  /* size */
-  background: var(--accent);
-  border-radius: var(--radius-full);
+  left: calc(-1 * var(--page-range-center) - var(--page-range-width) / 2);
+  width: var(--page-range-width);
   display: none;
+  pointer-events: none;
+  border-radius: 0;
+  z-index: 4;
 }
 
-.page.in-scope .page-bar {
+.page-range-bar.visible {
   display: block;
+}
+
+.page-range-bar:not(.last) {
+  bottom: calc(-1 * var(--page-gap, var(--space-4)));
 }
 
 .page-bar-actions {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: -40px;  /* size */
+  left: calc(-1 * var(--page-range-center) - var(--page-action-size) / 2);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+  width: var(--page-action-size);
   padding: var(--space-2) 0;
   z-index: 6;
-  /* Always hit-testable, only visible when the pointer is on the page or on these buttons, so the
-     reader can travel from the page to the buttons without them vanishing on the way. */
   opacity: 0;
   transition: opacity var(--duration) var(--ease);
 }
@@ -2446,24 +2455,42 @@ mark.find-hit {
 }
 
 .page-bar-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;  /* size */
-  height: 24px;  /* size */
+  display: block;
+  width: var(--page-action-size);
+  height: var(--page-action-size);
   padding: 0;
-  color: var(--accent);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 50%;
-  box-shadow: var(--shadow-1);
+  color: #ffffff;
+  background: transparent;
+  border: 0;
   cursor: pointer;
+  opacity: 0.86;
+  filter:
+    drop-shadow(0 1px 1px rgb(60 44 94 / 0.68))  /* size */
+    drop-shadow(0 0 1px rgb(60 44 94 / 0.35));  /* size */
+  transition: opacity var(--duration) var(--ease), filter var(--duration) var(--ease);
+}
+
+.page-bar-btn svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.page-bar-end svg {
+  transform: scaleY(-1);
 }
 
 .page-bar-btn:hover {
-  color: var(--surface);
-  background: var(--accent);
-  border-color: var(--accent);
+  opacity: 1;
+  filter: drop-shadow(0 1px 2px rgb(60 44 94 / 0.8));  /* size */
+}
+
+.page-bar-btn:focus-visible {
+  outline: none;
+  opacity: 1;
+  filter:
+    drop-shadow(0 0 2px #ffffff)  /* size */
+    drop-shadow(0 1px 2px rgb(60 44 94 / 0.8));  /* size */
 }
 
 /* Scope row: one segmented control, three quiet icons, a count badge only where it means something. */
@@ -2582,14 +2609,14 @@ mark.find-hit {
 }
 
 /* The right sheet of a spread carries its bar and actions on the right, away from the spine. */
-.page[data-spread="right"] .page-bar {
+.page[data-spread="right"] .page-range-bar {
   left: auto;
-  right: -10px;  /* size */
+  right: calc(-1 * var(--page-range-center) - var(--page-range-width) / 2);
 }
 
 .page[data-spread="right"] .page-bar-actions {
   left: auto;
-  right: -40px;  /* size */
+  right: calc(-1 * var(--page-range-center) - var(--page-action-size) / 2);
 }
 
 /* An icon-only header button: the same height, less horizontal padding. */
@@ -2857,23 +2884,26 @@ body.selection-quiet .textLayer :is(span, br)::selection {
 
 .composer-resize-handle::after {
   position: absolute;
-  top: 2px;  /* size */
+  top: 0;
   left: 50%;
-  width: 28px;  /* size */
-  height: 2px;  /* size */
+  width: 32px;  /* size */
+  height: 3px;  /* size */
   background: var(--border-strong);
-  border-radius: 2px;  /* size */
+  border-radius: 0;
   content: "";
   opacity: 0;
   transform: translateX(-50%);
   transition: opacity 120ms ease, background 120ms ease;
 }
 
-.composer-card:hover .composer-resize-handle::after,
+.composer-resize-handle:hover::after,
 .composer-resize-handle:focus-visible::after,
 .composer-card.composer-resizing .composer-resize-handle::after {
+  opacity: 1;
+}
+
+.composer-card:focus-within .composer-resize-handle::after {
   background: var(--accent);
-  opacity: 0.85;
 }
 
 .composer-card.composer-resizing {

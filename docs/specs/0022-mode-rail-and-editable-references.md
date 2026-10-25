@@ -583,3 +583,45 @@ missing.
 
 - Dragging in page mode adds rather than replaces. This supersedes the earlier replace-by-default
   answer, because replace made the middle-range case destructive; 清空 is the only replace gesture.
+
+## 2026-10-26 — wide page-range bar, direct SVG actions and range previews
+
+This supersedes the thin per-page bar and the old dashed page-outline preview.
+
+**Geometry.** One committed contiguous range draws one continuous vertical bar from the top of its
+first page to the bottom of its last page; page-gap space is filled so adjacent pages read as one bar.
+The bar is `1.8 ×` the original 24 px action diameter = 43.2 px wide, square-ended, and scales with the
+PDF. The stage reserves a left gutter for the bar and actions, so the bar is never clipped by the
+viewport at fit-width.
+
+**Colours.** Committed bar body `#ac90d5`, end caps `#7f5cbf`, 18 px end transitions. Preview uses the
+lighter pair `#cbb8ec` body / `#9a7ad3` endpoint. A placed endpoint is committed `#7f5cbf`; the rest of
+an unplaced interval remains the light pair.
+
+**Actions.** The three actions are the supplied SVGs exposed directly, 32.4 px = 3/4 bar width, centred
+on the bar. No circular button, no border: white semi-transparent fill plus a soft dark drop shadow for
+contrast on unselected white pages.
+
+**Add or subtract.** A candidate interval is a subtraction if and only if every page in it is already
+committed; otherwise it is an addition. Addition previews only the newly added pages in the light pair;
+committed pages stay dark. Subtraction previews the final post-subtraction result: removed bars and
+their page outlines disappear, remaining ranges split. Previews never merge with committed ranges;
+only the closing click writes to `page_set`, at which point adjacent ranges merge (1-3, 6-8 + 4-5
+previews as three bars, commits as one 1-8 bar).
+
+**Endpoint state machine.** First click places Start or End and does not mutate `page_set`. Opposite
+endpoint click closes the range. `start > end` is illegal: discard the first click and keep the second
+as the new first click, with no history entry. `Escape` clears the draft. `单独这一页` uses the same
+all-selected subtraction test on one page.
+
+**Repeated endpoint.** Setting → Reading → **重复点击同一端点**:
+- **调整引用范围（默认）**: inside a committed range, shrink the corresponding end to the page; outside,
+  extend the nearest range in that endpoint's outward direction; with no such range, select to page 1
+  (End) or the last page (Start).
+- **取消当前选择**: discard the draft without touching `page_set`.
+The preference is stored in `localStorage["pdfscope.page-repeat"]` and applies immediately.
+
+**Undo.** Draft/preview/hover are never history. A closing click, a same-endpoint adjustment or a
+single-page toggle pushes one snapshot before mutating. Merging or splitting is therefore one undo
+step. Cmd-Z with a draft cancels the draft first without consuming history; the next Cmd-Z reverts the
+last committed change. Redo clears any draft.

@@ -52,6 +52,16 @@ mod tests {
     }
 
     #[test]
+    fn range_helpers_follow_contiguity() {
+        let pages = vec![1, 2, 3, 6, 7, 8];
+        assert_eq!(range_containing(&pages, 2), Some((1, 3)));
+        assert_eq!(range_containing(&pages, 7), Some((6, 8)));
+        assert_eq!(range_containing(&pages, 4), None);
+        assert!(range_fully_selected(&pages, 1, 3));
+        assert!(!range_fully_selected(&pages, 3, 6));
+    }
+
+    #[test]
     fn toggling_adds_then_removes_a_page_in_order() {
         let mut pages = set(&[3, 9]);
         toggle_page(&mut pages, 6);
@@ -331,4 +341,29 @@ mod preview_tests {
         assert!(!in_preview(4, true, 5, 5));
         assert!(!in_preview(6, true, 5, 5));
     }
+}
+
+/// The contiguous committed range containing `page`, if any.
+pub fn range_containing(pages: &[u32], page: u32) -> Option<(u32, u32)> {
+    if page == 0 || pages.binary_search(&page).is_err() {
+        return None;
+    }
+    let mut start = page;
+    while start > 1 && pages.binary_search(&(start - 1)).is_ok() {
+        start -= 1;
+    }
+    let mut end = page;
+    while pages.binary_search(&(end + 1)).is_ok() {
+        end += 1;
+    }
+    Some((start, end))
+}
+
+/// Whether every page in the inclusive range is already committed.
+pub fn range_fully_selected(pages: &[u32], from: u32, to: u32) -> bool {
+    let (low, high) = if from <= to { (from, to) } else { (to, from) };
+    if low == 0 || low > high {
+        return false;
+    }
+    (low..=high).all(|page| pages.binary_search(&page).is_ok())
 }

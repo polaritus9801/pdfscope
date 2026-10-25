@@ -102,7 +102,9 @@ height and refreshed by a `ResizeObserver` (CSS fallback `30vh`, clamped to at l
 cap; above it the input scrolls internally instead of pushing the answer away. A caret restored at
 the end of a long draft is scrolled into view.
 
-The top edge has an invisible 8px drag handle with a hover line. Dragging it sets
+The top edge has an 8px drag target whose visible line appears only while the handle itself is
+hovered, keyboard-focused or being dragged. The line is 32 × 3 px, square-ended, and its colour
+strictly follows the card border: `#dccff3` when unfocused, `#7f5cbf` inside `:focus-within`. Dragging it sets
 `--composer-min-height`, a genuine floor: the user can make the input taller even when the content is
 short. Automatic growth is still capped at the 30% panel allowance, but a manual floor raises the CSS
 maximum to `max(--composer-auto-max, --composer-min-height)` so the chosen height is respected.

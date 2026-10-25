@@ -7,8 +7,8 @@ use wasm_bindgen_futures::JsFuture;
 
 use crate::icons::{icon, provider_tile};
 use crate::panel::{
-    PRESET_LABELS, RESUME_PREFERENCE_KEY, apply_font_size, apply_theme, bridge, flag_of, number_of,
-    preset, text_of,
+    PAGE_REPEAT_KEY, PRESET_LABELS, RESUME_PREFERENCE_KEY, apply_font_size, apply_theme, bridge,
+    flag_of, number_of, preset, text_of,
 };
 
 /// Publishes the timeout to the bridge, in milliseconds; zero disables the watchdog.
@@ -37,6 +37,22 @@ fn write_resume_preference(value: &str) {
         web_sys::window().and_then(|window| window.local_storage().ok().flatten())
     {
         let _ = storage.set_item(RESUME_PREFERENCE_KEY, value);
+    }
+}
+
+fn read_page_repeat_preference() -> String {
+    web_sys::window()
+        .and_then(|window| window.local_storage().ok().flatten())
+        .and_then(|storage| storage.get_item(PAGE_REPEAT_KEY).ok().flatten())
+        .filter(|value| value == "cancel")
+        .unwrap_or_else(|| "adjust".to_owned())
+}
+
+fn write_page_repeat_preference(value: &str) {
+    if let Some(storage) =
+        web_sys::window().and_then(|window| window.local_storage().ok().flatten())
+    {
+        let _ = storage.set_item(PAGE_REPEAT_KEY, value);
     }
 }
 
@@ -97,6 +113,7 @@ pub(crate) fn SettingsSheet(
     let form_mode = RwSignal::new("continuous".to_owned());
 
     let form_resume = RwSignal::new(read_resume_preference());
+    let form_page_repeat = RwSignal::new(read_page_repeat_preference());
     let form_page_limit = RwSignal::new(0_u32);
     let form_timeout = RwSignal::new("0".to_owned());
     let form_context_limit = RwSignal::new("128000".to_owned());
@@ -570,6 +587,25 @@ pub(crate) fn SettingsSheet(
                                         </p>
 
                                         <label class="settings-row">
+                                            <span>"重复点击同一端点"</span>
+                                            <select on:change=move |event| {
+                                                let value = event_target_value(&event);
+                                                form_page_repeat.set(value.clone());
+                                                write_page_repeat_preference(&value);
+                                            }>
+                                                <option value="adjust" selected=move || form_page_repeat.get() == "adjust">
+                                                    "调整引用范围（默认）"
+                                                </option>
+                                                <option value="cancel" selected=move || form_page_repeat.get() == "cancel">
+                                                    "取消当前选择"
+                                                </option>
+                                            </select>
+                                        </label>
+                                        <p class="settings-hint">
+                                            "范围内部收缩，范围外延伸，外侧没有范围时选到开头/结尾；此选项立即生效。"
+                                        </p>
+
+                                        <label class="settings-row">
                                             <span>"双页奇偶偏移"</span>
                                             <input
                                                 type="checkbox"
@@ -610,6 +646,8 @@ pub(crate) fn SettingsSheet(
                                                     form_remember.set(true);
                                                     form_resume.set("pinned".to_owned());
                                                     write_resume_preference("pinned");
+                                                    form_page_repeat.set("adjust".to_owned());
+                                                    write_page_repeat_preference("adjust");
                                                 }
                                             >
                                                 "恢复阅读默认"

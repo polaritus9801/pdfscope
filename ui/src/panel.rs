@@ -63,6 +63,7 @@ fn format_moment_full(timestamp: f64) -> String {
 
 /// Reading preference: open a document on its pinned group first, or strictly newest first.
 pub(crate) const RESUME_PREFERENCE_KEY: &str = "pdfscope.resume-pinned";
+pub(crate) const PAGE_REPEAT_KEY: &str = "pdfscope.page-repeat";
 
 fn resume_prefers_pinned() -> bool {
     let stored = web_sys::window()

@@ -7,6 +7,123 @@ use wasm_bindgen::{JsCast, JsValue};
 use crate::model::{Passage, Region, Selection, rect_style, truncate};
 use crate::{call, settle};
 
+/// The visible page-state for a page, combining committed pages with the current draft.
+#[derive(Clone, Copy, Default)]
+struct PageVisual {
+    base: bool,
+    add: bool,
+    open: Option<(u8, bool)>, // kind (0 start, 1 end), placed?
+}
+
+/// Pure preview model for one page. A candidate range is a subtraction only when every
+/// page in it is already committed; otherwise the new pages are an addition preview.
+fn page_visual(
+    page: u32,
+    set: &[u32],
+    anchor: Option<(u8, u32)>,
+    hover_page: Option<u32>,
+    hover_kind: Option<u8>,
+) -> PageVisual {
+    let mut candidate = None;
+    let mut open = None;
+
+    match (anchor, hover_page, hover_kind) {
+        (None, Some(hovered), Some(kind)) => {
+            if kind == 2 {
+                candidate = Some((hovered, hovered));
+            } else {
+                open = Some((kind, hovered, false));
+            }
+        }
+        (Some((anchor_kind, anchor_page)), Some(hovered), Some(kind)) => {
+            if kind == 2 {
+                candidate = Some((hovered, hovered));
+            } else if anchor_kind == kind {
+                open = Some((kind, hovered, false));
+            } else {
+                let (start, end) = if anchor_kind == 0 {
+                    (anchor_page, hovered)
+                } else {
+                    (hovered, anchor_page)
+                };
+                if start <= end {
+                    candidate = Some((start, end));
+                } else {
+                    open = Some((kind, hovered, false));
+                }
+            }
+        }
+        (Some((kind, anchor_page)), _, _) => {
+            open = Some((kind, anchor_page, true));
+        }
+        _ => {}
+    }
+
+    let mut visual = PageVisual {
+        base: set.binary_search(&page).is_ok(),
+        ..PageVisual::default()
+    };
+
+    if let Some((start, end)) = candidate {
+        if pdfscope_core::pages::range_fully_selected(set, start, end) {
+            if page >= start && page <= end {
+                visual.base = false;
+            }
+        } else {
+            visual.add = page >= start && page <= end && !visual.base;
+        }
+    }
+
+    if let Some((kind, open_page, placed)) = open {
+        if open_page == page {
+            visual.open = Some((kind, placed));
+        }
+    }
+
+    visual
+}
+
+fn page_label(page: u32) -> String {
+    format!("第 {page} 页")
+}
+
+fn page_ranges(set: &[u32]) -> Vec<(u32, u32)> {
+    let mut ranges: Vec<(u32, u32)> = Vec::new();
+    for &page in set {
+        match ranges.last_mut() {
+            Some((_, end)) if *end + 1 == page => *end = page,
+            _ => ranges.push((page, page)),
+        }
+    }
+    ranges
+}
+
+fn bar_gradient(first: bool, last: bool, top: &str, bottom: &str, body: &str) -> String {
+    match (first, last) {
+        (true, true) => format!(
+            "linear-gradient(to bottom, {top} 0, {body} 18px, {body} calc(100% - 18px), {bottom} 100%)"
+        ),
+        (true, false) => format!("linear-gradient(to bottom, {top} 0, {body} 18px, {body} 100%)"),
+        (false, true) => {
+            format!("linear-gradient(to bottom, {body} 0, {body} calc(100% - 18px), {bottom} 100%)")
+        }
+        (false, false) => body.to_owned(),
+    }
+}
+
+fn read_page_repeat() -> String {
+    web_sys::window()
+        .and_then(|window| window.local_storage().ok().flatten())
+        .and_then(|storage| {
+            storage
+                .get_item(crate::panel::PAGE_REPEAT_KEY)
+                .ok()
+                .flatten()
+        })
+        .filter(|value| value == "cancel")
+        .unwrap_or_else(|| "adjust".to_owned())
+}
+
 #[component]
 pub(crate) fn PageView(
     number: u32,
@@ -26,6 +143,8 @@ pub(crate) fn PageView(
     tool: RwSignal<u8>,
     anchor: RwSignal<Option<(u8, u32)>>,
     hover_page: RwSignal<Option<u32>>,
+    hover_kind: RwSignal<Option<u8>>,
+    total_pages: RwSignal<u32>,
 ) -> impl IntoView {
     // kind, id, start x/y, start rect, page width/height, whether undo was recorded
     // kind, id, start x/y, start rect, page w/h, undo recorded, mode (0 move, 1 left, 2 right,
@@ -237,46 +356,201 @@ pub(crate) fn PageView(
         }
     });
 
-    let in_scope = move || page_set.get().contains(&number);
+    let in_scope = move || {
+        page_visual(
+            number,
+            &page_set.get(),
+            anchor.get(),
+            hover_page.get(),
+            hover_kind.get(),
+        )
+        .base
+    };
     let in_preview = move || {
-        let Some((kind, endpoint)) = anchor.get() else {
-            return false;
-        };
-        let Some(hovered) = hover_page.get() else {
-            return false;
-        };
-        pdfscope_core::pages::in_preview(number, kind == 0, endpoint, hovered)
+        let visual = page_visual(
+            number,
+            &page_set.get(),
+            anchor.get(),
+            hover_page.get(),
+            hover_kind.get(),
+        );
+        visual.add || (visual.open.is_some() && !visual.base)
     };
 
-    let commit_range = move |from: u32, to: u32| {
-        undo_push.run(());
-        page_set.update(|set| pdfscope_core::add_range(set, from, to));
-        scope_mode.set(2);
-    };
-
-    let choose_start = move |_| {
-        anchor.set(Some((0, number)));
-        hover_page.set(Some(number));
-    };
-    let choose_end = move |_| {
-        match anchor.get() {
-            Some((0, start)) => {
-                commit_range(start, number);
-                anchor.set(None);
-            }
-            Some((1, end)) => {
-                commit_range(end, number);
-                anchor.set(None);
-            }
-            _ => anchor.set(Some((1, number))),
-        }
-        hover_page.set(None);
-    };
-    let toggle_page = move |_| {
-        undo_push.run(());
-        page_set.update(|set| pdfscope_core::toggle_page(set, number));
-        scope_mode.set(2);
+    let clear_draft = move || {
         anchor.set(None);
+        hover_page.set(None);
+        hover_kind.set(None);
+    };
+
+    let adjust_same_endpoint = move |kind: u8| {
+        let current = page_set.get_untracked();
+        let mut next = current.clone();
+        if let Some((range_start, range_end)) =
+            pdfscope_core::pages::range_containing(&current, number)
+        {
+            if kind == 1 {
+                if number < range_end {
+                    pdfscope_core::pages::subtract_range(&mut next, number + 1, range_end);
+                }
+            } else if number > range_start {
+                pdfscope_core::pages::subtract_range(&mut next, range_start, number - 1);
+            }
+        } else {
+            let ranges = page_ranges(&current);
+            if kind == 1 {
+                let nearest = ranges
+                    .iter()
+                    .filter(|(_, end)| *end < number)
+                    .max_by_key(|(_, end)| *end)
+                    .copied();
+                match nearest {
+                    Some((_, end)) => pdfscope_core::pages::add_range(&mut next, end + 1, number),
+                    None => pdfscope_core::pages::add_range(&mut next, 1, number),
+                }
+            } else {
+                let nearest = ranges
+                    .iter()
+                    .filter(|(start, _)| *start > number)
+                    .min_by_key(|(start, _)| *start)
+                    .copied();
+                match nearest {
+                    Some((start, _)) => {
+                        pdfscope_core::pages::add_range(&mut next, number, start - 1)
+                    }
+                    None => pdfscope_core::pages::add_range(
+                        &mut next,
+                        number,
+                        total_pages.get_untracked(),
+                    ),
+                }
+            }
+        }
+        if next != current {
+            undo_push.run(());
+            page_set.set(next);
+            scope_mode.set(2);
+        }
+        clear_draft();
+    };
+
+    let choose_endpoint = move |kind: u8| {
+        match anchor.get_untracked() {
+            None => {
+                anchor.set(Some((kind, number)));
+                hover_page.set(None);
+                hover_kind.set(None);
+            }
+            Some((anchor_kind, anchor_page)) => {
+                if anchor_kind == kind {
+                    if read_page_repeat() == "cancel" {
+                        clear_draft();
+                    } else {
+                        adjust_same_endpoint(kind);
+                    }
+                } else {
+                    let (start, end) = if anchor_kind == 0 {
+                        (anchor_page, number)
+                    } else {
+                        (number, anchor_page)
+                    };
+                    if start > end {
+                        // The pair is illegal: discard the first click and keep this one as the anchor.
+                        anchor.set(Some((kind, number)));
+                        hover_page.set(None);
+                        hover_kind.set(None);
+                        return;
+                    }
+                    let current = page_set.get_untracked();
+                    let mut next = current.clone();
+                    if pdfscope_core::pages::range_fully_selected(&current, start, end) {
+                        pdfscope_core::pages::subtract_range(&mut next, start, end);
+                    } else {
+                        pdfscope_core::pages::add_range(&mut next, start, end);
+                    }
+                    if next != current {
+                        undo_push.run(());
+                        page_set.set(next);
+                        scope_mode.set(2);
+                    }
+                    clear_draft();
+                }
+            }
+        }
+    };
+
+    let choose_start = move |_| choose_endpoint(0);
+    let choose_end = move |_| choose_endpoint(1);
+
+    let toggle_page = move |_| {
+        let current = page_set.get_untracked();
+        let mut next = current.clone();
+        pdfscope_core::pages::toggle_page(&mut next, number);
+        if next != current {
+            undo_push.run(());
+            page_set.set(next);
+            scope_mode.set(2);
+        }
+        clear_draft();
+    };
+
+    let bar = move || -> (String, String) {
+        let set = page_set.get();
+        let anchor = anchor.get();
+        let hovered = hover_page.get();
+        let kind = hover_kind.get();
+        let visual = page_visual(number, &set, anchor, hovered, kind);
+        if let Some((open_kind, placed)) = visual.open {
+            let cap = if placed { "#7f5cbf" } else { "#9a7ad3" };
+            let background = if open_kind == 0 {
+                format!(
+                    "linear-gradient(to bottom, {cap} 0, #cbb8ec 18px, rgb(203 184 236 / 0) 100%)"
+                )
+            } else {
+                format!(
+                    "linear-gradient(to bottom, rgb(203 184 236 / 0) 0, #cbb8ec calc(100% - 18px), {cap} 100%)"
+                )
+            };
+            return (
+                "page-range-bar visible open last".to_owned(),
+                format!("background: {background};"),
+            );
+        }
+
+        if visual.add {
+            let first = !page_visual(number - 1, &set, anchor, hovered, kind).add || number == 1;
+            let last = !page_visual(number + 1, &set, anchor, hovered, kind).add;
+            // The placed endpoint can be the first selected page or the last one: a reverse
+            // start/end pair is legal, so the cap follows the anchor page, not the button label.
+            let placed = anchor.map(|(_, page)| page == number).unwrap_or(false);
+            let top = if first && placed {
+                "#7f5cbf"
+            } else {
+                "#9a7ad3"
+            };
+            let bottom = if last && placed { "#7f5cbf" } else { "#9a7ad3" };
+            let background = bar_gradient(first, last, top, bottom, "#cbb8ec");
+            let class = if last {
+                "page-range-bar visible add last"
+            } else {
+                "page-range-bar visible add"
+            };
+            return (class.to_owned(), format!("background: {background};"));
+        }
+
+        if visual.base {
+            let first = !page_visual(number - 1, &set, anchor, hovered, kind).base || number == 1;
+            let last = !page_visual(number + 1, &set, anchor, hovered, kind).base;
+            let background = bar_gradient(first, last, "#7f5cbf", "#7f5cbf", "#ac90d5");
+            let class = if last {
+                "page-range-bar visible base last"
+            } else {
+                "page-range-bar visible base"
+            };
+            return (class.to_owned(), format!("background: {background};"));
+        }
+
+        ("page-range-bar".to_owned(), String::new())
     };
 
     let rect_of = move |kind: u8, id: u64| -> Option<(f64, f64, f64, f64)> {
@@ -391,7 +665,7 @@ pub(crate) fn PageView(
                 if event
                     .target()
                     .and_then(|target| target.dyn_into::<web_sys::Element>().ok())
-                    .and_then(|element| element.closest(".page-bar-actions, .page-bar").ok().flatten())
+                    .and_then(|element| element.closest(".page-bar-actions, .page-range-bar").ok().flatten())
                     .is_some()
                 {
                     return;
@@ -454,25 +728,61 @@ pub(crate) fn PageView(
                 }
             />
 
-            <div class="page-bar" aria-hidden="true"></div>
+            <div
+                class=move || bar().0
+                style=move || bar().1
+                aria-hidden="true"
+            ></div>
             <div
                 class="page-bar-actions"
                 on:mouseenter=move |_| hover_page.set(Some(number))
-                on:mouseleave=move |_| hover_page.set(None)
+                on:mouseleave=move |_| {
+                    hover_page.set(None);
+                    hover_kind.set(None);
+                }
             >
-                <button class="page-bar-btn" title="从这里开始" on:click=choose_start>
-                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M5 12h13M9 6l-6 6 6 6" />
+                <button
+                    class="page-bar-btn page-bar-start"
+                    title="从这里开始"
+                    aria-label=move || format!("{}：从这里开始", page_label(number))
+                    on:mouseenter=move |_| {
+                        hover_page.set(Some(number));
+                        hover_kind.set(Some(0));
+                    }
+                    on:click=choose_start
+                >
+                    <svg viewBox="0 0 1024 1024" width="32" height="32" aria-hidden="true">
+                        <path fill="currentColor" d="M855.866698 106.426915c0 23.451108-19.010983 42.463114-42.463114 42.463114L203.435319 148.890029c-23.451108 0-42.463114-19.010983-42.463114-42.463114l0 0c0-23.451108 19.010983-42.463114 42.463114-42.463114l609.968266 0C836.855716 63.963801 855.866698 82.974783 855.866698 106.426915L855.866698 106.426915zM511.826038 264.35069c-23.451108 0-42.463114 19.010983-42.463114 42.463114l0 609.968266c0 23.451108 19.010983 42.463114 42.463114 42.463114l0 0c23.451108 0 42.463114-19.010983 42.463114-42.463114L554.289152 306.812781C554.288129 283.361673 535.277146 264.35069 511.826038 264.35069L511.826038 264.35069zM541.961382 233.023194c-16.582677-16.582677-42.517349-17.534352-57.927317-2.124384L171.253362 543.67849c-15.408945 15.408945-14.458293 41.343617 2.124384 57.926294l0 0c16.582677 16.582677 42.517349 17.534352 57.926294 2.124384L544.085766 290.949488C559.494711 275.540544 558.544059 249.605871 541.961382 233.023194L541.961382 233.023194zM481.696834 233.023194c-16.582677 16.582677-17.534352 42.517349-2.124384 57.926294l312.780703 312.780703c15.408945 15.408945 41.343617 14.458293 57.926294-2.124384l0 0c16.582677-16.582677 17.534352-42.517349 2.124384-57.926294L539.623128 230.897787C524.214183 215.488843 498.27951 216.440517 481.696834 233.023194L481.696834 233.023194z"></path>
                     </svg>
                 </button>
-                <button class="page-bar-btn" title="单独这一页" on:click=toggle_page>
-                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="5" y="4" width="14" height="16" rx="1.5" />
+                <button
+                    class="page-bar-btn page-bar-single"
+                    title="单独这一页"
+                    aria-label=move || format!("{}：单独这一页", page_label(number))
+                    on:mouseenter=move |_| {
+                        hover_page.set(Some(number));
+                        hover_kind.set(Some(2));
+                    }
+                    on:click=toggle_page
+                >
+                    <svg viewBox="0 0 1024 1024" width="32" height="32" aria-hidden="true">
+                        <path fill="currentColor" d="M896 512c0 212.074667-171.925333 384-384 384S128 724.074667 128 512 299.925333 128 512 128s384 171.925333 384 384zM512 853.333333c188.522667 0 341.333333-152.810667 341.333333-341.333333S700.522667 170.666667 512 170.666667 170.666667 323.477333 170.666667 512s152.810667 341.333333 341.333333 341.333333z"></path>
+                        <path fill="currentColor" d="M277.333333 512a21.333333 21.333333 0 0 1 21.333334-21.333333h423.104a21.333333 21.333333 0 1 1 0 42.666666H298.666667a21.333333 21.333333 0 0 1-21.333334-21.333333z"></path>
+                        <path fill="currentColor" d="M510.229333 744.896a21.333333 21.333333 0 0 1-21.333333-21.333333V300.437333a21.333333 21.333333 0 0 1 42.666667 0v423.125334a21.333333 21.333333 0 0 1-21.333334 21.333333z"></path>
                     </svg>
                 </button>
-                <button class="page-bar-btn" title="到这里结束" on:click=choose_end>
-                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M19 12H6M15 6l6 6-6 6" />
+                <button
+                    class="page-bar-btn page-bar-end"
+                    title="到这里结束"
+                    aria-label=move || format!("{}：到这里结束", page_label(number))
+                    on:mouseenter=move |_| {
+                        hover_page.set(Some(number));
+                        hover_kind.set(Some(1));
+                    }
+                    on:click=choose_end
+                >
+                    <svg viewBox="0 0 1024 1024" width="32" height="32" aria-hidden="true">
+                        <path fill="currentColor" d="M855.866698 106.426915c0 23.451108-19.010983 42.463114-42.463114 42.463114L203.435319 148.890029c-23.451108 0-42.463114-19.010983-42.463114-42.463114l0 0c0-23.451108 19.010983-42.463114 42.463114-42.463114l609.968266 0C836.855716 63.963801 855.866698 82.974783 855.866698 106.426915L855.866698 106.426915zM511.826038 264.35069c-23.451108 0-42.463114 19.010983-42.463114 42.463114l0 609.968266c0 23.451108 19.010983 42.463114 42.463114 42.463114l0 0c23.451108 0 42.463114-19.010983 42.463114-42.463114L554.289152 306.812781C554.288129 283.361673 535.277146 264.35069 511.826038 264.35069L511.826038 264.35069zM541.961382 233.023194c-16.582677-16.582677-42.517349-17.534352-57.927317-2.124384L171.253362 543.67849c-15.408945 15.408945-14.458293 41.343617 2.124384 57.926294l0 0c16.582677 16.582677 42.517349 17.534352 57.926294 2.124384L544.085766 290.949488C559.494711 275.540544 558.544059 249.605871 541.961382 233.023194L541.961382 233.023194zM481.696834 233.023194c-16.582677 16.582677-17.534352 42.517349-2.124384 57.926294l312.780703 312.780703c15.408945 15.408945 41.343617 14.458293 57.926294-2.124384l0 0c16.582677-16.582677 17.534352-42.517349 2.124384-57.926294L539.623128 230.897787C524.214183 215.488843 498.27951 216.440517 481.696834 233.023194L481.696834 233.023194z"></path>
                     </svg>
                 </button>
             </div>

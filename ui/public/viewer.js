@@ -492,9 +492,11 @@ function measureBaseLayout(force = false) {
     pages.style.removeProperty("gap");
     const cssGap = parseFloat(getComputedStyle(pages).gap);
     pageGapRatio = (Number.isFinite(cssGap) && cssGap > 0 ? cssGap : 16) / width;
+    pages.style.setProperty("--page-gap", `${cssGap > 0 ? cssGap : 16}px`);
   } else {
     const gap = pageGapRatio > 0 ? pageGapRatio * width : 16;
     pages.style.gap = `${gap.toFixed(2)}px`;
+    pages.style.setProperty("--page-gap", `${gap.toFixed(2)}px`);
   }
 
   baseWidth = width;
@@ -1704,7 +1706,7 @@ document.addEventListener(
   (event) => {
     if (event.button !== 0) return;
     if (toolMode !== "pages" && !event.metaKey && !event.ctrlKey) return;
-    if (event.target.closest(".page-bar-actions, .page-bar, .ref-frame, .ref-handle")) return;
+    if (event.target.closest(".page-bar-actions, .page-range-bar, .ref-frame, .ref-handle")) return;
     const page = pageShellOf(event.target);
     if (!page) return;
 
@@ -2830,6 +2832,7 @@ window.PDFScope = {
       pages.style.setProperty("--view-scale", "1");
       pages.style.setProperty("--ui-scale", "1");
       pages.style.removeProperty("gap");
+      pages.style.removeProperty("--page-gap");
       pages.classList.remove("zooming");
     }
 
