@@ -799,10 +799,15 @@ start/single/end toolbar:
   endpoint. The bar still sits in the side gutter and the left/right/both/none rules are unchanged.
   Additive segments carry the old endpoint rule: the clicked anchor end is `--deep-border`, the
   hovering end is `--light-border`, and the span between them is `--light-body`. A placed open
-  anchor likewise shows its cap immediately.
+  anchor likewise shows its cap immediately. Base caps are computed from visual base neighbours, so
+  a segment next to an open committed page loses that cap and extends through the page gap exactly
+  as the old per-page bars did. Repeated-endpoint extension uses the document page count.
 - Selection outlines are overlay boxes: solid for committed pages, dashed for additions/open
   endpoints, lighter dashed for subtraction; a subtraction outline replaces the solid one instead of
   drawing through it.
+- Metrics include an unscaled page rect and a `visible` flag. Paged/spread layouts refresh metrics
+  after paged reflow and page navigation; hidden sheets reject hover/click so an action can never
+  target an off-screen page.
 - Two full-height hit strips map pointer Y to a page and third with the reported geometry. The
   pointer only updates hover state when the page/third/side changes.
 - Two toolbars (left/right, subject to the side setting) hold the actual three buttons. They are
@@ -822,3 +827,5 @@ reproducible measurement is [`docs/perf/overlay-baseline.md`](../perf/overlay-ba
 
 **Ruler cost.** Page-ruler geometry reads the rendered page rectangles only on render/resize/zoom
 settle; scroll updates move the thumb only. Tick drawing is capped/sampled as documented above.
+
+The full old-to-global rule audit is in [`docs/perf/overlay-parity.md`](../perf/overlay-parity.md).

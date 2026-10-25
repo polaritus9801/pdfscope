@@ -86,6 +86,9 @@ minor releases may contain breaking changes; they are always called out.
 - Restored the placed-endpoint bar colour: after a start anchor, the anchor end is still deep purple
   while the hovered end is light purple and the span between is body lilac. The global bar no longer
   paints both ends as hover endpoints.
+- Completed the page-range parity audit: repeated endpoint extension again uses the document page
+  count, base segment caps/gaps use visual base neighbours (including an open committed page), and
+  paged/spread actions only target visible sheets. Details in `docs/perf/overlay-parity.md`.
 - Page-bar action icons now appear in place with no opacity transition or hover-shadow swap; the old
   0.16s fade plus one-vs-two-layer shadow read as a tiny upward jump on all three buttons.
 - The composer resize handle is now a square-ended border segment shown only while the handle itself
