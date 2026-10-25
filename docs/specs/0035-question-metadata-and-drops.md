@@ -58,8 +58,8 @@ used and the recents entry has no native path.
 
 Removing a reference from the context shelf no longer deletes the matching inline `@` pill. The pill
 turns red and the send button gets the supplied red/white warning SVG at its lower-right corner
-(50% of the original 18px icon = 9px, 2pt further right, bottom-aligned, absolute, no layout
-change). If the reader sends with red pills:
+(18px wide, 2pt further right, bottom-aligned, absolute, no layout change; the send button's hover
+no longer lifts, so the badge cannot jump). If the reader sends with red pills:
 
 1. The panel dims and shows a centered confirmation dialog with a larger X close button (no hover
    background), equivalent to 修改.

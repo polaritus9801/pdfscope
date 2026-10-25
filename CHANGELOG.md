@@ -174,8 +174,9 @@ minor releases may contain breaking changes; they are always called out.
 
 - Use one-pixel editable caret boundaries outside @ pills (not zero-width characters); Backspace/
   Delete removes the pill instead of entering it.
-- The warning badge is 50% of the original icon size (9px) and 2pt further right; the warning
-  dialog gains a larger X and equal-width 仍然发送 / 修改 buttons.
+- The warning badge is 18px wide, 2pt further right and bottom-aligned; the send button hover no
+  longer lifts so the badge stays put. The warning dialog gains a larger X and equal-width 仍然发送 /
+  修改 buttons.
 
 - The send warning uses the supplied SVG with a white exclamation, 85% of the old size and right/
   bottom aligned to the send button.

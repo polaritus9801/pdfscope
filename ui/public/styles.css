@@ -3505,7 +3505,8 @@ body.selection-quiet .textLayer :is(span, br)::selection {
 
 .send-button:hover:not(:disabled) {
   background: var(--accent-strong, var(--accent));
-  transform: translateY(-1px);  /* size */
+  /* Keep the warning badge perfectly anchored below the button: no hover lift. */
+  transform: none;
 }
 
 .send-button:disabled {
@@ -4827,7 +4828,9 @@ body.panel-dragging .panel-resize::after {
 .send-warning {
   right: -2pt;
   bottom: 1px;  /* size */
-  width: 9px;  /* size */
+  width: 18px;  /* size */
+  transition: none;
+  transform: none !important;
 }
 
 .send-warning svg {
