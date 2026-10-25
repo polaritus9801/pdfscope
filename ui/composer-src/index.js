@@ -32,6 +32,7 @@ const MARKDOWN_KEY = "pdfscope.composer.markdown";
 let markdownEnabled = readMarkdownPreference();
 let markdownDot = null;
 let resizeHandle = null;
+let autoCapObserver = null;
 
 function readMarkdownPreference() {
   try {
@@ -221,11 +222,23 @@ function dispatchTransaction(transaction) {
   syncMention(transaction.docChanged && !transaction.getMeta("programmatic"));
 }
 
+function scrollCaretIntoView() {
+  if (!view || !root) return;
+  const coords = view.coordsAtPos(view.state.selection.head);
+  if (!coords) return;
+  const box = root.getBoundingClientRect();
+  const top = box.top + 8;
+  const bottom = box.bottom - 4;
+  if (coords.bottom > bottom) root.scrollTop += coords.bottom - bottom;
+  else if (coords.top < top) root.scrollTop -= top - coords.top;
+}
+
 function placeEnd() {
   if (!view) return;
   const selection = Selection.atEnd(view.state.doc);
   view.dispatch(view.state.tr.setSelection(selection).scrollIntoView());
   view.focus();
+  requestAnimationFrame(scrollCaretIntoView);
 }
 
 function replaceDoc(doc, silent = false) {
@@ -802,6 +815,7 @@ function setMarkdownEnabled(next) {
         .setMeta("markdownPreview", markdownEnabled),
     );
     view.focus();
+    requestAnimationFrame(scrollCaretIntoView);
   }
   updateMarkdownDot();
 }
@@ -827,6 +841,22 @@ function installComposerHandles() {
   handle.dataset.bound = "1";
 
   const ask = () => card.querySelector(".ask");
+  const panel = card.closest(".panel") || document.querySelector(".panel");
+  const applyAutoCap = () => {
+    const target = ask();
+    if (!target) return;
+    const panelHeight = panel?.clientHeight || window.innerHeight;
+    const cap = Math.max(120, Math.round(panelHeight * 0.4));
+    target.style.setProperty("--composer-auto-max", `${cap}px`);
+  };
+  autoCapObserver?.disconnect();
+  if ("ResizeObserver" in window && panel) {
+    autoCapObserver = new ResizeObserver(applyAutoCap);
+    autoCapObserver.observe(panel);
+  }
+  window.addEventListener("resize", applyAutoCap);
+  applyAutoCap();
+
   const reset = () => {
     const target = ask();
     if (target) target.style.removeProperty("--composer-min-height");

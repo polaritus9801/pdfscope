@@ -48,12 +48,12 @@ the document. Inline delimiters are hidden only for paragraphs whose line is not
 line reveals all of that line's syntax, so `**bold**` and every other marker remain editable without
 per-span cursor flips. The serialized question, draft and prompt history contain the raw Markdown.
 
-The composer always takes its natural content height. A previous mode-height floor kept the taller
-of the plain and decorated layouts, which avoided a small jump but left a blank white strip under the
-shorter layout (very visible with stacked display formulas); it was removed. The page bottom stays
-fixed because the PDF.js hidden canvas no longer creates body overflow. While the composer is being
-dragged vertically the body uses an explicit `ns-resize` cursor, never the horizontal panel-resize
-cursor.
+The composer takes its natural content height up to the automatic cap described under Resizing. A
+previous mode-height floor kept the taller of the plain and decorated layouts, which avoided a small
+jump but left a blank white strip under the shorter layout (very visible with stacked display
+formulas); it was removed. The page bottom stays fixed because the PDF.js hidden canvas no longer
+creates body overflow. While the composer is being dragged vertically the body uses an explicit
+`ns-resize` cursor, never the horizontal panel-resize cursor.
 
 Supported now:
 
@@ -92,11 +92,18 @@ PDF.js's hidden measurement canvas is kept out of flow (`position: fixed`, offsc
 flow it added a 19px inline line box to `body`; focusing the composer could scroll `body` by that
 amount and shift the whole app even when the composer itself did not change height.
 
+There is one enforced automatic height cap: `--composer-auto-max`, computed as 40% of the AI panel's
+height and refreshed by a `ResizeObserver` (CSS fallback `40vh`). Content grows naturally up to that
+cap; above it the input scrolls internally instead of pushing the answer away. A caret restored at
+the end of a long draft is scrolled into view.
+
 The top edge has an invisible 8px drag handle with a hover line. Dragging it changes the editor
-`--composer-min-height`; the manual height is a **floor**, not a fixed height. Content still
-auto-grows above it and shrinks back only to the floor. Dragging to the current minimum or
-double-clicking the handle returns to auto. The handle is keyboard accessible (↑/↓, Home/Enter).
-The baseline minimum stays the current 56px content area.
+`--composer-min-height`; the manual height is a **floor**, not a fixed height. Because the CSS maximum
+is `max(--composer-auto-max, --composer-min-height)`, a manual drag can deliberately raise the input
+above the automatic cap; content may then scroll or leave space, but that is the user's choice.
+Dragging to the current minimum or double-clicking the handle returns to the automatic cap. The
+handle is keyboard accessible (↑/↓, Home/Enter). The baseline minimum stays the current 56px content
+area.
 
 ## Behaviour
 

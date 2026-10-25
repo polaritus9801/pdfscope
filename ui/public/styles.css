@@ -3643,8 +3643,12 @@ body.composer-resizing * {
   flex-direction: column;
   width: 100%;
   min-height: max(56px, var(--composer-min-height, 56px));  /* size */
-  max-height: 60vh;
+  /* Only this cap is enforced for automatic growth. A manual drag can raise it by setting the
+     min-height above the cap; content taller than the cap scrolls inside the input. */
+  max-height: max(var(--composer-auto-max, 40vh), var(--composer-min-height, 0px));
   height: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   padding: var(--space-2) var(--space-3) 0;
   background: transparent;
   border: 0;
