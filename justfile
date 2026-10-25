@@ -64,6 +64,9 @@ run:  # Run the web server on the default port.
 ui:  # Build the UI bundle into ui/dist.
     @if [ -x ui/node_modules/.bin/esbuild ]; then (cd ui && npm run build:composer); fi
     cd ui && trunk build
+    # Tauri's generated asset list is not always invalidated by rewrites inside ui/dist (and Trunk
+    # may briefly stage assets). Touch the descriptor so its build script regenerates it.
+    touch crates/pdfscope-desktop/build.rs
 
 composer:  # Rebuild the ProseMirror composer bundle.
     cd ui && npm run build:composer
@@ -76,6 +79,10 @@ desktop: ui  # Build the UI, then run the desktop shell.
 
 desktop-check: ui  # Type-check the desktop shell.
     cargo check -p pdfscope-desktop
+
+perf-baseline:  # Build release UI and benchmark 1000/3000-page overlay performance.
+    cd ui && trunk build --release
+    node scripts/ui-smoke/perf.mjs
 
 new-spec name:  # Scaffold docs/specs/NNNN-name.md.
     @./scripts/new-doc.sh spec "{{name}}"

@@ -780,7 +780,7 @@ used on manager cards.
 **Navigation scrollbars.** 目录 and 缩略图 now use exactly the AI panel's scrollbar recipe: 4 px,
 transparent track, `--border-strong` rounded thumb, no hover variant or accent styling.
 
-## 2026-10-26 — long-document page actions and document-scoped previews
+## 2026-10-26 — global page-range overlay and document-scoped previews
 
 **Preview cache.** Page-ruler hover previews and reference popovers share
 `referencePreviewCache`. Its key now includes a monotonically increasing `documentEpoch`, the cache is
@@ -789,21 +789,29 @@ instead of writing into the new document's cache. `thumbnailCache`/`renderThumbn
 epoch + `isConnected` guard. Loading a new PDF hides/resets the existing ruler preview, marks and
 section token, so a page preview from the previous file can never be shown or cached for the new one.
 
-**Page actions.** The old design mounted both left/right action columns, three buttons and three SVG
-paths for every page. It now mounts:
+**Page-range overlay.** Page shells now carry only content and the committed `.in-scope` class.
+One `PageRangeOverlay` inside `.pages` owns every transient outline, every range bar and the
+start/single/end toolbar:
 
-- one transparent hit column per side per page, containing three empty buttons for the
-  start/single/end thirds (no SVG, no reactive state);
-- exactly one SVG visual for the hovered page/side/kind, rendered through a `Show`;
-- one memoized `PageVisual` per page shared by the page class, bar and visual;
-- one memoized bar class/style per page instead of recomputing `page_visual` four or five times.
-  Page class directives stay individual so JS-added classes (`range-preview`, `subtract`, `pointer-page`,
-  `flash`) are not wiped by a reactive class string.
+- `PDFViewer.rebuildMetrics()` reports unscaled page tops/heights through
+  `window.__pdfscopePageMetrics`; the overlay only re-renders when geometry changes, never on scroll.
+- Range bars are one element per committed range, addition segment, subtraction ghost or open
+  endpoint. The bar still sits in the side gutter and the left/right/both/none rules are unchanged.
+- Selection outlines are overlay boxes: solid for committed pages, dashed for additions/open
+  endpoints, lighter dashed for subtraction; a subtraction outline replaces the solid one instead of
+  drawing through it.
+- Two full-height hit strips map pointer Y to a page and third with the reported geometry. The
+  pointer only updates hover state when the page/third/side changes.
+- Two toolbars (left/right, subject to the side setting) hold the actual three buttons. They are
+  revealed for the hovered page; the same buttons are the keyboard path at the current page, so there
+  are three global tab stops rather than three per page. Page tool gestures still use `.in-scope` and
+  `.range-preview` directly and are unchanged.
 
-On a 400-page fixture this removes all action SVGs from the initial DOM (11,434 → 5,034 nodes); on a
-1000-page fixture the DOM is 12,228 nodes with zero action SVGs until hover, and a release-build
-hover is ~118 ms instead of the previous full per-page column/SVG update. The range preview still
-outlines only affected pages, but no longer pays for thousands of hidden SVG paths.
+The page shells no longer mount `PageVisual`, per-page bars, action columns or per-page hit
+buttons. A 1000-page fixture drops from ~12,228 DOM nodes to 2,270; 3000 pages is 6,285 nodes.
+Release headless-Chrome measurements: hover is single-digit to high-teens milliseconds at both 1000
+and 3000 pages; a 500-page preview is about 30–33 ms and a 500-page commit 32–38 ms. The
+reproducible measurement is [`docs/perf/overlay-baseline.md`](../perf/overlay-baseline.md).
 
 **Ruler cost.** Page-ruler geometry reads the rendered page rectangles only on render/resize/zoom
 settle; scroll updates move the thumb only. Tick drawing is capped/sampled as documented above.

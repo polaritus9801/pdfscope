@@ -2770,25 +2770,8 @@ mark.find-hit {
 .dot-s  { bottom: -5px; left: 50%; transform: translateX(-50%); cursor: ns-resize; }  /* size */
 .dot-se { bottom: -5px; right: -5px; cursor: nwse-resize; }  /* size */
 
-/* Page scope: a purple outer bar marks committed pages, dashed marks a pending preview. */
-.page.in-scope {
-  outline: 2px solid var(--accent);  /* size */
-}
-
-.page.preview {
-  outline: 2px dashed color-mix(in srgb, var(--accent) 70%, transparent);  /* size */
-}
-
-/* Subtraction preview: the page is still visible, but its scope is about to go. */
-.page.removing {
-  outline: 2px dashed color-mix(in srgb, var(--accent) 28%, transparent);  /* size */
-}
-
-.page.in-scope,
-.page.preview,
-.page.removing {
-  transition: outline-color 140ms ease;
-}
+/* Page scope is drawn by the global page-range overlay; `.in-scope` stays on the shell for the
+   page gesture's add/subtract decision. */
 
 @media (prefers-reduced-motion: reduce) {
   .page-range-bar {
@@ -2877,67 +2860,6 @@ mark.find-hit {
 }
 
 .page-bar-actions.range-right {
-  display: flex;
-}
-
-/* Invisible full-column hit surfaces. Only the hovered page mounts the SVG action visual; this
-   removes thousands of buttons/SVGs from long documents while keeping the three third-zones. */
-.page-action-hits {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: calc(-1 * var(--page-range-center) - var(--page-range-width) / 2);
-  z-index: 7;
-  display: none;
-  flex-direction: column;
-  width: var(--page-range-width);
-}
-
-.page-action-hit {
-  flex: 1;
-  width: 100%;
-  padding: 0;
-  color: transparent;
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-}
-
-.page-action-hit:focus-visible {
-  outline: 2px solid var(--accent);  /* size */
-  outline-offset: -2px;  /* size */
-}
-
-.page-action-hits.range-right {
-  left: auto;
-  right: calc(-1 * var(--page-range-center) - var(--page-range-width) / 2);
-  display: flex;
-}
-
-.page-bar-actions.visual {
-  pointer-events: none;
-}
-
-.page-bar-actions.visual .page-bar-btn {
-  opacity: 0;
-}
-
-.page-bar-actions.visual[data-kind="0"] .page-bar-start,
-.page-bar-actions.visual[data-kind="1"] .page-bar-end,
-.page-bar-actions.visual[data-kind="2"] .page-bar-single {
-  opacity: 1;
-}
-
-html[data-range-side="left"] .page-action-hits.range-left {
-  display: flex;
-}
-
-html[data-range-side="left"] .page-action-hits.range-right,
-html[data-range-side="none"] .page-action-hits {
-  display: none;
-}
-
-html[data-range-side="both"] .page-action-hits.range-left {
   display: flex;
 }
 
@@ -5705,4 +5627,114 @@ html,
 body {
   overflow: hidden;
   overflow: clip;
+}
+
+/* ── Global page-range overlay ─────────────────────────────────────────────────────────────── */
+
+.page-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  --page-range-width: 43.2px;  /* size */
+  --page-range-center: 34px;  /* size */
+  --deep-border: #7f5cbf;
+  --deep-body: #cbb8ec;
+  --light-border: #b49be2;
+  --light-body: #dccff3;
+  --range-end-fade: 64px;  /* size */
+}
+
+.page-overlay-solid,
+.page-overlay-preview {
+  position: absolute;
+  right: 0;
+  left: 0;
+  z-index: 3;
+  outline: 2px solid var(--accent);  /* size */
+  outline-offset: 0;
+  pointer-events: none;
+  transition: outline-color 140ms ease;
+}
+
+.page-overlay-preview {
+  outline: 2px dashed color-mix(in srgb, var(--accent) 70%, transparent);  /* size */
+}
+
+.page-overlay-preview.subtract {
+  outline-color: color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+/* One bar can span a whole committed range; the old per-page chaining and its gap extension are
+   intentionally cancelled by `.global`. */
+.page-range-bar.global {
+  bottom: auto;
+  height: auto;
+}
+
+.page-overlay-hit {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(-1 * var(--page-range-center) - var(--page-range-width) / 2);
+  z-index: 8;
+  display: none;
+  width: var(--page-range-width);
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.page-overlay-hit.range-right {
+  left: auto;
+  right: calc(-1 * var(--page-range-center) - var(--page-range-width) / 2);
+  display: block;
+}
+
+.page-overlay-hit.range-left {
+  display: none;
+}
+
+html[data-range-side="left"] .page-overlay-hit.range-left {
+  display: block;
+}
+
+html[data-range-side="left"] .page-overlay-hit.range-right,
+html[data-range-side="none"] .page-overlay-hit {
+  display: none;
+}
+
+html[data-range-side="both"] .page-overlay-hit.range-left {
+  display: block;
+}
+
+.page-overlay-actions {
+  top: var(--page-overlay-top, 0);
+  bottom: auto;
+  z-index: 9;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.page-overlay-actions.active,
+.page-overlay-actions:focus-within {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.page-overlay-actions[data-kind="0"] .page-bar-start,
+.page-overlay-actions[data-kind="1"] .page-bar-end,
+.page-overlay-actions[data-kind="2"] .page-bar-single {
+  opacity: 1;
+}
+
+.page-overlay-actions:focus-within .page-bar-btn {
+  opacity: 0.55;
+}
+
+.page-overlay-actions:focus-within .page-bar-btn:focus-visible {
+  opacity: 1;
+}
+
+.page-overlay-actions .page-bar-btn:focus-visible {
+  outline: none;
 }

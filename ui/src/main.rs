@@ -16,12 +16,14 @@ use web_sys::HtmlInputElement;
 mod icons;
 mod model;
 mod page;
+mod page_overlay;
 mod panel;
 mod scope_ui;
 mod settings;
 
 pub(crate) use model::{AnswerRef, PageSize, Passage, Region, Selection, truncate};
 pub(crate) use page::PageView;
+use page_overlay::{PageGeometry, PageRangeOverlay};
 
 use model::{parse_page_sizes, parse_rects, parse_selection, read_flag, read_number, read_string};
 
@@ -150,6 +152,7 @@ fn App() -> impl IntoView {
     let page = RwSignal::new(1_u32);
     let pages = RwSignal::new(0_u32);
     let page_sizes = RwSignal::new(Vec::<PageSize>::new());
+    let page_layout = RwSignal::new(PageGeometry::default());
     let zoom = RwSignal::new(100_u32);
     let ready = RwSignal::new(false);
     let file_name = RwSignal::new(String::new());
@@ -460,6 +463,7 @@ fn App() -> impl IntoView {
             error.set(None);
             pages.set(0);
             page_sizes.set(Vec::new());
+            page_layout.set(PageGeometry::default());
             zoom.set(100);
             ready.set(false);
             passages.set(Vec::new());
@@ -910,6 +914,23 @@ fn App() -> impl IntoView {
             let _ = js_sys::Reflect::set(
                 &window,
                 &JsValue::from_str("__pdfscopePageRange"),
+                callback.as_ref(),
+            );
+        }
+        callback.forget();
+    });
+
+    // The renderer owns page geometry; it reports unscaled page tops/heights after every layout.
+    Effect::new(move |_| {
+        let callback = Closure::<dyn Fn(String)>::new(move |json: String| {
+            if let Ok(next) = serde_json::from_str::<PageGeometry>(&json) {
+                page_layout.set(next);
+            }
+        });
+        if let Some(window) = web_sys::window() {
+            let _ = js_sys::Reflect::set(
+                &window,
+                &JsValue::from_str("__pdfscopePageMetrics"),
                 callback.as_ref(),
             );
         }
@@ -1587,18 +1608,23 @@ fn App() -> impl IntoView {
                                             focused_ref=focused_ref
                                             edit_epoch=edit_epoch
                                             page_set=page_set
-                                            scope_mode=scope_mode
                                             tool=tool
-                                            anchor=anchor
-                                            hover_page=hover_page
-                                            hover_kind=hover_kind
-                                            hover_side=hover_side
-                                            total_pages=pages
                                         />
                                     }
                                 })
                                 .collect_view()
                         }}
+                        <PageRangeOverlay
+                            page_set=page_set
+                            anchor=anchor
+                            hover_page=hover_page
+                            hover_kind=hover_kind
+                            hover_side=hover_side
+                            current_page=page
+                            layout=page_layout
+                            undo_push=undo_push
+                            scope_mode=scope_mode
+                        />
                         </div>
                     </div>
 

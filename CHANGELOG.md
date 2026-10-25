@@ -72,10 +72,12 @@ minor releases may contain breaking changes; they are always called out.
 - Fixed page-ruler thumbnails/reference previews showing the previous document's page: preview
   caches are now document-epoch scoped, cleared on load, and in-flight old-document renders are
   discarded; thumbnail rendering has the same guard.
-- Long documents no longer mount two action columns, six buttons and six SVGs per page. Page actions
-  use three empty hit buttons per side and mount a single SVG visual only for the hovered page/side.
-  `PageVisual` and the page-bar class/style are memoized per page, cutting reactive work and DOM
-  nodes roughly in half at 400 pages with no action SVGs until hover.
+- Page-range bars, preview outlines and page actions now live in one global overlay instead of every
+  `PageView`. A 1000-page fixture drops from ~12,228 to 2,270 DOM nodes; hover is single-digit to
+  high-teens milliseconds at 1000 and 3000 pages in the release headless-Chrome baseline, with a
+  500-page preview around 30 ms. Page shells keep only content and the `.in-scope` gesture class.
+- Added `just perf-baseline`: deterministic 1000/3000-page PDFs generated in memory, release UI,
+  headless Chrome, and raw results in `docs/perf/overlay-baseline.json`.
 - Page-bar action icons now appear in place with no opacity transition or hover-shadow swap; the old
   0.16s fade plus one-vs-two-layer shadow read as a tiny upward jump on all three buttons.
 - The composer resize handle is now a square-ended border segment shown only while the handle itself
