@@ -319,8 +319,13 @@ body {
 /* ── Page ruler ─────────────────────────────────────────────────────────────────────────────── */
 /* Replaces the platform vertical scrollbar; horizontal scrolling (when zoomed beyond the stage)
    stays native. The rail sits in the right gutter and never changes the PDF layout. */
-html[data-scroll-style="ruler"].ruler-ready .stage::-webkit-scrollbar:vertical {
-  width: 0;  /* size */
+html[data-scroll-style="ruler"].ruler-ready .stage {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+html[data-scroll-style="ruler"].ruler-ready .stage::-webkit-scrollbar {
+  display: none;
 }
 
 html[data-scroll-style="native"] .page-ruler {
@@ -334,6 +339,7 @@ html[data-scroll-style="native"] .page-ruler {
   z-index: 6;
   width: 16px;  /* size */
   height: 100%;
+  background: color-mix(in srgb, var(--surface) 92%, var(--border));
   outline: none;
   touch-action: none;
   cursor: default;
@@ -345,7 +351,7 @@ html[data-scroll-style="native"] .page-ruler {
   bottom: 0;
   left: 0;
   width: 1px;  /* size */
-  background: color-mix(in srgb, var(--border-strong) 55%, transparent);
+  background: color-mix(in srgb, var(--ink-faint) 28%, transparent);
   content: "";
 }
 
@@ -360,8 +366,8 @@ html[data-scroll-style="native"] .page-ruler {
   right: 3px;  /* size */
   width: 8px;  /* size */
   min-height: 22px;  /* size */
-  background: color-mix(in srgb, var(--accent) 23%, transparent);
-  border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  background: color-mix(in srgb, var(--accent) 28%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--accent) 68%, transparent);
   border-radius: 999px;  /* size */
   cursor: grab;
 }
@@ -2374,8 +2380,7 @@ mark.find-hit {
   border-radius: var(--radius-xs);
 }
 
-.thumb.current .thumb-number,
-.manager-thumb.selected .thumb-number {
+.thumb.current .thumb-number {
   color: var(--accent-ink);
   background: var(--accent);
   border-color: var(--accent);
@@ -2781,7 +2786,9 @@ mark.find-hit {
   border: 0;
   cursor: pointer;
   opacity: 0;
-  transition: opacity var(--duration) var(--ease);
+  /* Geometry and shadow stay fixed while the button fades in; changing either read as a tiny
+     vertical jump on hover. */
+  transition: none;
 }
 
 .page-bar-start,
@@ -2819,10 +2826,6 @@ mark.find-hit {
   filter:
     drop-shadow(0 0 2px #ffffff)  /* size */
     drop-shadow(0 1px 2px rgb(60 44 94 / 0.8));  /* size */
-}
-
-.page-bar-btn:hover svg {
-  filter: drop-shadow(0 1px 2px rgb(60 44 94 / 0.8));  /* size */
 }
 
 /* Left/right/both/none. Right is the default: tools on the left, range bar on the right. */
@@ -2977,6 +2980,7 @@ html[data-range-side="both"] .page-bar-actions.range-right {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--surface);
+  transition: none;
 }
 
 .manager-thumb:hover {
@@ -2995,16 +2999,20 @@ html[data-range-side="both"] .page-bar-actions.range-right {
   pointer-events: none;
 }
 
-.manager-thumb.drag-preview {
+/* Add previews use the same wide ring as a committed selection, without the check badge.
+   Subtract previews simply drop the ring; the check stays until pointer-up removes the page. */
+.manager-thumb.drag-preview:not(.drag-subtract) {
   border-color: var(--accent);
-  background: var(--accent-soft);
-  box-shadow: inset 0 0 0 1px var(--accent);  /* size */
+  background: var(--surface);
+  box-shadow:
+    0 0 0 1px var(--accent),  /* size */
+    0 0 0 3px var(--accent-soft);  /* size */
 }
 
 .manager-thumb.drag-preview.drag-subtract {
-  border-color: var(--danger);
-  background: color-mix(in srgb, var(--danger) 9%, var(--surface));
-  box-shadow: inset 0 0 0 1px var(--danger);  /* size */
+  border-color: var(--border);
+  background: var(--surface);
+  box-shadow: none;
 }
 
 .manager-thumb.selected {

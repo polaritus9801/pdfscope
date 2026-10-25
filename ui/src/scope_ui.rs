@@ -16,6 +16,18 @@ fn page_at(x: f64, y: f64) -> Option<u32> {
         .ok()
 }
 
+/// Dragging from an unselected page adds and from a selected page subtracts. Shift always adds;
+/// Ctrl/Command always subtracts. The explicit modifiers win over the start-page default.
+fn drag_is_subtract(shift: bool, ctrl: bool, start_selected: bool) -> bool {
+    if ctrl {
+        true
+    } else if shift {
+        false
+    } else {
+        start_selected
+    }
+}
+
 #[component]
 pub(crate) fn PageManager(
     open: RwSignal<bool>,
@@ -25,8 +37,9 @@ pub(crate) fn PageManager(
     undo_push: Callback<()>,
     page: RwSignal<u32>,
 ) -> impl IntoView {
-    // start page, pointer x/y at press. Hover tracks the live range; subtract mirrors Alt.
-    let manager_drag = RwSignal::new(Option::<(u32, f64, f64)>::None);
+    // start page, pointer x/y at press and whether that page was already referenced. Hover tracks
+    // the live range; the modifier defaults are decided from that starting state.
+    let manager_drag = RwSignal::new(Option::<(u32, f64, f64, bool)>::None);
     let manager_hover = RwSignal::new(Option::<u32>::None);
     let manager_subtract = RwSignal::new(false);
     let grid_ref = NodeRef::<leptos::html::Div>::new();
@@ -87,7 +100,7 @@ pub(crate) fn PageManager(
                             <div>
                                 <h2>"页面引用"</h2>
                                 <p class="page-manager-hint">
-                                    "点击切换单页 · 拖拽选择范围 · Alt 拖拽减选"
+                                    "点击切换单页 · 拖拽选择范围 · Shift 加选 · ⌘/Ctrl 减选"
                                 </p>
                             </div>
                             <button class="icon-button" title="关闭" on:click=move |_| open.set(false)>
@@ -99,11 +112,27 @@ pub(crate) fn PageManager(
                             id="manager-grid"
                             node_ref=grid_ref
                             on:dragstart=move |event: web_sys::DragEvent| event.prevent_default()
+                            on:contextmenu=move |event: web_sys::MouseEvent| event.prevent_default()
+                            on:lostpointercapture=move |_| {
+                                // Ctrl-click on macOS can turn into a native context click and swallow
+                                // pointerup; never leave a phantom range preview behind.
+                                if manager_drag.get_untracked().is_some() {
+                                    clear_drag();
+                                }
+                            }
                             on:pointermove=move |event: web_sys::PointerEvent| {
                                 if manager_drag.get_untracked().is_none() {
                                     return;
                                 }
-                                manager_subtract.set(event.alt_key());
+                                if let Some((_, _, _, start_selected)) =
+                                    manager_drag.get_untracked()
+                                {
+                                    manager_subtract.set(drag_is_subtract(
+                                        event.shift_key(),
+                                        event.ctrl_key() || event.meta_key(),
+                                        start_selected,
+                                    ));
+                                }
                                 if let Some(target) =
                                     page_at(event.client_x() as f64, event.client_y() as f64)
                                 {
@@ -111,27 +140,36 @@ pub(crate) fn PageManager(
                                 }
                             }
                             on:pointerup=move |event: web_sys::PointerEvent| {
-                                let Some((start, start_x, start_y)) =
+                                let Some((start, start_x, start_y, start_selected)) =
                                     manager_drag.get_untracked()
                                 else {
                                     return;
                                 };
-                                if let Some(grid) = grid_ref.get() {
-                                    let _ = grid.release_pointer_capture(event.pointer_id());
-                                }
                                 let target = page_at(
                                     event.client_x() as f64,
                                     event.client_y() as f64,
                                 )
                                 .or_else(|| manager_hover.get_untracked())
                                 .unwrap_or(start);
-                                let subtract =
-                                    event.alt_key() || manager_subtract.get_untracked();
+                                let ctrl = event.ctrl_key() || event.meta_key();
+                                let shift = event.shift_key();
+                                let subtract = drag_is_subtract(shift, ctrl, start_selected);
                                 let moved = (event.client_x() as f64 - start_x).abs()
                                     + (event.client_y() as f64 - start_y).abs();
                                 clear_drag();
+                                if let Some(grid) = grid_ref.get() {
+                                    let _ = grid.release_pointer_capture(event.pointer_id());
+                                }
                                 if moved < 4.0 || target == start {
-                                    toggle_page.run((start, subtract));
+                                    if ctrl {
+                                        toggle_page.run((start, true));
+                                    } else if shift {
+                                        // Shift is additive even when the clicked page is already
+                                        // referenced, so this must not go through toggle.
+                                        change_range.run((start, start, false));
+                                    } else {
+                                        toggle_page.run((start, false));
+                                    }
                                 } else {
                                     change_range.run((start, target, subtract));
                                 }
@@ -154,7 +192,7 @@ pub(crate) fn PageManager(
                                             class:selected=move || page_set.get().contains(&number)
                                             class:current=move || page.get() == number
                                             class:drag-preview=move || {
-                                                let Some((start, _, _)) = manager_drag.get() else {
+                                                let Some((start, _, _, _)) = manager_drag.get() else {
                                                     return false;
                                                 };
                                                 let end = manager_hover.get().unwrap_or(start);
@@ -173,13 +211,20 @@ pub(crate) fn PageManager(
                                                 // browser starts a native image drag and the app's file-drop
                                                 // layer shows its upload overlay instead of selecting pages.
                                                 event.prevent_default();
+                                                let start_selected =
+                                                    page_set.get_untracked().contains(&number);
                                                 manager_drag.set(Some((
                                                     number,
                                                     event.client_x() as f64,
                                                     event.client_y() as f64,
+                                                    start_selected,
                                                 )));
                                                 manager_hover.set(Some(number));
-                                                manager_subtract.set(event.alt_key());
+                                                manager_subtract.set(drag_is_subtract(
+                                                    event.shift_key(),
+                                                    event.ctrl_key() || event.meta_key(),
+                                                    start_selected,
+                                                ));
                                                 if let Some(grid) = grid_ref.get() {
                                                     let _ =
                                                         grid.set_pointer_capture(event.pointer_id());

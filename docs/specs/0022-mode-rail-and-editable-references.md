@@ -649,7 +649,9 @@ the right height before their image arrives. Thumbnail renders are 200 px wide.
 
 **Manager.** The dialog is 1120 px wide, cards are at least 160 px and sit in a max-content grid so
 rows never collapse to fit the dialog. The header carries the interaction hint (`点击切换单页 ·
-拖拽选择范围 · Alt 拖拽减选`); selected cards get an accent ring, accent page pill and a check badge;
+拖拽选择范围 · Shift 加选 · ⌘/Ctrl 减选`); selected cards get an accent ring and a check
+badge; their page pill stays the neutral current-unselected style. Only the reader's current page gets
+the purple page pill;
 the reader's current page gets a dashed outline. The footer shows the selected count, disables 清空
 when empty, and the current page is centred on open.
 
@@ -692,19 +694,26 @@ Firefox), independent of the reader scrollbar. The manager grid keeps its normal
 ## 2026-10-26 — page ruler, manager drag and native-drag fix
 
 **Page ruler.** 设置 → 阅读 → **PDF 滚动条** defaults to 页面标尺 and can be switched to 系统滚动条 for
-side-by-side comparison. The ruler is a 16 px overlay at the reader's right edge (the native vertical
-scrollbar is hidden in ruler mode; the horizontal scrollbar remains for zoomed pages). It draws:
+direct comparison. The ruler is a 16 px overlay at the reader's right edge. Ruler mode hides the
+platform scrollbars entirely (vertical and horizontal); horizontal panning remains available through
+trackpad/shift-wheel, and 系统滚动条 restores both. It draws:
 
-- a tick for every page boundary, longer every 10 pages;
-- a quiet accent band for every depth-0 outline entry;
-- the current page line;
-- a draggable viewport thumb whose height is `clientHeight / scrollHeight` of the track.
+- page ticks at each page's *centred* scroll position, so the tick lines up with the middle of the
+  viewport thumb, not its top; the thumb centre tracks `scrollTop + clientHeight / 2`;
+- bookmark bars whose horizontal length follows outline depth (`16 - 3 × depth`, clamped): top-level
+  entries longest, nested entries shorter; one shallowest bookmark per page;
+- with no bookmarks, page-count majors via a nice-step target of ~16 bars (1/2/5×10ⁿ pages), with
+  a shorter tick for every sampled page;
+- bookmarks are always drawn, while minor page ticks are sampled to at most ~500 / track-height
+  density; this keeps 1000-page documents readable and bounded;
+- the current page line and a draggable viewport thumb (`clientHeight / scrollHeight`).
 
 Scrolling only moves the thumb and redraws when the current page changes. Geometry is rebuilt from
 the rendered page rectangles on render, resize, page-mode change and zoom settle, so mixed page sizes
-and panel reflow are correct. Hovering the rail finds the page by its top fraction, shows the page
+and panel reflow are correct. Clicking a page tick centres that page; dragging the thumb centres the
+content under the pointer. Hovering the rail finds the page by its centred tick, shows the page
 number plus the nearest outline title, draws a hover tick, and after 160 ms shows a cached page
-preview. Clicking jumps to that page; the thumb drags; the wheel over the ruler scrolls the reader;
+preview. Clicking centres that page; the thumb drags; the wheel over the ruler scrolls the reader;
 Arrow/Page/Home/End work when the ruler is focused. The ruler is a scrollbar role with
 `aria-valuemin/max/now`, page-valued text and an accessible focus ring. Ruler mode reads
 `localStorage["pdfscope.scroll-style"]`; `native` shows the platform scrollbar instead.
@@ -714,8 +723,11 @@ image drag. Dragging a card therefore started an HTML5 drag of the thumbnail ima
 file-drop layer interpreted as an upload; pointerup never reached the card. The grid now owns pointer
 capture, hit-tests `elementFromPoint`, suppresses `dragstart`/pointerdown defaults, and sets
 `draggable=false` plus `pointer-events:none` on thumbnail images. A press/up under 4 px toggles one
-page; a real drag paints a live range preview and commits one add/subtract range, with Alt subtracting.
-No hover translate/shadow is applied to manager cards.
+page; a real drag paints a live range preview and commits one range. Dragging from an unselected page
+adds and from a selected page subtracts by default; Shift forces add and Ctrl/Command forces subtract.
+Add previews carry the same wide ring as selection but no check; subtract previews drop the ring while
+leaving the existing check visible until pointer-up. No red state, hover translate or hover shadow is
+used on manager cards.
 
 **Navigation scrollbars.** 目录 and 缩略图 now use exactly the AI panel's scrollbar recipe: 4 px,
 transparent track, `--border-strong` rounded thumb, no hover variant or accent styling.

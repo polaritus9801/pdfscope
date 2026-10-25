@@ -49,13 +49,19 @@ minor releases may contain breaking changes; they are always called out.
 - The 目录/缩略图 scrollbars now match the AI panel exactly: 4 px, transparent track and the same
   `--border-strong` thumb, with no custom accent/hover styling.
 - Added a complete page ruler, enabled by default under 设置 → 阅读 → PDF 滚动条 (switch to 系统滚动条
-  to compare). It shows page ticks, chapter bands, the current page, a draggable viewport thumb, hover
-  page/section tooltips, cached page previews, click/drag/keyboard/wheel navigation and ARIA scrollbar
-  state, using page-rectangle geometry so mixed sizes and zoom reflow stay aligned.
+  to compare). It shows page-centred ticks aligned with the thumb centre, hierarchy-scaled bookmark
+  bars, smart page-count majors when there is no outline, density sampling for very long documents,
+  the current page, a draggable viewport thumb, hover page/section tooltips, cached page previews,
+  click/drag/keyboard/wheel navigation and ARIA scrollbar state.
 - Page manager drags no longer start a native image drag. Pointer capture on the grid, blocked
   dragstart, non-draggable images and pointerdown default prevention make drag select a live range
-  (Alt subtract) instead of grabbing the page and triggering the AI panel's upload drop overlay.
-  Manager cards also no longer lift on hover.
+  (Shift add, Ctrl/Command subtract, or add/subtract chosen by the starting page's current state)
+  instead of grabbing the page and triggering the AI panel's upload drop overlay. Add previews use the
+  committed wide ring without a check; subtract previews drop the ring while keeping the check until
+  release. Selected cards keep a neutral page pill and only the current page gets the purple pill.
+  Manager cards no longer lift or fade their outline on hover.
+- Page-bar action icons now appear in place with no opacity transition or hover-shadow swap; the old
+  0.16s fade plus one-vs-two-layer shadow read as a tiny upward jump on all three buttons.
 - The composer resize handle is now a square-ended border segment shown only while the handle itself
   is hovered/focused/dragged; its colour follows the input border state.
 
