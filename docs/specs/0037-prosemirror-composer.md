@@ -97,13 +97,13 @@ height and refreshed by a `ResizeObserver` (CSS fallback `40vh`). Content grows 
 cap; above it the input scrolls internally instead of pushing the answer away. A caret restored at
 the end of a long draft is scrolled into view.
 
-The top edge has an invisible 8px drag handle with a hover line. Dragging it changes the editor
-`--composer-min-height`; the manual height is a **floor**, not a fixed height. Because the CSS maximum
-is `max(--composer-auto-max, --composer-min-height)`, a manual drag can deliberately raise the input
-above the automatic cap; content may then scroll or leave space, but that is the user's choice.
-Dragging to the current minimum or double-clicking the handle returns to the automatic cap. The
-handle is keyboard accessible (↑/↓, Home/Enter). The baseline minimum stays the current 56px content
-area.
+The top edge has an invisible 8px drag handle with a hover line. Dragging it sets
+`--composer-manual-max`, which replaces the automatic 40% cap. It is a **maximum**, never a minimum:
+short content still collapses to its natural height, so a previously dragged height cannot preserve
+a blank white block. Long content can be given more room with a manual drag and scrolls if it exceeds
+that allowance. Double-clicking the handle removes the manual maximum and returns to the automatic
+cap. The handle is keyboard accessible (↑/↓, Home/Enter). The baseline minimum stays the current
+56px content area.
 
 ## Behaviour
 

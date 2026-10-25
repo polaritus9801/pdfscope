@@ -3642,10 +3642,10 @@ body.composer-resizing * {
   display: flex;
   flex-direction: column;
   width: 100%;
-  min-height: max(56px, var(--composer-min-height, 56px));  /* size */
-  /* Only this cap is enforced for automatic growth. A manual drag can raise it by setting the
-     min-height above the cap; content taller than the cap scrolls inside the input. */
-  max-height: max(var(--composer-auto-max, 40vh), var(--composer-min-height, 0px));
+  min-height: 56px;  /* size */
+  /* Automatic growth is capped at 40% of the AI panel. A manual drag replaces that cap; it never
+     acts as a floor, so short content cannot preserve a blank white block. */
+  max-height: var(--composer-manual-max, var(--composer-auto-max, 40vh));
   height: auto;
   overflow-x: hidden;
   overflow-y: auto;
