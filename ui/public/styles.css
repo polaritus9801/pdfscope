@@ -5044,3 +5044,15 @@ body.panel-dragging .panel-resize::after {
 .ask.editor .ProseMirror .md-math-source-hidden {
   display: none;
 }
+
+/* PDF.js uses a hidden canvas for measurement. Left in normal flow it creates a
+   19-pixel line box at the bottom of <body>; focusing the composer then scrolls body
+   by that amount, shifting the whole app and exposing the bottom bar/white gap. */
+body > canvas.hiddenCanvasElement {
+  position: fixed;
+  top: 0;
+  left: -10000px;  /* size */
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}

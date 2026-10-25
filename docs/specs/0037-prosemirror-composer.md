@@ -87,6 +87,10 @@ markers. The placeholder is inset 12px, matching the editor content padding.
 
 ## Resizing
 
+PDF.js's hidden measurement canvas is kept out of flow (`position: fixed`, offscreen). In normal
+flow it added a 19px inline line box to `body`; focusing the composer could scroll `body` by that
+amount and shift the whole app even when the composer itself did not change height.
+
 The mode toggle uses a transient height floor described above. The top edge has an invisible 8px drag
 handle with a hover line. Dragging it changes the editor
 `--composer-min-height`; the manual height is a **floor**, not a fixed height. Content still

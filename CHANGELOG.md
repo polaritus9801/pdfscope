@@ -8,6 +8,12 @@ minor releases may contain breaking changes; they are always called out.
 
 ## [Unreleased]
 
+### Fixed
+
+- PDF.js's hidden measurement canvas no longer contributes a 19px line box to `body`. Focusing the
+  composer after toggling live preview could scroll `body` by that amount, shifting the whole app and
+  exposing the bottom bar/white gap. The canvas is now out of flow.
+
 ### Added
 
 - A tiny top-right dot toggles Markdown live preview. Raw Markdown remains the document; whole-line
