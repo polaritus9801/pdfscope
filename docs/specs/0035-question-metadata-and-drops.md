@@ -58,13 +58,14 @@ used and the recents entry has no native path.
 
 Removing a reference from the context shelf no longer deletes the matching inline `@` pill. The pill
 turns red and the send button gets the supplied red/white warning SVG at its lower-right corner
-(15.3px, right/bottom aligned, absolute, no layout change). If the reader sends with red pills:
+(50% of the previous size, 2pt further right, bottom-aligned, absolute, no layout change). If the reader sends with red pills:
 
-1. The panel dims and shows a centered confirmation dialog.
-2. `是` (white) sends anyway; `修改` (purple) focuses the composer immediately after the first red pill.
+1. The panel dims and shows a centered confirmation dialog with an X close button.
+2. The actions are two equal-width buttons: `仍然发送` (white) sends anyway; `修改` (purple) focuses
+   the composer immediately after the first red pill. The X has the same effect as 修改.
 3. The dialog disappears when all red pills are deleted.
 
-The composer does **not** use zero-width characters around pills. Clicking the left/right half places
-the caret before/after the pill; Backspace or Delete adjacent to a pill removes the pill instead of
-letting the caret enter it. The field also nudges its scroll/paint pass after opening the @ picker so a
+The composer does **not** use zero-width characters around pills. It uses one-pixel editable boundary
+elements on each side; clicking the left/right half puts the native caret in that boundary, outside the
+pill. Backspace or Delete adjacent to a pill removes the pill instead of letting the caret enter it. The field also nudges its scroll/paint pass after opening the @ picker so a
 long, scrolled message does not leave a stale blank run beside the @.

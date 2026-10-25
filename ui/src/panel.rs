@@ -805,6 +805,12 @@ pub fn AiPanel(
     let orphan_refs = RwSignal::new(Vec::<String>::new());
     let send_warning = RwSignal::new(false);
     let force_send = RwSignal::new(false);
+    let edit_first_orphan = Callback::new(move |_: ()| {
+        send_warning.set(false);
+        if let Some(key) = orphan_refs.get_untracked().first().cloned() {
+            let _ = composer("focusAfterToken", &[JsValue::from_str(&key)]);
+        }
+    });
     let interrupted = RwSignal::new(false);
     let continue_target = RwSignal::new(None::<usize>);
     let reasoning = RwSignal::new(String::new());
@@ -4798,7 +4804,16 @@ pub fn AiPanel(
                     <Show when=move || send_warning.get()>
                         <div class="orphan-warning-overlay">
                             <div class="orphan-warning-dialog" role="dialog" aria-modal="true">
-                                <h3>"有引用已删除"</h3>
+                                <div class="orphan-warning-head">
+                                    <h3>"有引用已删除"</h3>
+                                    <button
+                                        class="orphan-warning-close"
+                                        title="关闭"
+                                        on:click=move |_| edit_first_orphan.run(())
+                                    >
+                                        {icon("close", 14)}
+                                    </button>
+                                </div>
                                 <p>"红色 @ 引用对应的上下文已经删除，是否仍然发送？"</p>
                                 <div class="orphan-warning-actions">
                                     <button
@@ -4809,16 +4824,11 @@ pub fn AiPanel(
                                             send(());
                                         }
                                     >
-                                        "是"
+                                        "仍然发送"
                                     </button>
                                     <button
                                         class="button button-primary"
-                                        on:click=move |_| {
-                                            send_warning.set(false);
-                                            if let Some(key) = orphan_refs.get_untracked().first().cloned() {
-                                                let _ = composer("focusAfterToken", &[JsValue::from_str(&key)]);
-                                            }
-                                        }
+                                        on:click=move |_| edit_first_orphan.run(())
                                     >
                                         "修改"
                                     </button>

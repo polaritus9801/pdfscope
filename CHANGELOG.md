@@ -172,6 +172,11 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Fixed
 
+- Use one-pixel editable caret boundaries outside @ pills (not zero-width characters); Backspace/
+  Delete removes the pill instead of entering it.
+- The warning badge is 50% of its previous size and 2pt further right; the warning dialog gains an X
+  and equal-width 仍然发送 / 修改 buttons.
+
 - The send warning uses the supplied SVG with a white exclamation, 85% of the old size and right/
   bottom aligned to the send button.
 - The open reference capsule is #7f5cbf with white icon/count; layout is unchanged.

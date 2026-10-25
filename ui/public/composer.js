@@ -147,23 +147,41 @@ function makeToken(key, label) {
   return token;
 }
 
+function mentionBoundary() {
+  const boundary = document.createElement("span");
+  boundary.className = "mention-boundary";
+  boundary.contentEditable = "true";
+  return boundary;
+}
+
+function boundaryAround(token, before) {
+  const node = before ? token?.previousSibling : token?.nextSibling;
+  return node?.nodeType === Node.ELEMENT_NODE && node.classList.contains("mention-boundary")
+    ? node
+    : null;
+}
+
 function insertToken(key, label) {
   if (!root) return;
   removeTrailingAt();
 
   const token = makeToken(key, label);
+  const before = mentionBoundary();
+  const after = mentionBoundary();
 
   const range = caretInRoot();
   if (!range) {
-    root.append(token);
+    root.append(before, token, after);
   } else {
     range.deleteContents();
     range.insertNode(token);
+    token.before(before);
+    token.after(after);
   }
 
-  // No trailing space and no invisible character: keep the caret just outside the pill.
+  // A one-pixel editable boundary element gives the native caret a position outside the pill.
   const caret = document.createRange();
-  caret.setStartAfter(token);
+  caret.setStart(after, 0);
   caret.collapse(true);
   const selection = window.getSelection();
   selection.removeAllRanges();
@@ -207,6 +225,16 @@ function tokenAtSelection(range, backward) {
     const element = node;
     const inside = element.closest?.(".mention");
     if (inside && root.contains(inside)) return inside;
+    if (element.classList.contains("mention-boundary")) {
+      if (backward && range.startOffset === 0) {
+        const previous = element.previousSibling;
+        if (previous?.nodeType === Node.ELEMENT_NODE && previous.classList.contains("mention")) return previous;
+      }
+      if (!backward && range.startOffset === element.childNodes.length) {
+        const next = element.nextSibling;
+        if (next?.nodeType === Node.ELEMENT_NODE && next.classList.contains("mention")) return next;
+      }
+    }
     if (backward && range.startOffset > 0) {
       const previous = element.childNodes[range.startOffset - 1];
       if (previous?.nodeType === Node.ELEMENT_NODE && previous.classList.contains("mention")) return previous;
@@ -238,8 +266,12 @@ function removeTokenAtSelection(backward) {
   const token = tokenAtSelection(range, backward);
   if (!token) return;
   const parent = token.parentNode;
-  const next = token.nextSibling;
+  const beforeBoundary = boundaryAround(token, true);
+  const afterBoundary = boundaryAround(token, false);
+  const next = afterBoundary?.nextSibling ?? token.nextSibling;
   token.remove();
+  beforeBoundary?.remove();
+  afterBoundary?.remove();
   root.focus();
   const caret = document.createRange();
   if (next) {
@@ -306,9 +338,13 @@ window.Composer = {
         const liveRect = live.getBoundingClientRect();
         const range = document.createRange();
         if (event.clientX < liveRect.left + liveRect.width / 2) {
-          range.setStartBefore(live);
+          const before = boundaryAround(live, true);
+          if (before) range.setStart(before, 0);
+          else range.setStartBefore(live);
         } else {
-          range.setStartAfter(live);
+          const after = boundaryAround(live, false);
+          if (after) range.setStart(after, 0);
+          else range.setStartAfter(live);
         }
         range.collapse(true);
         const selection = window.getSelection();
@@ -357,7 +393,11 @@ window.Composer = {
     if (!root) return;
     const token = root.querySelector(`.mention[data-key="${key}"]`);
     if (!token) return;
+    const before = boundaryAround(token, true);
+    const after = boundaryAround(token, false);
     token.remove();
+    before?.remove();
+    after?.remove();
     emit();
   },
 
@@ -391,7 +431,9 @@ window.Composer = {
       const token = root.querySelector(`.mention[data-key="${key}"]`);
       if (!token) return;
       const range = document.createRange();
-      range.setStartAfter(token);
+      const after = boundaryAround(token, false);
+      if (after) range.setStart(after, 0);
+      else range.setStartAfter(token);
       range.collapse(true);
       const selection = window.getSelection();
       selection?.removeAllRanges();
@@ -434,7 +476,7 @@ window.Composer = {
     const nodes = [];
     for (const part of parts ?? []) {
       if (part && part.key && part.label) {
-        nodes.push(makeToken(part.key, part.label));
+        nodes.push(mentionBoundary(), makeToken(part.key, part.label), mentionBoundary());
       } else if (part && typeof part.text === "string" && part.text.length > 0) {
         nodes.push(document.createTextNode(part.text));
       }

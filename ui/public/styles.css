@@ -4739,9 +4739,31 @@ body.panel-dragging .panel-resize::after {
   box-shadow: var(--shadow-3);
 }
 
+.orphan-warning-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
 .orphan-warning-dialog h3 {
   margin: 0 0 var(--space-2);
   font-size: var(--text-lg);
+}
+
+.orphan-warning-close {
+  display: flex;
+  padding: 2px;  /* size */
+  color: var(--ink-faint);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.orphan-warning-close:hover {
+  color: var(--ink);
+  background: var(--surface-sunken);
 }
 
 .orphan-warning-dialog p {
@@ -4751,10 +4773,15 @@ body.panel-dragging .panel-resize::after {
 }
 
 .orphan-warning-actions {
-  display: flex;
-  justify-content: flex-end;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: var(--space-2);
   margin-top: var(--space-4);
+}
+
+.orphan-warning-actions .button {
+  width: 100%;
+  min-width: 0;
 }
 
 .orphan-warning-keep {
@@ -4772,18 +4799,7 @@ body.panel-dragging .panel-resize::after {
   display: block;
 }
 
-.send-warning b {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding-bottom: 2px;  /* size */
-  color: #ffffff;
-  font-size: 12px;  /* size */
-  font-weight: 800;
-  line-height: 1;
-}
+
 
 .question-refs-badge.open,
 .question-refs-badge.open:hover {
@@ -4795,4 +4811,27 @@ body.panel-dragging .panel-resize::after {
 .question-refs-badge.open svg,
 .question-refs-badge.open span {
   color: #ffffff;
+}
+
+
+/* A one-pixel editable gap outside each pill; not a character, but a native caret slot. */
+.mention-boundary {
+  display: inline-block;
+  width: 1px;  /* size */
+  min-height: 1em;
+  vertical-align: middle;
+}
+
+
+/* Final warning badge: 50% of the previous icon and 2pt further right. */
+.send-warning {
+  right: -2pt;
+  bottom: 1px;  /* size */
+  width: 7.65px;  /* size */
+}
+
+.send-warning svg {
+  display: block;
+  width: 100%;
+  height: auto;
 }
