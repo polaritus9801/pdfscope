@@ -18,7 +18,8 @@ minor releases may contain breaking changes; they are always called out.
   actual operation: additions preview only newly added pages; fully committed candidate ranges
   preview the post-subtraction result.
 - Each page action owns a full-width third of the bar: top starts, middle toggles one page, bottom
-  ends. The bar sits 12 px off the sheet and the page actions' hit area is the full bar width.
+  ends, and the icons sit at 1/6, 1/2 and 5/6 of the page. The bar sits 12 px off the sheet and the
+  page actions' hit area is the full bar width. Endpoint fades are 64 px instead of 18 px.
 - New setting 设置 → 阅读 → 页面引用条位置: left (default), right, both or hidden.
 - Adding a page range and removing one share one rule: a candidate interval entirely inside the
   committed set subtracts, otherwise it adds. Invalid start-after-end clicks discard the first click.

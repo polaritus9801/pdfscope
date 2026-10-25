@@ -101,11 +101,15 @@ fn page_ranges(set: &[u32]) -> Vec<(u32, u32)> {
 fn bar_gradient(first: bool, last: bool, top: &str, bottom: &str, body: &str) -> String {
     match (first, last) {
         (true, true) => format!(
-            "linear-gradient(to bottom, {top} 0, {body} 18px, {body} calc(100% - 18px), {bottom} 100%)"
+            "linear-gradient(to bottom, {top} 0, {body} var(--range-end-fade), {body} calc(100% - var(--range-end-fade)), {bottom} 100%)"
         ),
-        (true, false) => format!("linear-gradient(to bottom, {top} 0, {body} 18px, {body} 100%)"),
+        (true, false) => format!(
+            "linear-gradient(to bottom, {top} 0, {body} var(--range-end-fade), {body} 100%)"
+        ),
         (false, true) => {
-            format!("linear-gradient(to bottom, {body} 0, {body} calc(100% - 18px), {bottom} 100%)")
+            format!(
+                "linear-gradient(to bottom, {body} 0, {body} calc(100% - var(--range-end-fade)), {bottom} 100%)"
+            )
         }
         (false, false) => body.to_owned(),
     }
@@ -575,11 +579,11 @@ pub(crate) fn PageView(
             };
             let background = if open_kind == 0 {
                 format!(
-                    "linear-gradient(to bottom, {cap} 0, var(--light-body) 18px, rgb(220 207 243 / 0) 100%)"
+                    "linear-gradient(to bottom, {cap} 0, var(--light-body) var(--range-end-fade), rgb(220 207 243 / 0) 100%)"
                 )
             } else {
                 format!(
-                    "linear-gradient(to bottom, rgb(220 207 243 / 0) 0, var(--light-body) calc(100% - 18px), {cap} 100%)"
+                    "linear-gradient(to bottom, rgb(220 207 243 / 0) 0, var(--light-body) calc(100% - var(--range-end-fade)), {cap} 100%)"
                 )
             };
             return (

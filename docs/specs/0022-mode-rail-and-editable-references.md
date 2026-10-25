@@ -595,14 +595,15 @@ PDF. It sits 12 px away from the page edge. The stage reserves a 116 px left gut
 the right when needed), so neither the bar nor its actions are clipped at fit-width.
 
 **Colours.** Committed: `--deep-border: #7f5cbf` end caps and `--deep-body: #cbb8ec` body,
-with 18 px transitions. Preview: `--light-border: #b49be2` ends and `--light-body: #dccff3`
-body. A placed endpoint stays deep-border; the unplaced remainder uses the light pair. These are CSS
-variables on `.page`; the endpoint stops at 18 px.
+with a 64 px `--range-end-fade` transition. Preview: `--light-border: #b49be2` ends and
+`--light-body: #dccff3` body. A placed endpoint stays deep-border; the unplaced remainder uses the
+light pair. These are CSS variables on `.page`; the endpoint fade length is tunable in one place.
 
 **Actions.** The three supplied SVGs are exposed directly, 32.4 px = 3/4 bar width, with no circular
 chrome and no border. They are white at 86 % opacity with a soft dark drop shadow. Nothing is visible
 on page hover: only the button under the pointer is shown. Each button owns a full-width third of the
-bar: top 1/3 starts a range, middle 1/3 toggles one page, bottom 1/3 ends it.
+bar: top 1/3 starts a range, middle 1/3 toggles one page, bottom 1/3 ends it. Their icons are centred
+in those thirds, i.e. start at 1/6, single at 1/2 and end at 5/6 of the page height.
 
 **Side preference.** 设置 → 阅读 → **页面引用条位置** offers 左侧 (default), 右侧, 两侧 and 不显示.
 It is stored in `localStorage["pdfscope.page-bar-side"]` and applied immediately. Right/both reserve a

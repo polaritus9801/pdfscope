@@ -640,6 +640,7 @@ html[data-range-side="both"] .stage {
   --deep-body: #cbb8ec;
   --light-border: #b49be2;
   --light-body: #dccff3;
+  --range-end-fade: 64px;  /* size */
 }
 
 .page-layer {
@@ -2483,14 +2484,9 @@ mark.find-hit {
   transition: opacity var(--duration) var(--ease);
 }
 
-.page-bar-start {
-  align-items: flex-start;
-  padding-top: var(--space-2);
-}
-
+.page-bar-start,
 .page-bar-end {
-  align-items: flex-end;
-  padding-bottom: var(--space-2);
+  align-items: center;
 }
 
 .page-bar-btn svg {
