@@ -72,7 +72,7 @@ pub(crate) fn read_page_bar_side() -> String {
         .and_then(|window| window.local_storage().ok().flatten())
         .and_then(|storage| storage.get_item(PAGE_BAR_SIDE_KEY).ok().flatten())
         .filter(|value| matches!(value.as_str(), "left" | "right" | "both" | "none"))
-        .unwrap_or_else(|| "left".to_owned())
+        .unwrap_or_else(|| "right".to_owned())
 }
 
 pub(crate) fn apply_page_bar_side(value: &str) {
@@ -88,7 +88,7 @@ pub(crate) fn write_page_bar_side(value: &str) {
     let value = if matches!(value, "left" | "right" | "both" | "none") {
         value
     } else {
-        "left"
+        "right"
     };
     if let Some(storage) =
         web_sys::window().and_then(|window| window.local_storage().ok().flatten())

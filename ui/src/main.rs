@@ -1603,6 +1603,20 @@ fn App() -> impl IntoView {
                     }}
 
                 </main>
+                    {move || {
+                        hovered
+                            .get()
+                            .map(|(target, _)| {
+                                let total = pages.get().max(1) as f64;
+                                let top = (target as f64 - 0.5) / total * 100.0;
+                                view! {
+                                    <div
+                                        class="stage-scroll-marker"
+                                        style=format!("top:{top:.2}%")
+                                    ></div>
+                                }
+                            })
+                    }}
                     </div>
                     <div class="oobe-overlay" class:hidden=move || ready.get()>
                         <div
@@ -1929,20 +1943,6 @@ fn App() -> impl IntoView {
                         }
                     }
                 >
-                    {move || {
-                        hovered
-                            .get()
-                            .map(|(target, _)| {
-                                let total = pages.get().max(1) as f64;
-                                let top = (target as f64 - 0.5) / total * 100.0;
-                                view! {
-                                    <div
-                                        class="rail-marker"
-                                        style=format!("top:{top:.2}%")
-                                    ></div>
-                                }
-                            })
-                    }}
                 </div>
 
                 <panel::AiPanel

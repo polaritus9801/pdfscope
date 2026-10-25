@@ -591,8 +591,9 @@ This supersedes the thin per-page bar and the old dashed page-outline preview.
 **Geometry.** One committed contiguous range draws one continuous vertical bar from the top of its
 first page to the bottom of its last page; page-gap space is filled so adjacent pages read as one bar.
 The bar is `1.8 ×` the original 24 px action diameter = 43.2 px wide, square-ended, and scales with the
-PDF. It sits 12 px away from the page edge. The stage reserves a 116 px left gutter (and the same on
-the right when needed), so neither the bar nor its actions are clipped at fit-width.
+PDF. It sits 12 px away from the page edge. By default the stage reserves symmetric 116 px gutters:
+the tool rail lives on the left and the range bar on the right, so the PDF column and the zoom anchor
+stay horizontally centred. Choosing 左侧/不显示 releases the right gutter.
 
 **Colours.** Committed: `--deep-border: #7f5cbf` end caps and `--deep-body: #cbb8ec` body,
 with a 64 px `--range-end-fade` transition. Preview: `--light-border: #b49be2` ends and
@@ -605,9 +606,9 @@ on page hover: only the button under the pointer is shown. Each button owns a fu
 bar: top 1/3 starts a range, middle 1/3 toggles one page, bottom 1/3 ends it. Their icons are centred
 in those thirds, i.e. start at 1/6, single at 1/2 and end at 5/6 of the page height.
 
-**Side preference.** 设置 → 阅读 → **页面引用条位置** offers 左侧 (default), 右侧, 两侧 and 不显示.
-It is stored in `localStorage["pdfscope.page-bar-side"]` and applied immediately. Right/both reserve a
-right gutter and reflow the page column; both renders a second independent bar/action column.
+**Side preference.** 设置 → 阅读 → **页面引用条位置** offers 右侧 (default), 左侧, 两侧 and 不显示.
+It is stored in `localStorage["pdfscope.page-bar-side"]` and applied immediately. Right/both keep the
+symmetric gutters; both renders a second independent bar/action column.
 
 **Add or subtract.** A candidate interval is a subtraction if and only if every page in it is already
 committed; otherwise it is an addition. Addition previews only the newly added pages in the light pair;
@@ -660,3 +661,23 @@ are muted and indented, each row shows its target page, and the current section 
 Outline destinations that arrive as PDF page references (`{num, gen}`) are now resolved through
 `getPageIndex` rather than coerced to a number; previously every such entry became page 0, which
 made the whole TOC appear disabled and page numbers blank.
+
+
+## 2026-10-26 — scrollbar hint, centred reader and thin navigation scrollbars
+
+**Default side.** The page-range bar now defaults to the right. The stage reserves 116 px on both
+sides by default (tool rail left, bar right), which restores a horizontally centred PDF at fit width
+and keeps the zoom anchor at the centre of the page column. 左侧 and 不显示 release the right gutter.
+
+**Zoom anchor.** `readingOrigin` measures the stage content box (excluding both gutters), and
+centre-origin zooms (buttons, fit width, API, initial default zoom) recenter `scrollLeft` to
+`(scalerWidth - contentWidth) / 2` on every frame and at settle. Pointer zooms (wheel/pinch) still
+preserve the point under the pointer.
+
+**Scrollbar hint.** The purple page marker moved off the AI-panel divider. It is now a 4×12 px tick
+at `right: 3px` inside the reader shell, riding the native reader scrollbar and positioned by
+`(page - 0.5) / totalPages`. The divider no longer grows a dot. The reader's own scrollbar keeps its
+native width.
+
+**Navigation scrollbars.** 目录 and 缩略图 lists use a 4 px WebKit scrollbar (thin native scrollbar on
+Firefox), independent of the reader scrollbar. The manager grid keeps its normal scrollbar.

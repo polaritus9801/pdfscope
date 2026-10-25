@@ -53,6 +53,9 @@ let displayScale = 1;
 let targetScale = 1;
 let zoomOrigin = null;
 let zoomDirect = false;
+// Centre-origin zooms (buttons, fit width, API) keep the page column horizontally centred. Pointer
+// zooms (wheel/pinch) keep the point under the fingers instead.
+let zoomRecenter = false;
 let zoomFrame = 0;
 let zoomLastTime = 0;
 let zooming = false;
@@ -639,7 +642,11 @@ function readingOrigin() {
   const stage = stageElement();
   if (!stage) return { x: 0, y: 0 };
   const rect = stage.getBoundingClientRect();
-  return { x: rect.left + rect.width / 2, y: rect.top + readingOffset() };
+  const padding = stagePadding(stage);
+  // Use the content area, not the stage border box: asymmetric gutters (tool rail, range bar) used
+  // to pull the zoom anchor off the visual centre of the page column.
+  const x = rect.left + padding.left + stageContentWidth(stage) / 2;
+  return { x, y: rect.top + readingOffset() };
 }
 
 function resolveOrigin(origin) {
@@ -668,10 +675,11 @@ function requestZoomFrame() {
   zoomFrame = requestAnimationFrame(zoomStep);
 }
 
-function setZoomTarget(scale, { direct = false, origin = null } = {}) {
+function setZoomTarget(scale, { direct = false, origin = null, recenter = false } = {}) {
   if (!document_) return;
   targetScale = clamp(scale, MIN_SCALE, MAX_SCALE);
   zoomDirect = direct;
+  zoomRecenter = recenter;
   zoomOrigin = resolveOrigin(origin);
   zooming = true;
   clearSettle();
@@ -683,6 +691,7 @@ function requestZoomBy(steps, options = {}) {
   setZoomTarget(targetScale + 0.25 * Number(steps || 0), {
     direct: false,
     origin: options.origin ?? readingOrigin(),
+    recenter: !options.origin,
   });
 }
 
@@ -690,11 +699,12 @@ function requestZoomTo(percent, options = {}) {
   setZoomTarget(Number(percent) / 100, {
     direct: options.animate === false,
     origin: options.origin ?? readingOrigin(),
+    recenter: !options.origin,
   });
 }
 
 function requestFitWidth() {
-  setZoomTarget(1, { direct: false, origin: readingOrigin() });
+  setZoomTarget(1, { direct: false, origin: readingOrigin(), recenter: true });
 }
 
 /// One rAF owns the visual scale. A pinch is direct; wheel/buttons ease toward the target.
@@ -778,8 +788,12 @@ function applyDisplayScale(scale, origin) {
   applyPan();
 
   // When the column is narrower than the stage, auto margins centre it and scrollLeft must be 0.
-  if (scaler.offsetWidth <= stageContentWidth(stage) + 0.5) {
+  // Centre-origin zooms also keep a wider column centred; pointer zooms leave the scroll alone.
+  const contentWidth = stageContentWidth(stage);
+  if (scaler.offsetWidth <= contentWidth + 0.5) {
     stage.scrollLeft = 0;
+  } else if (zoomRecenter) {
+    stage.scrollLeft = (scaler.offsetWidth - contentWidth) / 2;
   }
 
   if (!document.body.classList.contains("panel-dragging")) syncCurrentPage();
@@ -804,6 +818,18 @@ function finishZoom() {
   zooming = false;
   reportZoom(true);
   centerAtRest();
+  if (zoomRecenter) {
+    const stage = stageElement();
+    const scaler = scalerElement();
+    if (stage && scaler) {
+      const contentWidth = stageContentWidth(stage);
+      stage.scrollLeft =
+        scaler.offsetWidth > contentWidth + 0.5
+          ? (scaler.offsetWidth - contentWidth) / 2
+          : 0;
+    }
+  }
+  zoomRecenter = false;
   updateWindow(true).catch(() => {});
   pagesElement()?.classList.remove("zooming");
 }
@@ -3321,7 +3347,7 @@ window.PDFScope = {
 
   async render(pageNumber) {
     if (pendingDefaultZoom > 0) {
-      setZoomTarget(pendingDefaultZoom / 100, { direct: true });
+      setZoomTarget(pendingDefaultZoom / 100, { direct: true, recenter: true });
       pendingDefaultZoom = 0;
     }
     if (!document_) return;

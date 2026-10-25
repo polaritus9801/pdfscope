@@ -272,14 +272,59 @@ body {
   /* We own scroll anchoring during zoom; the browser must not adjust it as the scaler resizes. */
   overflow-anchor: none;
   padding: var(--space-5);
-  /* Reserve the left gutter for the wide page-range bar and its direct SVG actions. */
+  /* Symmetric gutters: the tool rail lives on the left, the wide page-range bar on the right by
+     default, and the PDF column stays horizontally centred for a stable zoom anchor. */
   padding-left: calc(var(--space-5) * 4 + var(--space-4) + var(--space-1));
+  padding-right: calc(var(--space-5) * 4 + var(--space-4) + var(--space-1));
+}
+
+html[data-range-side="left"] .stage,
+html[data-range-side="none"] .stage {
   padding-right: 0;
 }
 
-html[data-range-side="right"] .stage,
-html[data-range-side="both"] .stage {
-  padding-right: calc(var(--space-5) * 4 + var(--space-4) + var(--space-1));
+/* Directory/thumbnail scrollbars stay deliberately thin (about 4pt), independent of the reader's
+   native scrollbar. */
+.thumb-list,
+.outline-list {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--accent) 38%, transparent) transparent;
+}
+
+.thumb-list::-webkit-scrollbar,
+.outline-list::-webkit-scrollbar {
+  width: 4px;  /* size */
+  height: 4px;  /* size */
+}
+
+.thumb-list::-webkit-scrollbar-track,
+.outline-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.thumb-list::-webkit-scrollbar-thumb,
+.outline-list::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--accent) 38%, transparent);
+  border-radius: 999px;  /* size */
+}
+
+.thumb-list::-webkit-scrollbar-thumb:hover,
+.outline-list::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--accent) 62%, transparent);
+}
+
+/* The hovered page marker rides the reader's scrollbar, not the AI-panel divider. */
+.stage-scroll-marker {
+  position: absolute;
+  right: 3px;  /* size */
+  width: 4px;  /* size */
+  height: 12px;  /* size */
+  margin-top: -6px;  /* size */
+  z-index: 5;
+  background: var(--accent-strong);
+  border-radius: 999px;  /* size */
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 72%);  /* size */
+  pointer-events: none;
 }
 
 /* The column is laid out once at the base width. Zoom transforms the whole column; the scaler
@@ -1128,16 +1173,6 @@ html[data-range-side="both"] .stage {
 
 .workspace:has(.panel.collapsed) .rail::before {
   cursor: default;
-}
-
-.rail-marker {
-  position: absolute;
-  left: -1px;  /* size */
-  width: 6px;  /* size */
-  height: 8px;  /* size */
-  margin-top: -var(--space-1);
-  background: var(--accent-strong);
-  border-radius: 3px;  /* size */
 }
 
 /* #2: the window never scrolls; only the reader and the panel body do. */
@@ -2603,6 +2638,11 @@ mark.find-hit {
 }
 
 .page-range-bar.range-right {
+  display: block;
+}
+
+.page-range-bar.range-left,
+.page-bar-actions.range-left {
   display: none;
 }
 
@@ -2619,7 +2659,7 @@ mark.find-hit {
 }
 
 .page-bar-actions.range-right {
-  display: none;
+  display: flex;
 }
 
 .page-bar-btn {
@@ -2678,12 +2718,24 @@ mark.find-hit {
   filter: drop-shadow(0 1px 2px rgb(60 44 94 / 0.8));  /* size */
 }
 
-/* Left/right/both/none. Left is the default. */
+/* Left/right/both/none. Right is the default: tools on the left, range bar on the right. */
 html[data-range-side="right"] .page-range-bar.range-left,
 html[data-range-side="right"] .page-bar-actions.range-left,
+html[data-range-side="left"] .page-range-bar.range-right,
+html[data-range-side="left"] .page-bar-actions.range-right,
 html[data-range-side="none"] .page-range-bar,
 html[data-range-side="none"] .page-bar-actions {
   display: none;
+}
+
+html[data-range-side="left"] .page-range-bar.range-left,
+html[data-range-side="both"] .page-range-bar.range-left {
+  display: block;
+}
+
+html[data-range-side="left"] .page-bar-actions.range-left,
+html[data-range-side="both"] .page-bar-actions.range-left {
+  display: flex;
 }
 
 html[data-range-side="right"] .page-range-bar.range-right,

@@ -613,11 +613,11 @@ pub(crate) fn SettingsSheet(
                                                 form_page_bar_side.set(value.clone());
                                                 write_page_bar_side(&value);
                                             }>
-                                                <option value="left" selected=move || form_page_bar_side.get() == "left">
-                                                    "左侧（默认）"
-                                                </option>
                                                 <option value="right" selected=move || form_page_bar_side.get() == "right">
-                                                    "右侧"
+                                                    "右侧（默认）"
+                                                </option>
+                                                <option value="left" selected=move || form_page_bar_side.get() == "left">
+                                                    "左侧"
                                                 </option>
                                                 <option value="both" selected=move || form_page_bar_side.get() == "both">
                                                     "两侧"
@@ -674,8 +674,8 @@ pub(crate) fn SettingsSheet(
                                                     write_resume_preference("pinned");
                                                     form_page_repeat.set("adjust".to_owned());
                                                     write_page_repeat_preference("adjust");
-                                                    form_page_bar_side.set("left".to_owned());
-                                                    write_page_bar_side("left");
+                                                    form_page_bar_side.set("right".to_owned());
+                                                    write_page_bar_side("right");
                                                 }
                                             >
                                                 "恢复阅读默认"
