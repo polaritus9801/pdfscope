@@ -797,6 +797,9 @@ start/single/end toolbar:
   `window.__pdfscopePageMetrics`; the overlay only re-renders when geometry changes, never on scroll.
 - Range bars are one element per committed range, addition segment, subtraction ghost or open
   endpoint. The bar still sits in the side gutter and the left/right/both/none rules are unchanged.
+  Additive segments carry the old endpoint rule: the clicked anchor end is `--deep-border`, the
+  hovering end is `--light-border`, and the span between them is `--light-body`. A placed open
+  anchor likewise shows its cap immediately.
 - Selection outlines are overlay boxes: solid for committed pages, dashed for additions/open
   endpoints, lighter dashed for subtraction; a subtraction outline replaces the solid one instead of
   drawing through it.

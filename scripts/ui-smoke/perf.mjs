@@ -291,11 +291,13 @@ try {
         pointerType: "mouse",
       }));
       await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      const bar = document.querySelector(".page-range-bar.global.visible");
       return {
         ms: performance.now() - started,
         targetPage,
         previewOutlines: document.querySelectorAll(".page-overlay-preview").length,
         visibleBars: document.querySelectorAll(".page-range-bar.global.visible").length,
+        barBackground: bar?.style.background ?? "",
       };
     })()`);
 
@@ -342,6 +344,12 @@ try {
     }
     if (preview.previewOutlines !== preview.targetPage) {
       failures.push(`${count}: preview outlined ${preview.previewOutlines}/${preview.targetPage}`);
+    }
+    if (
+      !preview.barBackground.includes("var(--deep-border) 0") ||
+      !preview.barBackground.includes("var(--light-border) 100%")
+    ) {
+      failures.push(`${count}: placed anchor cap is not deep (${preview.barBackground})`);
     }
     if (commit.selectionOutlines !== preview.targetPage) {
       failures.push(`${count}: committed ${commit.selectionOutlines}/${preview.targetPage}`);

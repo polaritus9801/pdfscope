@@ -83,6 +83,9 @@ minor releases may contain breaking changes; they are always called out.
 - Restored the old post-click feel: after clicking start/end/single, moving inside the same third
   keeps the button and hover preview hidden. They reappear only after a different page/third/side
   or after leaving the strip, matching the old per-button `mouseenter` behaviour.
+- Restored the placed-endpoint bar colour: after a start anchor, the anchor end is still deep purple
+  while the hovered end is light purple and the span between is body lilac. The global bar no longer
+  paints both ends as hover endpoints.
 - Page-bar action icons now appear in place with no opacity transition or hover-shadow swap; the old
   0.16s fade plus one-vs-two-layer shadow read as a tiny upward jump on all three buttons.
 - The composer resize handle is now a square-ended border segment shown only while the handle itself

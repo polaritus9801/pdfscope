@@ -521,8 +521,22 @@ pub(crate) fn PageRangeOverlay(
                     });
                 }
             } else {
+                // The old per-page bar chose its cap colour from `first/last + placed`: the clicked
+                // anchor endpoint was deep, the hovered endpoint light. Carry that rule onto the
+                // single segment instead of painting both ends light.
+                let anchor_page = anchor.get().map(|(_, page)| page);
                 for (from, to) in add_segments(start, end, &set) {
                     if let Some((top, height)) = page_span(&layout, from, to) {
+                        let top_color = if anchor_page == Some(from) {
+                            "var(--deep-border)"
+                        } else {
+                            "var(--light-border)"
+                        };
+                        let bottom_color = if anchor_page == Some(to) {
+                            "var(--deep-border)"
+                        } else {
+                            "var(--light-border)"
+                        };
                         specs.push(BarSpec {
                             top,
                             height,
@@ -532,8 +546,8 @@ pub(crate) fn PageRangeOverlay(
                                 bar_gradient(
                                     true,
                                     true,
-                                    "var(--light-border)",
-                                    "var(--light-border)",
+                                    top_color,
+                                    bottom_color,
                                     "var(--light-body)"
                                 )
                             ),
