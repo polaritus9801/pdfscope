@@ -4762,3 +4762,37 @@ body.panel-dragging .panel-resize::after {
   background: var(--surface);
   border: 1px solid var(--border-strong);
 }
+
+.send-warning {
+  right: 2px;  /* size */
+  bottom: 2px;  /* size */
+}
+
+.send-warning svg {
+  display: block;
+}
+
+.send-warning b {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-bottom: 2px;  /* size */
+  color: #ffffff;
+  font-size: 12px;  /* size */
+  font-weight: 800;
+  line-height: 1;
+}
+
+.question-refs-badge.open,
+.question-refs-badge.open:hover {
+  color: #ffffff;
+  background: #7f5cbf;
+  border-color: #7f5cbf;
+}
+
+.question-refs-badge.open svg,
+.question-refs-badge.open span {
+  color: #ffffff;
+}

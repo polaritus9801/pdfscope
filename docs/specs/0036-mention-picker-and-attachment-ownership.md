@@ -38,8 +38,9 @@ The context shelf is the owner of references, not the inline token.
 
 - Deleting an `@` pill from the editor removes only that text occurrence. The corresponding passage,
   region, page, image, file or answer stays in the context shelf and is still sent.
-- Tokens have no trailing space. The caret is kept outside the non-editable pill; clicking its left
-  half places the caret before it, clicking its right half after it.
+- Tokens have no trailing space and no zero-width guards. Clicking the left/right half places the
+  caret before/after the pill; Backspace/Delete adjacent to a pill removes the pill and keeps the
+  caret outside.
 - Removing a reference from the shelf keeps its token, marks it red as an orphan and shows a small
   warning on the send button. The reader can delete the red pill or confirm sending via the centered
   “是 / 修改” dialog; “修改” focuses just after the first red pill.

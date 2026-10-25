@@ -34,7 +34,7 @@ function serialise() {
   };
 
   for (const child of root.childNodes) walk(child);
-  return { text: text.replace(/\u200B/g, "").replace(/\n{3,}/g, "\n\n"), keys };
+  return { text: text.replace(/\n{3,}/g, "\n\n"), keys };
 }
 
 function emit() {
@@ -92,6 +92,23 @@ function removeTrailingAt() {
   selection.addRange(range);
 }
 
+function refreshEditorPaint() {
+  if (!root) return;
+  const range = caretInRoot();
+  if (range) {
+    const caret = range.getBoundingClientRect();
+    const box = root.getBoundingClientRect();
+    if (caret.bottom > box.bottom) root.scrollTop += caret.bottom - box.bottom + 8;
+    else if (caret.top < box.top) root.scrollTop -= box.top - caret.top + 8;
+  }
+  // WebKit can leave a stale blank run beside the @ after scrolling a long field; force one
+  // compositing pass without changing the document.
+  root.style.transform = "translateZ(0)";
+  requestAnimationFrame(() => {
+    if (root) root.style.transform = "";
+  });
+}
+
 function checkMention() {
   if (!allowMention) return;
   const text = textBeforeCaret();
@@ -100,6 +117,7 @@ function checkMention() {
     return;
   }
   window.__pdfscopeMentionOpen?.();
+  requestAnimationFrame(refreshEditorPaint);
 }
 
 function insertText(text) {
@@ -129,45 +147,23 @@ function makeToken(key, label) {
   return token;
 }
 
-function zeroGuard() {
-  return document.createTextNode("\u200B");
-}
-
-function afterGuard(token) {
-  const next = token?.nextSibling;
-  return next && next.nodeType === Node.TEXT_NODE && next.textContent.startsWith("\u200B")
-    ? next
-    : null;
-}
-
-function beforeGuard(token) {
-  const previous = token?.previousSibling;
-  return previous && previous.nodeType === Node.TEXT_NODE && previous.textContent.endsWith("\u200B")
-    ? previous
-    : null;
-}
-
 function insertToken(key, label) {
   if (!root) return;
   removeTrailingAt();
 
   const token = makeToken(key, label);
-  const before = zeroGuard();
-  const after = zeroGuard();
 
   const range = caretInRoot();
   if (!range) {
-    root.append(before, token, after);
+    root.append(token);
   } else {
     range.deleteContents();
     range.insertNode(token);
-    token.before(before);
-    token.after(after);
   }
 
-  // Invisible zero-width guards give the caret a position outside the pill without a visible space.
+  // No trailing space and no invisible character: keep the caret just outside the pill.
   const caret = document.createRange();
-  caret.setStart(after, 1);
+  caret.setStartAfter(token);
   caret.collapse(true);
   const selection = window.getSelection();
   selection.removeAllRanges();
@@ -198,13 +194,65 @@ document.addEventListener("selectionchange", () => {
   const token = anchor instanceof Element ? anchor.closest(".mention") : null;
   if (!token) return;
   const range = document.createRange();
-  const guard = afterGuard(token);
-  if (guard) range.setStart(guard, 1);
-  else range.setStartAfter(token);
+  range.setStartAfter(token);
   range.collapse(true);
   selection.removeAllRanges();
   selection.addRange(range);
 });
+
+function tokenAtSelection(range, backward) {
+  if (!root || !range?.collapsed) return null;
+  const node = range.startContainer;
+  if (node.nodeType === Node.ELEMENT_NODE) {
+    const element = node;
+    const inside = element.closest?.(".mention");
+    if (inside && root.contains(inside)) return inside;
+    if (backward && range.startOffset > 0) {
+      const previous = element.childNodes[range.startOffset - 1];
+      if (previous?.nodeType === Node.ELEMENT_NODE && previous.classList.contains("mention")) return previous;
+    }
+    if (!backward && range.startOffset < element.childNodes.length) {
+      const next = element.childNodes[range.startOffset];
+      if (next?.nodeType === Node.ELEMENT_NODE && next.classList.contains("mention")) return next;
+    }
+    return null;
+  }
+  if (node.nodeType !== Node.TEXT_NODE) return null;
+  const inside = node.parentElement?.closest(".mention");
+  if (inside && root.contains(inside)) return inside;
+  if (backward && range.startOffset === 0) {
+    const previous = node.previousSibling;
+    if (previous?.nodeType === Node.ELEMENT_NODE && previous.classList.contains("mention")) return previous;
+  }
+  if (!backward && range.startOffset === node.textContent.length) {
+    const next = node.nextSibling;
+    if (next?.nodeType === Node.ELEMENT_NODE && next.classList.contains("mention")) return next;
+  }
+  return null;
+}
+
+function removeTokenAtSelection(backward) {
+  const selection = window.getSelection();
+  if (!root || !selection?.rangeCount) return;
+  const range = selection.getRangeAt(0);
+  const token = tokenAtSelection(range, backward);
+  if (!token) return;
+  const parent = token.parentNode;
+  const next = token.nextSibling;
+  token.remove();
+  root.focus();
+  const caret = document.createRange();
+  if (next) {
+    caret.setStartBefore(next);
+    caret.collapse(true);
+  } else {
+    caret.selectNodeContents(root);
+    caret.collapse(false);
+  }
+  selection.removeAllRanges();
+  selection.addRange(caret);
+  emit();
+}
 
 window.Composer = {
   init(element, callback) {
@@ -226,6 +274,13 @@ window.Composer = {
       event.preventDefault();
       const text = clipboard?.getData("text/plain") ?? "";
       insertText(text);
+    });
+    root.addEventListener("keydown", (event) => {
+      if ((event.key === "Backspace" || event.key === "Delete") && !event.metaKey && !event.ctrlKey && !event.altKey) {
+        const beforeLength = root.textContent.length;
+        removeTokenAtSelection(event.key === "Backspace");
+        if (root.textContent.length !== beforeLength) event.preventDefault();
+      }
     });
     root.addEventListener("blur", () => {
       window.__pdfscopeMentionClose?.();
@@ -251,13 +306,9 @@ window.Composer = {
         const liveRect = live.getBoundingClientRect();
         const range = document.createRange();
         if (event.clientX < liveRect.left + liveRect.width / 2) {
-          const guard = beforeGuard(live);
-          if (guard) range.setStartBefore(guard);
-          else range.setStartBefore(live);
+          range.setStartBefore(live);
         } else {
-          const guard = afterGuard(live);
-          if (guard) range.setStartAfter(guard);
-          else range.setStartAfter(live);
+          range.setStartAfter(live);
         }
         range.collapse(true);
         const selection = window.getSelection();
@@ -306,18 +357,7 @@ window.Composer = {
     if (!root) return;
     const token = root.querySelector(`.mention[data-key="${key}"]`);
     if (!token) return;
-    // Take the following space with it, so two removals do not leave a double gap.
-    const before = beforeGuard(token);
-    const after = afterGuard(token);
     token.remove();
-    if (before) {
-      before.textContent = before.textContent.slice(0, -1);
-      if (!before.textContent) before.remove();
-    }
-    if (after) {
-      after.textContent = after.textContent.slice(1);
-      if (!after.textContent) after.remove();
-    }
     emit();
   },
 
@@ -350,10 +390,8 @@ window.Composer = {
     const place = () => {
       const token = root.querySelector(`.mention[data-key="${key}"]`);
       if (!token) return;
-      const guard = afterGuard(token);
       const range = document.createRange();
-      if (guard) range.setStart(guard, 1);
-      else range.setStartAfter(token);
+      range.setStartAfter(token);
       range.collapse(true);
       const selection = window.getSelection();
       selection?.removeAllRanges();
@@ -396,7 +434,7 @@ window.Composer = {
     const nodes = [];
     for (const part of parts ?? []) {
       if (part && part.key && part.label) {
-        nodes.push(zeroGuard(), makeToken(part.key, part.label), zeroGuard());
+        nodes.push(makeToken(part.key, part.label));
       } else if (part && typeof part.text === "string" && part.text.length > 0) {
         nodes.push(document.createTextNode(part.text));
       }

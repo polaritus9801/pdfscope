@@ -64,6 +64,7 @@ layout change). If the reader sends with red pills:
 2. `是` (white) sends anyway; `修改` (purple) focuses the composer immediately after the first red pill.
 3. The dialog disappears when all red pills are deleted.
 
-The composer keeps zero-width guards around each pill so the caret has an outside position on both
-sides without a visible space. Clicking the left half of a pill places the caret before it; the right
-half places it after.
+The composer does **not** use zero-width characters around pills. Clicking the left/right half places
+the caret before/after the pill; Backspace or Delete adjacent to a pill removes the pill instead of
+letting the caret enter it. The field also nudges its scroll/paint pass after opening the @ picker so a
+long, scrolled message does not leave a stale blank run beside the @.
