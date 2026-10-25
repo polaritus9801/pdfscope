@@ -2773,19 +2773,16 @@ body.selection-quiet .textLayer :is(span, br)::selection {
 }
 
 .ask.editor .ProseMirror p.md-list {
-  position: relative;
-  padding-left: 18px;  /* size */
+  padding-left: 2em;
+  text-indent: -2em;
 }
 
-.ask.editor .ProseMirror p.md-list::before {
-  position: absolute;
-  left: 2px;  /* size */
+.ask.editor .ProseMirror .md-list-marker {
+  display: inline-block;
+  width: 2em;
   color: var(--ink-faint);
-  content: attr(data-md-marker);
-}
-
-.ask.editor .ProseMirror p.md-list-active::before {
-  display: none;
+  font-variant-numeric: tabular-nums;
+  text-indent: 0;
 }
 
 .ask.editor .ProseMirror p.md-code-block {
@@ -2807,24 +2804,30 @@ body.selection-quiet .textLayer :is(span, br)::selection {
   width: 8px;  /* size */
   height: 8px;  /* size */
   padding: 0;
-  background: var(--accent-soft);
-  border: 1px solid var(--accent);
+  background: var(--surface);
+  border: 2px solid var(--accent);  /* size */
   border-radius: 50%;
   box-shadow: 0 0 0 1px var(--surface);
-  opacity: 0.9;
+  opacity: 1;
   cursor: pointer;
+}
+
+.markdown-dot::before {
+  position: absolute;
+  inset: -6px;  /* size */
+  border-radius: 50%;
+  content: "";
 }
 
 .markdown-dot:hover,
 .markdown-dot:focus-visible {
-  background: var(--accent);
-  opacity: 1;
+  background: #7f5cbf;
+  border-color: #7f5cbf;
 }
 
 .markdown-dot.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  opacity: 1;
+  background: #7f5cbf;
+  border-color: #7f5cbf;
 }
 
 .markdown-dot:focus-visible {
@@ -3628,7 +3631,7 @@ body.selection-quiet .textLayer :is(span, br)::selection {
   display: flex;
   flex-direction: column;
   width: 100%;
-  min-height: var(--composer-min-height, 56px);  /* size */
+  min-height: max(56px, var(--composer-min-height, 56px), var(--composer-mode-min, 0px));  /* size */
   max-height: 60vh;
   height: auto;
   padding: var(--space-2) var(--space-3) 0;

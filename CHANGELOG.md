@@ -10,9 +10,14 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
-- A tiny top-right dot toggles Obsidian-style live Markdown preview. Raw Markdown remains the
-  document (delimiters reveal while editing), the preference is persisted locally, and the composer
-  now supports headings, quotes, lists, fenced code, links and inline emphasis.
+- A tiny top-right dot toggles Markdown live preview. Raw Markdown remains the document; whole-line
+  syntax reveals on the active line, inline delimiters hide elsewhere, the preference is persisted,
+  and the composer supports headings, quotes, hanging-indent lists, fenced code, links and inline
+  emphasis.
+- The dot is now a high-contrast ring when off and filled on hover/on; toggling no longer changes
+  the composer or AI-panel height.
+- Structured arrow navigation crosses paragraph boundaries at the block edge, so hidden syntax can
+  never make Left/Right jump mid-word.
 - The composer's top edge can be dragged to set a manual height floor while content still
   auto-grows; double-click restores automatic height.
 

@@ -32,6 +32,7 @@ const MARKDOWN_KEY = "pdfscope.composer.markdown";
 let markdownEnabled = readMarkdownPreference();
 let markdownDot = null;
 let resizeHandle = null;
+let modeHeightFloor = 0;
 
 function readMarkdownPreference() {
   try {
@@ -217,6 +218,10 @@ function dispatchTransaction(transaction) {
   syncEmpty();
   if (!markdownDot?.isConnected) installMarkdownDot();
   if (!resizeHandle?.isConnected) installComposerHandles();
+  if (transaction.docChanged && !transaction.getMeta("markdownPreview")) {
+    modeHeightFloor = 0;
+    root?.style.removeProperty("--composer-mode-min");
+  }
   if (transaction.docChanged && !transaction.getMeta("silent")) emit();
   syncMention(transaction.docChanged && !transaction.getMeta("programmatic"));
 }
@@ -330,7 +335,7 @@ function syntaxDecoration(from, to, active) {
   });
 }
 
-function addInlineMarkdown(text, base, selection, decorations) {
+function addInlineMarkdown(text, base, lineActive, decorations) {
   const claimed = [];
   const overlaps = (from, to) => claimed.some(([start, end]) => from < end && to > start);
   const patterns = [
@@ -356,7 +361,7 @@ function addInlineMarkdown(text, base, selection, decorations) {
       const contentStart = rule.link ? start + 1 : start + rule.before;
       const contentEnd = rule.link ? start + 1 + match[1].length : end - rule.after;
       if (contentEnd <= contentStart) continue;
-      const active = selection.from <= base + end && selection.to >= base + start;
+      const active = lineActive;
       decorations.push(
         Decoration.inline(base + contentStart, base + contentEnd, { class: rule.className }),
       );
@@ -412,9 +417,10 @@ function buildMarkdownDecorations(state) {
           const list = /^(\s*)([-*+]|\d+\.)\s+/.exec(text);
           if (list) {
             classes.push("md-list", /^\d/.test(list[2]) ? "md-list-ol" : "md-list-ul");
-            classes.push(active ? "md-list-active" : "md-list-idle");
-            attrs["data-md-marker"] = list[2];
-            prefixEnd = list[0].length;
+            const marker = Decoration.inline(from + 1, from + 1 + list[0].length, {
+              class: "md-list-marker",
+            });
+            decorations.push(marker);
           }
         }
       }
@@ -437,7 +443,7 @@ function buildMarkdownDecorations(state) {
     if (!code) {
       let offset = 0;
       block.forEach((child) => {
-        if (child.isText) addInlineMarkdown(child.text, from + 1 + offset, selection, decorations);
+        if (child.isText) addInlineMarkdown(child.text, from + 1 + offset, active, decorations);
         offset += child.nodeSize;
       });
     }
@@ -567,6 +573,50 @@ function handleDragOver(event) {
   if (data.types?.includes("text/plain")) event.preventDefault();
 }
 
+function handleVerticalArrow(view, event) {
+  if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.key)) return false;
+  if (event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) return false;
+  if (document.querySelector(".mention-picker")) return false;
+  const selection = view.state.selection;
+  if (!selection.empty) return false;
+  const $from = selection.$from;
+  if ($from.depth !== 1) return false;
+  const blockStart = $from.before(1);
+  const blockEnd = $from.after(1);
+  const caret = view.coordsAtPos(selection.from);
+  if (!caret) return false;
+  const lineHeight = parseFloat(getComputedStyle(view.dom).lineHeight) || 20;
+  if (event.key === "ArrowUp") {
+    const first = view.coordsAtPos(blockStart + 1);
+    if (!first || caret.top - first.top >= lineHeight * 0.75 || blockStart <= 0) return false;
+    const target = TextSelection.near(view.state.doc.resolve(blockStart - 1), -1);
+    view.dispatch(view.state.tr.setSelection(target).scrollIntoView());
+    event.preventDefault();
+    return true;
+  }
+  if (event.key === "ArrowLeft") {
+    if (selection.from !== blockStart + 1 || blockStart <= 0) return false;
+    const target = TextSelection.near(view.state.doc.resolve(blockStart - 1), -1);
+    view.dispatch(view.state.tr.setSelection(target).scrollIntoView());
+    event.preventDefault();
+    return true;
+  }
+  if (event.key === "ArrowRight") {
+    if (selection.from !== blockEnd - 1 || blockEnd >= view.state.doc.content.size) return false;
+    const target = TextSelection.near(view.state.doc.resolve(blockEnd + 1), 1);
+    view.dispatch(view.state.tr.setSelection(target).scrollIntoView());
+    event.preventDefault();
+    return true;
+  }
+  const last = view.coordsAtPos(blockEnd - 1);
+  if (!last || last.bottom - caret.bottom >= lineHeight * 0.75) return false;
+  if (blockEnd >= view.state.doc.content.size) return false;
+  const target = TextSelection.near(view.state.doc.resolve(blockEnd + 1), 1);
+  view.dispatch(view.state.tr.setSelection(target).scrollIntoView());
+  event.preventDefault();
+  return true;
+}
+
 function handleMouseDown(event) {
   if (!view) return;
   const target = event.target instanceof Element ? event.target.closest(".mention") : null;
@@ -610,6 +660,8 @@ function setMarkdownEnabled(next) {
   }
   markdownEnabled = Boolean(next);
   writeMarkdownPreference(markdownEnabled);
+  const ask = root;
+  const before = ask?.getBoundingClientRect().height ?? 0;
   if (view) {
     // Force a decoration/plugin pass; the document (and its history) is untouched.
     view.dispatch(
@@ -618,6 +670,11 @@ function setMarkdownEnabled(next) {
         .setMeta("markdownPreview", markdownEnabled),
     );
     view.focus();
+  }
+  if (ask) {
+    const after = ask.getBoundingClientRect().height;
+    modeHeightFloor = Math.ceil(Math.max(before, after, modeHeightFloor));
+    ask.style.setProperty("--composer-mode-min", `${modeHeightFloor}px`);
   }
   updateMarkdownDot();
 }
@@ -645,7 +702,10 @@ function installComposerHandles() {
   const ask = () => card.querySelector(".ask");
   const reset = () => {
     const target = ask();
-    if (target) target.style.removeProperty("--composer-min-height");
+    if (target) {
+      target.style.removeProperty("--composer-min-height");
+      target.style.removeProperty("--composer-mode-min");
+    }
     card.classList.remove("resizing");
   };
   const setHeight = (value) => {
@@ -665,6 +725,8 @@ function installComposerHandles() {
     const startY = event.clientY;
     const startHeight = target.getBoundingClientRect().height;
     let latest = startHeight;
+    modeHeightFloor = 0;
+    target.style.removeProperty("--composer-mode-min");
     card.classList.add("resizing");
     handle.setPointerCapture?.(event.pointerId);
 
@@ -786,6 +848,15 @@ window.Composer = {
     });
     view = installView(root, state);
     view.dom.addEventListener("mousedown", handleMouseDown, true);
+    view.dom.addEventListener(
+      "keydown",
+      (event) => {
+        if (!view || !handleVerticalArrow(view, event)) return;
+        event.preventDefault();
+        event.stopPropagation();
+      },
+      true,
+    );
     view.dom.addEventListener("pointerover", handlePointerOver, true);
     view.dom.addEventListener("pointerout", handlePointerOut, true);
     root.addEventListener("drop", handleDrop, true);

@@ -43,10 +43,13 @@ plain). The mode only changes decorations: the document is always the raw Markdo
 turning it off/on never rewrites or loses anything.
 
 In live mode ProseMirror decorations render Markdown in place while the source characters stay in
-the document. Delimiters are hidden only while the cursor/selection is outside that span; moving the
-caret into the text (or onto a heading/quote/list line) reveals the delimiters again, so `**bold**`
-and every other marker remain editable, Obsidian-Live-Preview style. The serialized question, draft
-and prompt history contain the raw Markdown.
+the document. Inline delimiters are hidden only for paragraphs whose line is not active; entering a
+line reveals all of that line's syntax, so `**bold**` and every other marker remain editable without
+per-span cursor flips. The serialized question, draft and prompt history contain the raw Markdown.
+
+The editor's height is held at the larger of the plain and decorated heights while switching the
+mode, so repeated toggles cannot push the AI panel up or make the bottom bar oscillate. The floor is
+released as soon as the document changes or a manual resize starts.
 
 Supported now:
 
@@ -54,15 +57,22 @@ Supported now:
   `[label](url)`
 - blocks: `#`–`######`, `>` block quotes, `-`/`*`/`+` and `1.` lists, fenced ``` code blocks
 
-Not yet supported: tables, images, task checkboxes, footnotes, math and nested emphasis. Code fences
-stay visible (rather than hidden) so they remain easy to edit.
+List markers stay visible and use a fixed hanging indent, so `1.`/`2.` lines and wrapped lines keep
+the same text column. Paragraph-level arrow movement jumps between block ends instead of mapping
+through hidden marker widths.
+
+Not supported: tables, images, task checkboxes, footnotes and math. Those are document-level GFM
+features; pretending to support them with regex spans would recreate exactly the cursor/layout bugs
+this pass fixes. Full parity needs a dedicated Markdown editor (CodeMirror + Lezer/Obsidian-style
+renderer), not a chat-input decoration layer.
 
 Mod-B/Mod-I/Mod-E wrap/unwrap the source selection in `**`, `*` or backticks by inserting literal
 markers. The placeholder is inset 12px, matching the editor content padding.
 
 ## Resizing
 
-The top edge has an invisible 8px drag handle with a hover line. Dragging it changes the editor
+The mode toggle uses a transient height floor described above. The top edge has an invisible 8px drag
+handle with a hover line. Dragging it changes the editor
 `--composer-min-height`; the manual height is a **floor**, not a fixed height. Content still
 auto-grows above it and shrinks back only to the floor. Dragging to the current minimum or
 double-clicking the handle returns to auto. The handle is keyboard accessible (↑/↓, Home/Enter).
