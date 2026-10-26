@@ -25,16 +25,16 @@ pub fn segments(text: &str) -> Vec<Segment> {
     let mut start = 0;
 
     while index < bytes.len() {
-        if bytes[index] == b'[' {
-            if let Some((page, end)) = parse(text, index) {
-                if start < index {
-                    out.push(Segment::Text(text[start..index].to_owned()));
-                }
-                out.push(Segment::Citation(page));
-                index = end;
-                start = end;
-                continue;
+        if bytes[index] == b'['
+            && let Some((page, end)) = parse(text, index)
+        {
+            if start < index {
+                out.push(Segment::Text(text[start..index].to_owned()));
             }
+            out.push(Segment::Citation(page));
+            index = end;
+            start = end;
+            continue;
         }
         index += 1;
     }

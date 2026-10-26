@@ -349,18 +349,16 @@ fn read_search_keys(app: &tauri::AppHandle) -> BTreeMap<String, String> {
         .unwrap_or_default();
 
     // Migrate the single Tavily key written by the first build.
-    if !keys.contains_key("tavily") {
-        if let Ok(path) = app
+    if !keys.contains_key("tavily")
+        && let Ok(path) = app
             .path()
             .app_config_dir()
             .map(|directory| directory.join(SEARCH_KEY_FILE))
-        {
-            if let Ok(key) = std::fs::read_to_string(path) {
-                let key = key.trim();
-                if !key.is_empty() {
-                    keys.insert("tavily".to_owned(), key.to_owned());
-                }
-            }
+        && let Ok(key) = std::fs::read_to_string(path)
+    {
+        let key = key.trim();
+        if !key.is_empty() {
+            keys.insert("tavily".to_owned(), key.to_owned());
         }
     }
     keys
@@ -427,19 +425,19 @@ pub(crate) fn save_settings(app: tauri::AppHandle, settings: SettingsInput) -> R
         return Err("模型名不能为空".to_owned());
     }
 
-    if let Some(key) = settings.api_key.as_deref().map(str::trim) {
-        if !key.is_empty() {
-            write_key(&app, key)?;
-        }
+    if let Some(key) = settings.api_key.as_deref().map(str::trim)
+        && !key.is_empty()
+    {
+        write_key(&app, key)?;
     }
     let provider = settings
         .search_provider
         .clone()
         .unwrap_or_else(default_search_provider);
-    if let Some(key) = settings.search_api_key.as_deref().map(str::trim) {
-        if !key.is_empty() {
-            write_search_key(&app, &provider, key)?;
-        }
+    if let Some(key) = settings.search_api_key.as_deref().map(str::trim)
+        && !key.is_empty()
+    {
+        write_search_key(&app, &provider, key)?;
     }
 
     let stored_window = read_settings(&app).window;

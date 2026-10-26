@@ -23,18 +23,18 @@ exclude = ["ui"]
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.88"
 license = "MIT"
 authors = ["z1mLi"]
 repository = "https://github.com/polaritus9801/pdfscope"
 
 [workspace.dependencies]
 # Internal
-pdfscope-core = { path = "crates/pdfscope-core" }
-pdfscope-proto = { path = "crates/pdfscope-proto" }
-pdfscope-store = { path = "crates/pdfscope-store" }
-pdfscope-ai = { path = "crates/pdfscope-ai" }
-pdfscope-api = { path = "crates/pdfscope-api" }
+pdfscope-core = { version = "0.1.0", path = "crates/pdfscope-core" }
+pdfscope-proto = { version = "0.1.0", path = "crates/pdfscope-proto" }
+pdfscope-store = { version = "0.1.0", path = "crates/pdfscope-store" }
+pdfscope-ai = { version = "0.1.0", path = "crates/pdfscope-ai" }
+pdfscope-api = { version = "0.1.0", path = "crates/pdfscope-api" }
 
 # Serialization
 serde = { version = "1", features = ["derive"] }

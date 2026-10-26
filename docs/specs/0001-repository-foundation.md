@@ -75,7 +75,7 @@ No other public API is added.
 
 ## Assumptions
 
-- Rust stable ≥ 1.85 is available on contributors' machines; `rust-toolchain.toml` pins it.
+- Rust stable ≥ 1.88 is available on contributors' machines; `rust-toolchain.toml` pins it.
 - SQLite is bundled by `sqlx`, so no system package is required on any target.
 - `just` is available or installable; the underlying commands are also documented verbatim.
 

@@ -6,7 +6,19 @@ exclude-dev = true
 [advisories]
 version = 2
 # Fail the build on any advisory that is not explicitly ignored below.
-ignore = []
+# These are unmaintained transitive crates in the Linux GTK/WebKit and rfd stacks. They have no safe
+# upgrade available from Tauri 2.11/rfd 0.15 and are not reachable from PDFScope's untrusted input.
+ignore = [
+    { id = "RUSTSEC-2024-0370", reason = "glib/gtk macro transitive; no safe upgrade in Tauri 2.11" },
+    { id = "RUSTSEC-2025-0075", reason = "urlpattern/tauri-utils transitive; no safe upgrade" },
+    { id = "RUSTSEC-2025-0080", reason = "urlpattern/tauri-utils transitive; no safe upgrade" },
+    { id = "RUSTSEC-2025-0081", reason = "urlpattern/tauri-utils transitive; no safe upgrade" },
+    { id = "RUSTSEC-2025-0098", reason = "urlpattern/tauri-utils transitive; no safe upgrade" },
+    { id = "RUSTSEC-2025-0100", reason = "urlpattern/tauri-utils transitive; no safe upgrade" },
+    { id = "RUSTSEC-2026-0370", reason = "zbus transitive via rfd; no standalone upgrade" },
+    { id = "RUSTSEC-2026-0371", reason = "zbus_names transitive via rfd; no standalone upgrade" },
+    { id = "RUSTSEC-2026-0372", reason = "zvariant_derive transitive via rfd; no standalone upgrade" },
+]
 
 [licenses]
 version = 2
@@ -21,11 +33,11 @@ allow = [
     "BSD-3-Clause",
     "ISC",
     "Unicode-3.0",
-    "Unicode-DFS-2016",
     "Zlib",
     "MPL-2.0",
     "CC0-1.0",
     "BSL-1.0",
+    "CDLA-Permissive-2.0",
 ]
 confidence-threshold = 0.9
 

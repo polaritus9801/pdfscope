@@ -6,7 +6,7 @@
 
 [![CI](https://github.com/polaritus9801/pdfscope/actions/workflows/ci.yml/badge.svg)](https://github.com/polaritus9801/pdfscope/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-black.svg)](LICENSE)
-[![MSRV](https://img.shields.io/badge/MSRV-1.85-black.svg)](rust-toolchain.toml)
+[![MSRV](https://img.shields.io/badge/MSRV-1.88-black.svg)](rust-toolchain.toml)
 
 </div>
 

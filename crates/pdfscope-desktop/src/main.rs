@@ -21,13 +21,13 @@ fn main() -> anyhow::Result<()> {
     tauri::Builder::default()
         .manage(ask::AskControl::default())
         .setup(|app| {
-            if let Some(window) = app.get_webview_window("main") {
-                if let Some(state) = settings::remembered_window(app.handle()) {
-                    let _ = window.set_size(tauri::PhysicalSize::new(state.width, state.height));
-                    let _ = window.set_position(tauri::PhysicalPosition::new(state.x, state.y));
-                    if state.maximized {
-                        let _ = window.maximize();
-                    }
+            if let Some(window) = app.get_webview_window("main")
+                && let Some(state) = settings::remembered_window(app.handle())
+            {
+                let _ = window.set_size(tauri::PhysicalSize::new(state.width, state.height));
+                let _ = window.set_position(tauri::PhysicalPosition::new(state.x, state.y));
+                if state.maximized {
+                    let _ = window.maximize();
                 }
             }
             Ok(())

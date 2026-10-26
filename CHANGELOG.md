@@ -8,8 +8,13 @@ minor releases may contain breaking changes; they are always called out.
 
 ## [Unreleased]
 
-### Added
+### Changed
 
+- The dependency audit baseline is green again: Tokio, time, plist and quick-xml were updated,
+  internal workspace deps carry versions for `cargo-deny`, and the remaining unmaintained
+  GTK/rfd transitive advisories are documented with their reachability. MSRV is now 1.88.
+- Stable Clippy cleanups in citation parsing and the desktop settings/window setup; no behaviour
+  change.
 - CI now runs JS parse/token checks and a headless zoom/panel smoke against the built UI, and the
   spec gate covers `ui/public` changes. `just check` includes the JS parse check; `just smoke` runs
   the browser test locally.
