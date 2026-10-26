@@ -107,6 +107,8 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Context references now expose eye, pin, @ and X actions. Pinned references survive a send and are persisted per document; the eye toggles their inclusion without dropping the pin.
+- The non-page reference tray is height-capped and collapsible; the file strip stays fixed outside the tray and the page row remains always visible. The composer's automatic growth cap is now 35% of the panel.
 - The composer context shelf now groups references by kind: square screenshot/image media in insertion order,
   three-line clamped text/answer rows, file cards with type/name/size, and an always-visible
   page-reference row with a synchronized range input and the page manager. File attachments now

@@ -100,8 +100,8 @@ toggles and caret placement. There is deliberately no `position: fixed` body and
 listener: both were removed to avoid mobile-keyboard/print side effects and scroll jank while the PDF
 viewer is scrolling.
 
-There is one enforced automatic height cap: `--composer-auto-max`, computed as 30% of the AI panel's
-height and refreshed by a `ResizeObserver` (CSS fallback `30vh`, clamped to at least the 56px content floor). Content grows naturally up to that
+There is one enforced automatic height cap: `--composer-auto-max`, computed as 35% of the AI panel's
+height and refreshed by a `ResizeObserver` (CSS fallback `35vh`, clamped to at least the 56px content floor). Content grows naturally up to that
 cap; above it the input scrolls internally instead of pushing the answer away. A caret restored at
 the end of a long draft is scrolled into view.
 
@@ -109,7 +109,7 @@ The top edge has an 8px drag target whose visible line appears only while the ha
 hovered, keyboard-focused or being dragged. The line is 32 × 3 px, square-ended, and its colour
 strictly follows the card border: `#dccff3` when unfocused, `#7f5cbf` inside `:focus-within`. Dragging it sets
 `--composer-min-height`, a genuine floor: the user can make the input taller even when the content is
-short. Automatic growth is still capped at the 30% panel allowance, but a manual floor raises the CSS
+short. Automatic growth is still capped at the 35% panel allowance, but a manual floor raises the CSS
 maximum to `max(--composer-auto-max, --composer-min-height)` so the chosen height is respected.
 Double-clicking the handle removes the manual floor and returns to automatic height. The handle is
 keyboard accessible (↑/↓, Home/Enter). The baseline minimum stays the current 56px content area.

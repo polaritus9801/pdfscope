@@ -1031,6 +1031,85 @@ fn ensure_tree(conversation: &mut Conversation) {
     conversation.turns = tree_turns(&conversation.tree);
 }
 
+/// The four per-reference actions. `layout` selects the linear row cluster or the four corners of
+/// a media thumbnail. The eye slot stays in the DOM even when the reference is not pinned so the
+/// remaining icons never shift.
+#[component]
+fn ReferenceActions(
+    key: String,
+    pinned: RwSignal<Vec<String>>,
+    hidden: RwSignal<Vec<String>>,
+    layout: &'static str,
+    on_remove: Callback<()>,
+    on_insert: Callback<()>,
+    on_pin: Callback<()>,
+    on_eye: Callback<()>,
+) -> impl IntoView {
+    let pin_key = key.clone();
+    let pinned_now = Signal::derive(move || pinned.get().iter().any(|entry| entry == &pin_key));
+    let eye_key = key.clone();
+    let eye_on = Signal::derive(move || {
+        pinned_now.get() && !hidden.get().iter().any(|entry| entry == &eye_key)
+    });
+    view! {
+        <div class=format!("ref-actions ref-actions-{layout}")>
+            <button
+                type="button"
+                class="ref-action ref-action-eye"
+                class:is-hidden=move || !pinned_now.get()
+                class:active=move || eye_on.get()
+                aria-label="本次上下文可见"
+                aria-pressed=move || eye_on.get().to_string()
+                on:mousedown=move |event: web_sys::MouseEvent| event.prevent_default()
+                on:click=move |event: web_sys::MouseEvent| {
+                    event.stop_propagation();
+                    on_eye.run(());
+                }
+            >
+                {crate::icons::eye_mark(16)}
+            </button>
+            <button
+                type="button"
+                class="ref-action ref-action-pin"
+                class:active=move || pinned_now.get()
+                aria-label="固定引用"
+                aria-pressed=move || pinned_now.get().to_string()
+                on:mousedown=move |event: web_sys::MouseEvent| event.prevent_default()
+                on:click=move |event: web_sys::MouseEvent| {
+                    event.stop_propagation();
+                    on_pin.run(());
+                }
+            >
+                {crate::icons::pin_mark(16)}
+            </button>
+            <button
+                type="button"
+                class="ref-action ref-action-at"
+                aria-label="插入引用"
+                on:mousedown=move |event: web_sys::MouseEvent| event.prevent_default()
+                on:click=move |event: web_sys::MouseEvent| {
+                    event.stop_propagation();
+                    on_insert.run(());
+                }
+            >
+                {icon("at", 16)}
+            </button>
+            <button
+                type="button"
+                class="ref-action ref-action-remove"
+                aria-label="删除引用"
+                on:mousedown=move |event: web_sys::MouseEvent| event.prevent_default()
+                on:click=move |event: web_sys::MouseEvent| {
+                    event.stop_propagation();
+                    on_remove.run(());
+                }
+            >
+                {icon("close", 16)}
+            </button>
+        </div>
+    }
+}
+
 /// A text file the reader attached to a question.
 #[derive(Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 struct UserFile {
@@ -1047,6 +1126,24 @@ struct UserImage {
     id: u64,
     name: String,
     image: String,
+}
+
+#[derive(Clone, Default, serde::Serialize, serde::Deserialize)]
+struct PinnedContext {
+    #[serde(default)]
+    passages: Vec<Passage>,
+    #[serde(default)]
+    regions: Vec<Region>,
+    #[serde(default)]
+    pages: Vec<u32>,
+    #[serde(default)]
+    answers: Vec<crate::AnswerRef>,
+    #[serde(default)]
+    images: Vec<UserImage>,
+    #[serde(default)]
+    files: Vec<UserFile>,
+    #[serde(default)]
+    hidden: Vec<String>,
 }
 
 /// A real content preview opened from a context reference. Files currently carry extracted text;
@@ -1833,9 +1930,210 @@ pub fn AiPanel(
     });
 
     let manager_open = RwSignal::new(false);
+    let shelf_collapsed = RwSignal::new(false);
     let page_input = RwSignal::new(String::new());
     let page_input_dirty = RwSignal::new(false);
     let page_input_error = RwSignal::new(Option::<String>::None);
+    let pinned_keys = RwSignal::new(Vec::<String>::new());
+    let hidden_keys = RwSignal::new(Vec::<String>::new());
+    let pinned_doc = RwSignal::new(String::new());
+    let save_pinned = move || {
+        let document = document_key.get_untracked();
+        if document.is_empty() {
+            return;
+        }
+        let pins = pinned_keys.get_untracked();
+        let has = |key: &str| pins.iter().any(|entry| entry == key);
+        let snapshot = PinnedContext {
+            passages: passages
+                .get_untracked()
+                .into_iter()
+                .filter(|entry| has(&format!("p:{}", entry.id)))
+                .collect(),
+            regions: regions
+                .get_untracked()
+                .into_iter()
+                .filter(|entry| has(&format!("r:{}", entry.id)))
+                .collect(),
+            pages: if has("pages") {
+                page_set.get_untracked()
+            } else {
+                Vec::new()
+            },
+            answers: answers
+                .get_untracked()
+                .into_iter()
+                .filter(|entry| has(&format!("a:{}", entry.id)))
+                .collect(),
+            images: images
+                .get_untracked()
+                .into_iter()
+                .filter(|entry| has(&format!("img:{}", entry.id)))
+                .collect(),
+            files: files
+                .get_untracked()
+                .into_iter()
+                .filter(|entry| has(&format!("file:{}", entry.id)))
+                .collect(),
+            hidden: hidden_keys.get_untracked(),
+        };
+        if let Ok(json) = serde_json::to_string(&snapshot) {
+            if crate::call(
+                "savePinned",
+                &[JsValue::from_str(&document), JsValue::from_str(&json)],
+            )
+            .and_then(|value| value.as_bool())
+                != Some(true)
+            {
+                notify.run("图钉引用保存失败，可能是本地存储空间不足".to_owned());
+            }
+        }
+    };
+    let toggle_pin = move |key: &str| {
+        let key = key.to_owned();
+        if pinned_keys
+            .get_untracked()
+            .iter()
+            .any(|entry| entry == &key)
+        {
+            pinned_keys.update(|list| list.retain(|entry| entry != &key));
+            hidden_keys.update(|list| list.retain(|entry| entry != &key));
+        } else {
+            pinned_keys.update(|list| {
+                if !list.contains(&key) {
+                    list.push(key.clone());
+                }
+            });
+        }
+        save_pinned();
+    };
+    let toggle_eye = move |key: &str| {
+        if !pinned_keys.get_untracked().iter().any(|entry| entry == key) {
+            return;
+        }
+        let key = key.to_owned();
+        hidden_keys.update(|list| {
+            if let Some(index) = list.iter().position(|entry| entry == &key) {
+                list.remove(index);
+            } else {
+                list.push(key.clone());
+            }
+        });
+        save_pinned();
+    };
+    let clear_pins = move || {
+        pinned_keys.set(Vec::new());
+        hidden_keys.set(Vec::new());
+        let document = document_key.get_untracked();
+        if !document.is_empty() {
+            let _ = crate::call("clearPinned", &[JsValue::from_str(&document)]);
+        }
+    };
+    let save_pins_cb = Callback::new(move |_: ()| save_pinned());
+    let pin_ref = Callback::new(move |key: String| toggle_pin(&key));
+    let eye_ref = Callback::new(move |key: String| toggle_eye(&key));
+    let insert_ref = Callback::new(move |(key, label): (String, String)| {
+        let _ = composer(
+            "insertToken",
+            &[JsValue::from_str(&key), JsValue::from_str(&label)],
+        );
+    });
+    // Pinned references are document-scoped. Loading is intentionally a merge: the reader may
+    // already have selected text while the webview was restoring the document.
+    Effect::new(move |_| {
+        let document = document_key.get();
+        if document.is_empty() || pinned_doc.get_untracked() == document {
+            return;
+        }
+        pinned_doc.set(document.clone());
+        pinned_keys.set(Vec::new());
+        hidden_keys.set(Vec::new());
+        let loaded = crate::call("loadPinned", &[JsValue::from_str(&document)])
+            .and_then(|value| value.as_string())
+            .and_then(|json| serde_json::from_str::<PinnedContext>(&json).ok());
+        let Some(saved) = loaded else {
+            return;
+        };
+        let mut pins = Vec::new();
+        for passage in saved.passages {
+            let key = format!("p:{}", passage.id);
+            pins.push(key);
+            if !passages
+                .get_untracked()
+                .iter()
+                .any(|entry| entry.id == passage.id)
+            {
+                next_ref.update(|next| *next = (*next).max(passage.id + 1));
+                passages.update(|list| list.push(passage));
+            }
+        }
+        for region in saved.regions {
+            let key = format!("r:{}", region.id);
+            pins.push(key);
+            if !regions
+                .get_untracked()
+                .iter()
+                .any(|entry| entry.id == region.id)
+            {
+                next_ref.update(|next| *next = (*next).max(region.id + 1));
+                regions.update(|list| list.push(region));
+            }
+        }
+        for answer in saved.answers {
+            let key = format!("a:{}", answer.id);
+            pins.push(key);
+            if !answers
+                .get_untracked()
+                .iter()
+                .any(|entry| entry.id == answer.id)
+            {
+                next_answer.update(|next| *next = (*next).max(answer.id + 1));
+                answers.update(|list| list.push(answer));
+            }
+        }
+        for image in saved.images {
+            let key = format!("img:{}", image.id);
+            pins.push(key);
+            if !images
+                .get_untracked()
+                .iter()
+                .any(|entry| entry.id == image.id)
+            {
+                next_image.update(|next| *next = (*next).max(image.id + 1));
+                images.update(|list| list.push(image));
+            }
+        }
+        for file in saved.files {
+            let key = format!("file:{}", file.id);
+            pins.push(key);
+            if !files
+                .get_untracked()
+                .iter()
+                .any(|entry| entry.id == file.id)
+            {
+                next_file.update(|next| *next = (*next).max(file.id + 1));
+                files.update(|list| list.push(file));
+            }
+        }
+        if !saved.pages.is_empty() {
+            pins.push("pages".to_owned());
+            page_set.set(saved.pages);
+        }
+        pinned_keys.set(pins);
+        hidden_keys.set(saved.hidden);
+    });
+    // Pinned page sets are part of the persistent snapshot; save when the manager or input changes
+    // them (pin toggles save themselves).
+    Effect::new(move |_| {
+        let _ = page_set.get();
+        if pinned_keys
+            .get_untracked()
+            .iter()
+            .any(|entry| entry == "pages")
+        {
+            save_pinned();
+        }
+    });
     let commit_page_input = move || {
         if !page_input_dirty.get_untracked() {
             return;
@@ -1860,6 +2158,13 @@ pub fn AiPanel(
                 }
             }
             page_set.set(next.clone());
+            if pinned_keys
+                .get_untracked()
+                .iter()
+                .any(|entry| entry == "pages")
+            {
+                save_pinned();
+            }
         }
         page_input.set(format_page_ranges(&next));
         page_input_dirty.set(false);
@@ -1889,16 +2194,44 @@ pub fn AiPanel(
         }
     };
 
-    let capture_context = move || TurnContext {
-        passages: passages.get_untracked(),
-        regions: regions.get_untracked(),
-        pages: page_set.get_untracked(),
-        answers: answers.get_untracked(),
-        images: images.get_untracked(),
-        files: files.get_untracked(),
-        web: web.get_untracked(),
-        scope_mode: scope_mode.get_untracked(),
-        page: page.get_untracked(),
+    let capture_context = move || {
+        let hidden = hidden_keys.get_untracked();
+        let visible = |key: String| !hidden.iter().any(|entry| entry == &key);
+        TurnContext {
+            passages: passages
+                .get_untracked()
+                .into_iter()
+                .filter(|entry| visible(format!("p:{}", entry.id)))
+                .collect(),
+            regions: regions
+                .get_untracked()
+                .into_iter()
+                .filter(|entry| visible(format!("r:{}", entry.id)))
+                .collect(),
+            pages: if visible("pages".to_owned()) {
+                page_set.get_untracked()
+            } else {
+                Vec::new()
+            },
+            answers: answers
+                .get_untracked()
+                .into_iter()
+                .filter(|entry| visible(format!("a:{}", entry.id)))
+                .collect(),
+            images: images
+                .get_untracked()
+                .into_iter()
+                .filter(|entry| visible(format!("img:{}", entry.id)))
+                .collect(),
+            files: files
+                .get_untracked()
+                .into_iter()
+                .filter(|entry| visible(format!("file:{}", entry.id)))
+                .collect(),
+            web: web.get_untracked(),
+            scope_mode: scope_mode.get_untracked(),
+            page: page.get_untracked(),
+        }
     };
 
     let restore_context = move |context: &TurnContext| {
@@ -2512,15 +2845,33 @@ pub fn AiPanel(
         let web_now = web.get();
         sources.set(Vec::new());
 
-        let passages_now = passages.get();
-        let regions_now = regions.get();
+        let hidden_now = hidden_keys.get_untracked();
+        let visible = |key: &str| !hidden_now.iter().any(|entry| entry == key);
+        let passages_now: Vec<Passage> = passages
+            .get()
+            .into_iter()
+            .filter(|entry| visible(&format!("p:{}", entry.id)))
+            .collect();
+        let regions_now: Vec<Region> = regions
+            .get()
+            .into_iter()
+            .filter(|entry| visible(&format!("r:{}", entry.id)))
+            .collect();
 
         let current_page = page.get();
         let total = pages.get();
-        let pictures = images.get();
+        let pictures: Vec<UserImage> = images
+            .get()
+            .into_iter()
+            .filter(|entry| visible(&format!("img:{}", entry.id)))
+            .collect();
         let model_override = session_model.get();
         let mode = scope_mode.get();
-        let explicit = page_set.get();
+        let explicit: Vec<u32> = if visible("pages") {
+            page_set.get()
+        } else {
+            Vec::new()
+        };
 
         spawn_local(async move {
             let mut model_question = asked.clone();
@@ -2676,8 +3027,13 @@ pub fn AiPanel(
             // Only a request that actually starts consumes the references. A failed search or a
             // guard trip must leave them in the shelf so the reader can retry without re-selecting.
             if !passages_now.is_empty() || !regions_now.is_empty() {
-                passages.set(Vec::new());
-                regions.set(Vec::new());
+                let pins = pinned_keys.get_untracked();
+                passages.update(|list| {
+                    list.retain(|entry| pins.iter().any(|key| key == &format!("p:{}", entry.id)))
+                });
+                regions.update(|list| {
+                    list.retain(|entry| pins.iter().any(|key| key == &format!("r:{}", entry.id)))
+                });
                 reset_history.run(());
             }
             request_started.update(|count| *count += 1);
@@ -2994,9 +3350,19 @@ pub fn AiPanel(
             }
         }
         history_cursor.set(None);
-        answers.set(Vec::new());
-        images.set(Vec::new());
-        files.set(Vec::new());
+        let pins = pinned_keys.get_untracked();
+        answers.update(|list| {
+            list.retain(|entry| pins.iter().any(|key| key == &format!("a:{}", entry.id)))
+        });
+        images.update(|list| {
+            list.retain(|entry| pins.iter().any(|key| key == &format!("img:{}", entry.id)))
+        });
+        files.update(|list| {
+            list.retain(|entry| pins.iter().any(|key| key == &format!("file:{}", entry.id)))
+        });
+        if !pins.iter().any(|key| key == "pages") {
+            page_set.set(Vec::new());
+        }
         let sent_id = active.get();
         drop_draft(&sent_id);
         composer_clear();
@@ -3013,30 +3379,51 @@ pub fn AiPanel(
         }
         force_send.set(false);
         send_warning.set(false);
+        let hidden_now = hidden_keys.get_untracked();
+        let visible = |key: &str| !hidden_now.iter().any(|entry| entry == key);
         let mut order = Vec::new();
         for passage in passages.get() {
-            order.push(format!("p:{}", passage.id));
+            if visible(&format!("p:{}", passage.id)) {
+                order.push(format!("p:{}", passage.id));
+            }
         }
         for region in regions.get() {
-            order.push(format!("r:{}", region.id));
+            if visible(&format!("r:{}", region.id)) {
+                order.push(format!("r:{}", region.id));
+            }
         }
-        for page in page_set.get() {
-            order.push(format!("page:{page}"));
+        if visible("pages") {
+            for page in page_set.get() {
+                order.push(format!("page:{page}"));
+            }
         }
         for answer in answers.get() {
-            order.push(format!("a:{}", answer.id));
+            if visible(&format!("a:{}", answer.id)) {
+                order.push(format!("a:{}", answer.id));
+            }
         }
         for file in files.get() {
-            order.push(format!("file:{}", file.id));
+            if visible(&format!("file:{}", file.id)) {
+                order.push(format!("file:{}", file.id));
+            }
         }
         for image in images.get() {
-            order.push(format!("img:{}", image.id));
+            if visible(&format!("img:{}", image.id)) {
+                order.push(format!("img:{}", image.id));
+            }
         }
 
         let mut text = inline_question(&question.get(), &order);
-        if !answers.get().is_empty() {
+        let hidden_now = hidden_keys.get_untracked();
+        let visible = |key: &str| !hidden_now.iter().any(|entry| entry == key);
+        let visible_answers: Vec<_> = answers
+            .get()
+            .into_iter()
+            .filter(|answer| visible(&format!("a:{}", answer.id)))
+            .collect();
+        if !visible_answers.is_empty() {
             text.push_str("\n\n[引用的先前回答]\n");
-            for (index, answer) in answers.get().iter().enumerate() {
+            for (index, answer) in visible_answers.iter().enumerate() {
                 text.push_str(&format!(
                     "回答 {}：{}\n",
                     index + 1,
@@ -3044,7 +3431,11 @@ pub fn AiPanel(
                 ));
             }
         }
-        for file in files.get() {
+        for file in files
+            .get()
+            .into_iter()
+            .filter(|file| visible(&format!("file:{}", file.id)))
+        {
             text.push_str(&pdfscope_core::file_block(&file.name, &file.text, 20_000));
             text.push('\n');
         }
@@ -3268,6 +3659,9 @@ pub fn AiPanel(
         forget_reference(&key);
         undo_push.run(());
         passages.update(|list| list.retain(|entry| entry.id != id));
+        pinned_keys.update(|list| list.retain(|entry| entry != &key));
+        hidden_keys.update(|list| list.retain(|entry| entry != &key));
+        save_pins_cb.run(());
     };
     let remove_region = move |id: u64| {
         let key = format!("r:{id}");
@@ -3276,12 +3670,18 @@ pub fn AiPanel(
         undo_push.run(());
         regions.update(|list| list.retain(|entry| entry.id != id));
         media_order.update(|order| order.retain(|entry| entry != &key));
+        pinned_keys.update(|list| list.retain(|entry| entry != &key));
+        hidden_keys.update(|list| list.retain(|entry| entry != &key));
+        save_pins_cb.run(());
     };
     let remove_file = move |id: u64| {
         let key = format!("file:{id}");
         mark_orphan(&key);
         forget_reference(&key);
         files.update(|list| list.retain(|entry| entry.id != id));
+        pinned_keys.update(|list| list.retain(|entry| entry != &key));
+        hidden_keys.update(|list| list.retain(|entry| entry != &key));
+        save_pins_cb.run(());
     };
     let remove_image = move |id: u64| {
         let key = format!("img:{id}");
@@ -3289,6 +3689,9 @@ pub fn AiPanel(
         forget_reference(&key);
         images.update(|list| list.retain(|entry| entry.id != id));
         media_order.update(|order| order.retain(|entry| entry != &key));
+        pinned_keys.update(|list| list.retain(|entry| entry != &key));
+        hidden_keys.update(|list| list.retain(|entry| entry != &key));
+        save_pins_cb.run(());
     };
     let remove_answer = move |id: u64| {
         let key = format!("a:{id}");
@@ -3296,6 +3699,9 @@ pub fn AiPanel(
         forget_reference(&key);
         undo_push.run(());
         answers.update(|list| list.retain(|entry| entry.id != id));
+        pinned_keys.update(|list| list.retain(|entry| entry != &key));
+        hidden_keys.update(|list| list.retain(|entry| entry != &key));
+        save_pins_cb.run(());
     };
 
     let reset_transient = move || {
@@ -4451,9 +4857,24 @@ pub fn AiPanel(
                                                 let hover_class = key.clone();
                                                 let selected_class = key.clone();
                                                 let order_key = key.clone();
+                                                let action_key = key.clone();
+                                                let pin_class = key.clone();
+                                                let hidden_class = key.clone();
+                                                let eye_class = key.clone();
+                                                let action_insert = Callback::new(move |_| {
+                                                    insert_ref.run((
+                                                        format!("r:{id}"),
+                                                        format!("图 p.{page_number}"),
+                                                    ));
+                                                });
+                                                let action_pin = Callback::new(move |_| pin_ref.run(action_key.clone()));
+                                                let action_eye = Callback::new(move |_| eye_ref.run(eye_class.clone()));
+                                                let action_remove = Callback::new(move |_| remove_region(id));
                                                 view! {
                                                     <div
                                                         class="ref-media-thumb"
+                                                        class:ref-pinned=move || pinned_keys.get().iter().any(|entry| entry == &pin_class)
+                                                        class:ref-hidden=move || hidden_keys.get().iter().any(|entry| entry == &hidden_class)
                                                         style:order=move || media_order
                                                             .get()
                                                             .iter()
@@ -4463,7 +4884,6 @@ pub fn AiPanel(
                                                         class:reference-hover=move || hover_reference.get().as_deref() == Some(hover_class.as_str())
                                                         class:selected=move || active_reference.get().as_deref() == Some(selected_class.as_str())
                                                         draggable="true"
-                                                        title=format!("p.{} · 截图", region.page)
                                                         on:mouseenter=move |_| hover_reference_on.run(hover_key.clone())
                                                         on:mouseleave=move |_| hover_reference_off.run(leave_key.clone())
                                                         on:click=move |_| focus_reference.run(click_key.clone())
@@ -4478,19 +4898,19 @@ pub fn AiPanel(
                                                         }
                                                     >
                                                         <img src=region.image.clone() alt="" />
-                                                        <span class="ref-media-badge" title="框选截图">
+                                                        <span class="ref-media-badge">
                                                             <span class="ref-icon ref-icon-crop"></span>
                                                         </span>
-                                                        <button
-                                                            class="ref-media-remove"
-                                                            title="移除"
-                                                            on:click=move |event: web_sys::MouseEvent| {
-                                                                event.stop_propagation();
-                                                                remove_region(id);
-                                                            }
-                                                        >
-                                                            {icon("close", 10)}
-                                                        </button>
+                                                        <ReferenceActions
+                                                            key=key.clone()
+                                                            pinned=pinned_keys
+                                                            hidden=hidden_keys
+                                                            layout="media"
+                                                            on_remove=action_remove
+                                                            on_insert=action_insert
+                                                            on_pin=action_pin
+                                                            on_eye=action_eye
+                                                        />
                                                     </div>
                                                 }
                                             })
@@ -4506,9 +4926,21 @@ pub fn AiPanel(
                                                 let hover_class = key.clone();
                                                 let selected_class = key.clone();
                                                 let order_key = key.clone();
+                                                let action_key = key.clone();
+                                                let pin_class = key.clone();
+                                                let hidden_class = key.clone();
+                                                let eye_class = key.clone();
+                                                let action_insert = Callback::new(move |_| {
+                                                    insert_ref.run((format!("img:{id}"), "图片".to_owned()));
+                                                });
+                                                let action_pin = Callback::new(move |_| pin_ref.run(action_key.clone()));
+                                                let action_eye = Callback::new(move |_| eye_ref.run(eye_class.clone()));
+                                                let action_remove = Callback::new(move |_| remove_image(id));
                                                 view! {
                                                     <div
                                                         class="ref-media-thumb"
+                                                        class:ref-pinned=move || pinned_keys.get().iter().any(|entry| entry == &pin_class)
+                                                        class:ref-hidden=move || hidden_keys.get().iter().any(|entry| entry == &hidden_class)
                                                         style:order=move || media_order
                                                             .get()
                                                             .iter()
@@ -4517,25 +4949,24 @@ pub fn AiPanel(
                                                             .to_string()
                                                         class:reference-hover=move || hover_reference.get().as_deref() == Some(hover_class.as_str())
                                                         class:selected=move || active_reference.get().as_deref() == Some(selected_class.as_str())
-                                                        title=picture.name.clone()
                                                         on:mouseenter=move |_| hover_reference_on.run(hover_key.clone())
                                                         on:mouseleave=move |_| hover_reference_off.run(leave_key.clone())
                                                         on:click=move |_| focus_reference.run(click_key.clone())
                                                     >
                                                         <img src=picture.image.clone() alt="" />
-                                                        <span class="ref-media-badge" title="图片">
+                                                        <span class="ref-media-badge">
                                                             <span class="ref-icon ref-icon-image"></span>
                                                         </span>
-                                                        <button
-                                                            class="ref-media-remove"
-                                                            title="移除"
-                                                            on:click=move |event: web_sys::MouseEvent| {
-                                                                event.stop_propagation();
-                                                                remove_image(id);
-                                                            }
-                                                        >
-                                                            {icon("close", 10)}
-                                                        </button>
+                                                        <ReferenceActions
+                                                            key=key.clone()
+                                                            pinned=pinned_keys
+                                                            hidden=hidden_keys
+                                                            layout="media"
+                                                            on_remove=action_remove
+                                                            on_insert=action_insert
+                                                            on_pin=action_pin
+                                                            on_eye=action_eye
+                                                        />
                                                     </div>
                                                 }
                                             })
@@ -4559,13 +4990,24 @@ pub fn AiPanel(
                                                 let click_key = key.clone();
                                                 let hover_class = key.clone();
                                                 let selected_class = key.clone();
+                                                let pin_class = key.clone();
+                                                let hidden_class = key.clone();
+                                                let eye_class = key.clone();
+                                                let action_key = key.clone();
+                                                let action_insert = Callback::new(move |_| {
+                                                    insert_ref.run((format!("p:{id}"), format!("p.{page_number}")));
+                                                });
+                                                let action_pin = Callback::new(move |_| pin_ref.run(action_key.clone()));
+                                                let action_eye = Callback::new(move |_| eye_ref.run(eye_class.clone()));
+                                                let action_remove = Callback::new(move |_| remove_passage(id));
                                                 view! {
                                                     <div
                                                         class="ref-text-row"
                                                         class:reference-hover=move || hover_reference.get().as_deref() == Some(hover_class.as_str())
                                                         class:selected=move || active_reference.get().as_deref() == Some(selected_class.as_str())
+                                                        class:ref-pinned=move || pinned_keys.get().iter().any(|entry| entry == &pin_class)
+                                                        class:ref-hidden=move || hidden_keys.get().iter().any(|entry| entry == &hidden_class)
                                                         draggable="true"
-                                                        title=passage.quote.clone()
                                                         on:mouseenter=move |_| hover_reference_on.run(hover_key.clone())
                                                         on:mouseleave=move |_| hover_reference_off.run(leave_key.clone())
                                                         on:click=move |_| focus_reference.run(click_key.clone())
@@ -4582,16 +5024,16 @@ pub fn AiPanel(
                                                         <span class="ref-text-kind">{icon("quote", 12)}</span>
                                                         <span class="ref-text-copy">{passage.quote.clone()}</span>
                                                         <span class="ref-text-page">{format!("p.{page_number}")}</span>
-                                                        <button
-                                                            class="ref-text-remove"
-                                                            title="移除"
-                                                            on:click=move |event: web_sys::MouseEvent| {
-                                                                event.stop_propagation();
-                                                                remove_passage(id);
-                                                            }
-                                                        >
-                                                            {icon("close", 11)}
-                                                        </button>
+                                                        <ReferenceActions
+                                                            key=key.clone()
+                                                            pinned=pinned_keys
+                                                            hidden=hidden_keys
+                                                            layout="row"
+                                                            on_remove=action_remove
+                                                            on_insert=action_insert
+                                                            on_pin=action_pin
+                                                            on_eye=action_eye
+                                                        />
                                                     </div>
                                                 }
                                             })
@@ -4606,13 +5048,25 @@ pub fn AiPanel(
                                                 let click_key = key.clone();
                                                 let hover_class = key.clone();
                                                 let selected_class = key.clone();
+                                                let pin_class = key.clone();
+                                                let hidden_class = key.clone();
+                                                let eye_class = key.clone();
+                                                let action_key = key.clone();
+                                                let answer_label = answer.label.clone();
+                                                let action_insert = Callback::new(move |_| {
+                                                    insert_ref.run((format!("a:{id}"), format!("回复 {answer_label}")));
+                                                });
+                                                let action_pin = Callback::new(move |_| pin_ref.run(action_key.clone()));
+                                                let action_eye = Callback::new(move |_| eye_ref.run(eye_class.clone()));
+                                                let action_remove = Callback::new(move |_| remove_answer(id));
                                                 view! {
                                                     <div
                                                         class="ref-text-row"
                                                         class:reference-hover=move || hover_reference.get().as_deref() == Some(hover_class.as_str())
                                                         class:selected=move || active_reference.get().as_deref() == Some(selected_class.as_str())
+                                                        class:ref-pinned=move || pinned_keys.get().iter().any(|entry| entry == &pin_class)
+                                                        class:ref-hidden=move || hidden_keys.get().iter().any(|entry| entry == &hidden_class)
                                                         draggable="true"
-                                                        title=answer.quote.clone()
                                                         on:mouseenter=move |_| hover_reference_on.run(hover_key.clone())
                                                         on:mouseleave=move |_| hover_reference_off.run(leave_key.clone())
                                                         on:click=move |_| focus_reference.run(click_key.clone())
@@ -4629,16 +5083,16 @@ pub fn AiPanel(
                                                         <span class="ref-text-kind">{icon("sparkle", 12)}</span>
                                                         <span class="ref-text-copy">{answer.quote.clone()}</span>
                                                         <span class="ref-text-page">{answer.label.clone()}</span>
-                                                        <button
-                                                            class="ref-text-remove"
-                                                            title="移除"
-                                                            on:click=move |event: web_sys::MouseEvent| {
-                                                                event.stop_propagation();
-                                                                remove_answer(id);
-                                                            }
-                                                        >
-                                                            {icon("close", 11)}
-                                                        </button>
+                                                        <ReferenceActions
+                                                            key=key.clone()
+                                                            pinned=pinned_keys
+                                                            hidden=hidden_keys
+                                                            layout="row"
+                                                            on_remove=action_remove
+                                                            on_insert=action_insert
+                                                            on_pin=action_pin
+                                                            on_eye=action_eye
+                                                        />
                                                     </div>
                                                 }
                                             })
@@ -4661,30 +5115,46 @@ pub fn AiPanel(
                                                 let click_key = key.clone();
                                                 let hover_class = key.clone();
                                                 let selected_class = key.clone();
+                                                let pin_class = key.clone();
+                                                let hidden_class = key.clone();
+                                                let eye_class = key.clone();
+                                                let action_key = key.clone();
+                                                let file_name = file.name.clone();
+                                                let action_insert = Callback::new(move |_| {
+                                                    insert_ref.run((format!("file:{id}"), format!("文件 {file_name}")));
+                                                });
+                                                let action_pin = Callback::new(move |_| pin_ref.run(action_key.clone()));
+                                                let action_eye = Callback::new(move |_| eye_ref.run(eye_class.clone()));
+                                                let action_remove = Callback::new(move |_| remove_file(id));
                                                 let size = file_size_label(file.size);
                                                 view! {
                                                     <div
                                                         class="ref-file-card"
                                                         class:reference-hover=move || hover_reference.get().as_deref() == Some(hover_class.as_str())
                                                         class:selected=move || active_reference.get().as_deref() == Some(selected_class.as_str())
-                                                        title=file.name.clone()
+                                                        class:ref-pinned=move || pinned_keys.get().iter().any(|entry| entry == &pin_class)
+                                                        class:ref-hidden=move || hidden_keys.get().iter().any(|entry| entry == &hidden_class)
                                                         on:mouseenter=move |_| hover_reference_on.run(hover_key.clone())
                                                         on:mouseleave=move |_| hover_reference_off.run(leave_key.clone())
                                                         on:click=move |_| focus_reference.run(click_key.clone())
                                                     >
-                                                        <img class="ref-file-icon" src=file_icon_path(&file.name) alt="" />
-                                                        <span class="ref-file-name">{file.name.clone()}</span>
-                                                        <span class="ref-file-size">{size}</span>
-                                                        <button
-                                                            class="ref-file-remove"
-                                                            title="移除"
-                                                            on:click=move |event: web_sys::MouseEvent| {
-                                                                event.stop_propagation();
-                                                                remove_file(id);
-                                                            }
-                                                        >
-                                                            {icon("close", 11)}
-                                                        </button>
+                                                        <div class="ref-file-main">
+                                                            <img class="ref-file-icon" src=file_icon_path(&file.name) alt="" />
+                                                            <div class="ref-file-copy">
+                                                                <span class="ref-file-name">{file.name.clone()}</span>
+                                                                <span class="ref-file-size">{size}</span>
+                                                            </div>
+                                                        </div>
+                                                        <ReferenceActions
+                                                            key=key.clone()
+                                                            pinned=pinned_keys
+                                                            hidden=hidden_keys
+                                                            layout="file"
+                                                            on_remove=action_remove
+                                                            on_insert=action_insert
+                                                            on_pin=action_pin
+                                                            on_eye=action_eye
+                                                        />
                                                     </div>
                                                 }
                                             })
@@ -4694,6 +5164,38 @@ pub fn AiPanel(
                                 .into_any()
                             });
 
+                            let page_action_remove = Callback::new(move |_| {
+                                let previous = page_set.get_untracked();
+                                if previous.is_empty() {
+                                    return;
+                                }
+                                undo_push.run(());
+                                for page in previous {
+                                    let key = format!("page:{page}");
+                                    mark_orphan(&key);
+                                    forget_reference(&key);
+                                }
+                                page_set.set(Vec::new());
+                                page_input.set(String::new());
+                                page_input_dirty.set(false);
+                                page_input_error.set(None);
+                                pinned_keys.update(|list| list.retain(|entry| entry != "pages"));
+                                hidden_keys.update(|list| list.retain(|entry| entry != "pages"));
+                                save_pinned();
+                            });
+                            let page_action_insert = Callback::new(move |_| {
+                                let pages_now = page_set.get_untracked();
+                                if pages_now.is_empty() {
+                                    return;
+                                }
+                                let first = pages_now[0];
+                                insert_ref.run((
+                                    format!("page:{first}"),
+                                    format!("p.{}", format_page_ranges(&pages_now)),
+                                ));
+                            });
+                            let page_action_pin = Callback::new(move |_| pin_ref.run("pages".to_owned()));
+                            let page_action_eye = Callback::new(move |_| eye_ref.run("pages".to_owned()));
                             let page_row = view! {
                                 <div class="ref-page-wrap">
                                     <div class="ref-page-box">
@@ -4710,7 +5212,7 @@ pub fn AiPanel(
                                             type="text"
                                             spellcheck="false"
                                             aria-label="页面引用"
-                                            placeholder="1-3, 4, 6-8"
+                                            placeholder="输入页面引用，如：1-3, 5, 6-8"
                                             prop:value=move || page_input.get()
                                             on:input=move |event: web_sys::Event| {
                                                 page_input.set(event_target_value(&event));
@@ -4724,6 +5226,16 @@ pub fn AiPanel(
                                                     commit_page_input();
                                                 }
                                             }
+                                        />
+                                        <ReferenceActions
+                                            key="pages".to_owned()
+                                            pinned=pinned_keys
+                                            hidden=hidden_keys
+                                            layout="row"
+                                            on_remove=page_action_remove
+                                            on_insert=page_action_insert
+                                            on_pin=page_action_pin
+                                            on_eye=page_action_eye
                                         />
                                     </div>
                                     {move || page_input_error.get().map(|message| view! {
@@ -4745,7 +5257,6 @@ pub fn AiPanel(
                                                     view! {
                                                         <div
                                                             class="attach-chip"
-                                                            title=source.url.clone()
                                                             on:click=move |_| {
                                                                 let _ = crate::call(
                                                                     "openUrl",
@@ -4769,6 +5280,14 @@ pub fn AiPanel(
                                     <div class="shelf-head">
                                         <span class="shelf-title">{format!("上下文 · {total} 项")}</span>
                                         <button
+                                            class="shelf-collapse"
+                                            aria-label=move || if shelf_collapsed.get() { "展开引用" } else { "折叠引用" }
+                                            aria-expanded=move || (!shelf_collapsed.get()).to_string()
+                                            on:click=move |_| shelf_collapsed.update(|value| *value = !*value)
+                                        >
+                                            <span class="shelf-collapse-mark"></span>
+                                        </button>
+                                        <button
                                             class="shelf-clear"
                                             on:click=move |_| {
                                                 undo_push.run(());
@@ -4786,6 +5305,8 @@ pub fn AiPanel(
                                                 page_input.set(String::new());
                                                 page_input_dirty.set(false);
                                                 page_input_error.set(None);
+                                                clear_pins();
+                                                shelf_collapsed.set(false);
                                                 // The shelf is the source of truth; the editor must not keep
                                                 // pills whose attachment no longer exists.
                                                 let _ = composer("clearTokens", &[]);
@@ -4795,11 +5316,15 @@ pub fn AiPanel(
                                             "清空"
                                         </button>
                                     </div>
-                                    {media_row}
-                                    {text_row}
-                                    {file_row}
+                                    <div class="ref-body" class:is-collapsed=move || shelf_collapsed.get()>
+                                        <div class="ref-scroll">
+                                            {media_row}
+                                            {text_row}
+                                            {source_row}
+                                        </div>
+                                        {file_row}
+                                    </div>
                                     {page_row}
-                                    {source_row}
                                 </div>
                             }
                                 .into_any()

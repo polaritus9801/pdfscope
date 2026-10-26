@@ -32,6 +32,23 @@ Media items use the order they were added. Screenshots carry a purple crop badge
 - The page row is present with an empty set and stays synchronized with valid page-range edits.
 - Invalid page ranges do not mutate `page_set`.
 
+## Controls and shelf height
+
+Every screenshot, image, text/answer, file and page-group reference carries four equally sized
+20px buttons (16px marks): eye, pin, @ and X. Eye is present only when pin is active; its slot is
+reserved so the others do not shift. Text/file/page rows order them linearly; screenshots and images
+place them at the four corners and hide the type badge while hovered. @ inserts the reference token
+at the composer caret (or end when unfocused); X removes it; pin persists it in a document-scoped
+snapshot; eye toggles inclusion in the current send. Pinned references survive a send and reload;
+unpinned ones are consumed. Images/files are stored through the same local snapshot (quota failure
+shows a notice). Hover state is an inset border on the existing rounded rect; no outer ring or native
+title tooltip is used.
+
+The non-page shelf content sits in one vertical scroll capped at `min(30vh, 300px)`. The file strip,
+still one fixed row with a narrow horizontal scrollbar, sits outside that scroll; the page row sits
+below it and is never part of the scroll or the collapse. A small chevron button in the shelf header
+hides all non-page content.
+
 ## Constraints
 
 - Existing reference click/hover/focus/drag/remove behavior is preserved.

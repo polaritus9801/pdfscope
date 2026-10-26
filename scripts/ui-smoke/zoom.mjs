@@ -206,6 +206,18 @@ try {
   })()`);
   check(pageInput.exists, "the page reference row is visible without references");
   check(pageInput.button, "the page reference manager button is in the row");
+  check(pageInput.placeholder.startsWith("输入页面引用"), "the page input has its full placeholder", pageInput.placeholder);
+  const pageActions = await evaluate(`(() => {
+    const box = document.querySelector(".ref-page-box");
+    return {
+      count: box?.querySelectorAll(".ref-action").length ?? 0,
+      white: getComputedStyle(document.querySelector(".ref-page-input")).backgroundColor,
+      eye: getComputedStyle(box.querySelector(".ref-action-eye")).visibility,
+    };
+  })()`);
+  check(pageActions.count === 4, "page row has four actions", JSON.stringify(pageActions));
+  check(pageActions.white === "rgb(255, 255, 255)", "page input is white", pageActions.white);
+  check(pageActions.eye === "hidden", "eye stays hidden until pinned", pageActions.eye);
   await evaluate(`(() => {
     const input = document.querySelector(".ref-page-input");
     input.value = "1-3, 5";
@@ -243,6 +255,17 @@ try {
     "empty page ranges clear the set",
   );
 
+  await evaluate(`document.querySelector(".shelf-collapse")?.click()`);
+  await sleep(100);
+  const collapsed = await evaluate(`({
+    body: getComputedStyle(document.querySelector(".ref-body")).display,
+    page: !!document.querySelector(".ref-page-box"),
+    expanded: document.querySelector(".shelf-collapse")?.getAttribute("aria-expanded"),
+  })`);
+  check(collapsed.body === "none" && collapsed.page && collapsed.expanded === "false", "the shelf collapses except for the page row", JSON.stringify(collapsed));
+  await evaluate(`document.querySelector(".shelf-collapse")?.click()`);
+  await sleep(100);
+
   // File cards carry type, name and original size; image attachments use the square media strip.
   await evaluate(`(() => {
     const files = [
@@ -263,7 +286,7 @@ try {
   })()`);
   check(fileCard.text.includes("sample.rs") && fileCard.text.includes("5 B"), "file card shows name and size", JSON.stringify(fileCard));
   check(fileCard.icon.includes("code/rust.svg"), "file card uses the language icon", fileCard.icon);
-  await evaluate(`document.querySelector(".ref-file-remove")?.click()`);
+  await evaluate(`document.querySelector(".ref-file-card .ref-action-remove")?.click()`);
   await sleep(100);
 
   await evaluate(`(() => {
@@ -280,11 +303,11 @@ try {
   const imageTile = await evaluate(`(() => {
     const tile = document.querySelector(".ref-media-thumb");
     const rect = tile?.getBoundingClientRect();
-    return { width: rect?.width ?? 0, height: rect?.height ?? 0, badge: tile?.querySelector(".ref-media-badge")?.getAttribute("title") ?? "" };
+    return { width: rect?.width ?? 0, height: rect?.height ?? 0, badge: !!tile?.querySelector(".ref-media-badge") };
   })()`);
   check(Math.abs(imageTile.width - imageTile.height) < 1, "image reference is square", JSON.stringify(imageTile));
-  check(imageTile.badge === "图片", "image reference has the image badge", imageTile.badge);
-  await evaluate(`document.querySelector(".ref-media-remove")?.click()`);
+  check(imageTile.badge, "image reference has the image badge");
+  await evaluate(`document.querySelector(".ref-media-thumb .ref-action-remove")?.click()`);
   await sleep(100);
 
   await evaluate(`(async () => {

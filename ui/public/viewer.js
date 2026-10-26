@@ -3177,6 +3177,31 @@ window.PDFScope = {
     }
   },
 
+  loadPinned(key) {
+    try {
+      return window.localStorage.getItem(`pdfscope.pinned.${key}`);
+    } catch {
+      return null;
+    }
+  },
+
+  savePinned(key, json) {
+    try {
+      window.localStorage.setItem(`pdfscope.pinned.${key}`, json);
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
+  clearPinned(key) {
+    try {
+      window.localStorage.removeItem(`pdfscope.pinned.${key}`);
+    } catch {
+      // Nothing to clear.
+    }
+  },
+
   saveConversations(key, json) {
     try {
       window.localStorage.setItem(`pdfscope.conversations.${key}`, json);

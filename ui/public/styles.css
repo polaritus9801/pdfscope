@@ -4577,7 +4577,7 @@ body.composer-resizing * {
   /* Automatic growth is capped at 30% of the AI panel. A manual drag is a real floor: the user
      can deliberately make the input taller even when the content is short. The 56-pixel fallback
      keeps max-height from ever fighting the minimum before JS measures the panel. */
-  max-height: max(var(--composer-auto-max, 30vh), var(--composer-min-height, 56px));
+  max-height: max(var(--composer-auto-max, 35vh), var(--composer-min-height, 56px));
   height: auto;
   overflow-x: hidden;
   overflow-y: auto;
@@ -6234,4 +6234,285 @@ html[data-page-ruler="off"] .page-ruler-preview {
   background: transparent;
   border: 0;
   accent-color: var(--accent);
+}
+
+/* Reference actions, compact shelf and the pinned/visible states. */
+.ref-body {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;  /* size */
+}
+
+.ref-body.is-collapsed {
+  display: none;
+}
+
+.ref-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-height: min(30vh, 300px);  /* size */
+  overflow-y: auto;
+  scrollbar-width: thin;
+  overscroll-behavior: contain;
+}
+
+.ref-text-list {
+  max-height: none;
+  overflow: visible;
+  scrollbar-width: none;
+}
+
+.ref-file-strip {
+  flex: none;
+  margin: 0 0 1px;  /* size */
+  scrollbar-width: thin;
+}
+
+.ref-file-strip::-webkit-scrollbar {
+  display: block;
+  height: 4px;  /* size */
+}
+
+.ref-file-strip::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: var(--radius-full);
+}
+
+.ref-page-wrap {
+  margin-top: 1px;  /* size */
+}
+
+.shelf-collapse {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 22px;  /* size */
+  height: 18px;  /* size */
+  padding: 0;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: 5px;  /* size */
+  cursor: pointer;
+}
+
+.shelf-collapse:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.shelf-collapse-mark {
+  width: 0;
+  height: 0;
+  border-right: 4px solid transparent;  /* size */
+  border-left: 4px solid transparent;  /* size */
+  border-top: 5px solid var(--ink-faint);  /* size */
+  transition: transform 120ms ease;
+}
+
+.shelf-collapse[aria-expanded="false"] .shelf-collapse-mark {
+  transform: rotate(180deg);
+}
+
+.ref-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 1px;  /* size */
+}
+
+.ref-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;  /* size */
+  height: 20px;  /* size */
+  padding: 0;
+  color: var(--ink-faint);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+}
+
+.ref-action:hover {
+  color: var(--accent);
+}
+
+.ref-action.active {
+  color: var(--accent);
+}
+
+.ref-action.is-hidden {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.ref-action-remove:hover {
+  color: var(--danger);
+}
+
+.ref-actions-row {
+  margin-left: 2px;  /* size */
+}
+
+.ref-actions-media {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.ref-actions-media .ref-action {
+  position: absolute;
+  width: 20px;  /* size */
+  height: 20px;  /* size */
+  color: var(--accent);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
+  border-radius: 50%;
+  box-shadow: var(--shadow-1);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ref-media-thumb:hover .ref-actions-media .ref-action,
+.ref-media-thumb:focus-within .ref-actions-media .ref-action {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.ref-actions-media .ref-action-eye {
+  left: 3px;  /* size */
+  bottom: 3px;  /* size */
+}
+
+.ref-actions-media .ref-action-pin {
+  top: 3px;  /* size */
+  left: 3px;  /* size */
+}
+
+.ref-actions-media .ref-action-at {
+  right: 3px;  /* size */
+  bottom: 3px;  /* size */
+}
+
+.ref-actions-media .ref-action-remove {
+  top: 3px;  /* size */
+  right: 3px;  /* size */
+}
+
+.ref-media-thumb:hover .ref-media-badge,
+.ref-media-thumb:focus-within .ref-media-badge {
+  opacity: 0;
+}
+
+.ref-media-badge {
+  transition: opacity 100ms ease;
+}
+
+.ref-file-card {
+  position: relative;
+  min-width: 184px;  /* size */
+  max-width: 300px;  /* size */
+  height: 34px;  /* size */
+}
+
+.ref-file-main {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: var(--space-2);
+}
+
+.ref-file-copy {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: var(--space-2);
+}
+
+.ref-actions-file {
+  position: absolute;
+  top: 50%;  /* size */
+  right: 5px;  /* size */
+  padding-left: 4px;  /* size */
+  background: var(--surface);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.ref-file-card:hover .ref-file-copy,
+.ref-file-card:focus-within .ref-file-copy {
+  visibility: hidden;
+}
+
+.ref-file-card:hover .ref-actions-file,
+.ref-file-card:focus-within .ref-actions-file {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.ref-page-input {
+  height: 28px;  /* size */
+  padding: 0 var(--space-2);
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  line-height: 26px;  /* size */
+}
+
+.ref-page-input:focus {
+  border-color: var(--accent);
+}
+
+.ref-pinned {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+}
+
+.ref-hidden .ref-text-copy,
+.ref-hidden .ref-file-name,
+.ref-hidden .ref-file-size,
+.ref-hidden > img {
+  opacity: 0.55;
+}
+
+/* Hover/selection is an inset border on the card itself, never an outer tooltip ring. */
+.ref-media-thumb.reference-hover,
+.ref-text-row.reference-hover,
+.ref-file-card.reference-hover,
+.attach-chip.reference-hover,
+.attach-thumb.reference-hover {
+  outline: 0;
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.ref-media-thumb.selected,
+.ref-text-row.selected,
+.ref-file-card.selected,
+.attach-chip.selected,
+.attach-thumb.selected {
+  outline: 0;
+  box-shadow: inset 0 0 0 2px var(--accent-strong);
+}
+
+/* Keep the fixed file strip and the always-visible page row close together. */
+.context-shelf {
+  gap: 4px;  /* size */
+}
+
+.ref-page-wrap {
+  margin-top: 0;
+}
+
+.ref-text-row.ref-pinned {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.ref-text-row.ref-pinned.reference-hover,
+.ref-media-thumb.ref-pinned.reference-hover,
+.ref-file-card.ref-pinned.reference-hover {
+  box-shadow: inset 0 0 0 1px var(--accent);
 }

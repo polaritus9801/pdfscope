@@ -890,8 +890,8 @@ function installComposerHandles() {
     const target = ask();
     if (!target) return;
     const panelHeight = panel?.clientHeight || window.innerHeight;
-    // 30% of the panel, but never below a usable content area or the 56px floor.
-    const cap = Math.max(120, Math.round(panelHeight * 0.3));
+    // 35% of the panel, but never below a usable content area or the 56px floor.
+    const cap = Math.max(120, Math.round(panelHeight * 0.35));
     target.style.setProperty("--composer-auto-max", `${cap}px`);
   };
   autoCapObserver?.disconnect();
