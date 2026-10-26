@@ -477,12 +477,16 @@ html[data-scroll-skin="gray"] .page-ruler {
    around it carries the scaled scroll size, so no page reflows while the reader pinches. */
 .pages-scaler {
   position: relative;
-  margin: 0 auto;
+  margin: 0;
 }
 
 .pages {
   width: 100%;
-  transform: scale(var(--view-scale, 1));
+  /* Screen-space sub-pixel scroll and fit/anchor offset. Translation is outside scale so both
+     values are literal screen pixels; no layout/margin is touched by zoom. */
+  transform:
+    translate3d(var(--page-offset-x, 0px), var(--scroll-residual-y, 0px), 0)
+    scale(var(--view-scale, 1));
   transform-origin: 0 0;
   display: flex;
   flex-direction: column;

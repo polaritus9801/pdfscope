@@ -150,7 +150,6 @@ fn App() -> impl IntoView {
     crate::panel::apply_page_bar_side(&crate::panel::read_page_bar_side());
     crate::panel::apply_scroll_skin(&crate::panel::read_scroll_skin());
     crate::panel::apply_page_ruler_visible(crate::panel::read_page_ruler_visible());
-    crate::panel::apply_zoom_mode(&crate::panel::read_zoom_mode());
     let page = RwSignal::new(1_u32);
     let pages = RwSignal::new(0_u32);
     let page_sizes = RwSignal::new(Vec::<PageSize>::new());

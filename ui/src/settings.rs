@@ -9,8 +9,7 @@ use crate::icons::{icon, provider_tile};
 use crate::panel::{
     PAGE_REPEAT_KEY, PRESET_LABELS, RESUME_PREFERENCE_KEY, apply_font_size, apply_theme, bridge,
     flag_of, number_of, preset, read_page_bar_side, read_page_ruler_visible, read_scroll_skin,
-    read_zoom_mode, text_of, write_page_bar_side, write_page_ruler_visible, write_scroll_skin,
-    write_zoom_mode,
+    text_of, write_page_bar_side, write_page_ruler_visible, write_scroll_skin,
 };
 
 /// Publishes the timeout to the bridge, in milliseconds; zero disables the watchdog.
@@ -119,7 +118,6 @@ pub(crate) fn SettingsSheet(
     let form_page_bar_side = RwSignal::new(read_page_bar_side());
     let form_scroll_skin = RwSignal::new(read_scroll_skin());
     let form_page_ruler = RwSignal::new(read_page_ruler_visible());
-    let form_zoom_mode = RwSignal::new(read_zoom_mode());
     let form_page_limit = RwSignal::new(0_u32);
     let form_timeout = RwSignal::new("0".to_owned());
     let form_context_limit = RwSignal::new("128000".to_owned());
@@ -689,28 +687,6 @@ pub(crate) fn SettingsSheet(
                                         </label>
                                         <p class="settings-hint">
                                             "关闭后仍可拖动右侧滑块滚动，只隐藏页码刻度、章节、悬停预览和引用带；此选项立即生效。"
-                                        </p>
-
-                                        <label class="settings-row">
-                                            <span>"缩放方式"</span>
-                                            <select on:change=move |event| {
-                                                let value = event_target_value(&event);
-                                                form_zoom_mode.set(value.clone());
-                                                write_zoom_mode(&value);
-                                            }>
-                                                <option value="scroll" selected=move || form_zoom_mode.get() == "scroll">
-                                                    "滚动锚点（PDF.js）"
-                                                </option>
-                                                <option value="magnify" selected=move || form_zoom_mode.get() == "magnify">
-                                                    "放大（NSScrollView 语义）"
-                                                </option>
-                                                <option value="camera" selected=move || form_zoom_mode.get() == "camera">
-                                                    "合成器相机"
-                                                </option>
-                                            </select>
-                                        </label>
-                                        <p class="settings-hint">
-                                            "滚动锚点平滑跟随指针；放大模式即时锚定；相机模式在手势中直接变换图层。三种均为 Web 实现，NSScrollView 为语义模拟。"
                                         </p>
 
                                         <label class="settings-row">
