@@ -10,6 +10,9 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Appearance now offers grey and purple page-ruler skins (`pdfscope.scroll-skin`); the ruler remains
+  always active and skins only swap thumb variables, never reader geometry. Purple restores the
+  accent ramp, round end caps and narrow divider.
 - Page-ruler and manager polish: neutral 50% major ticks, stable layering, distinct current/selected
   manager states, and hover previews that do not re-anchor the reader.
 - Reader page ruler: canvas page/chapter ticks, current-page line, draggable viewport thumb,

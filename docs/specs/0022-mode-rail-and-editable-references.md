@@ -689,3 +689,11 @@ selection state are distinct, and successful range commits clear the live previe
 neutral ink, page majors are 50% of the longest tick, and the rail/canvas/hover layers are stacked
 so the thumb and hover line cannot disappear behind the canvas. Hover changes page/section without
 re-anchoring the scroll; the thumb is the only drag target.
+
+### Scrollbar skins and purple ruler accents
+
+The Reading-tab ruler/system-scrollbar switch is replaced by an Appearance-tab scrollbar-skin
+picker: 灰色 is the platform-scrollbar grey, 紫色 follows the accent. The choice is stored as
+`localStorage["pdfscope.scroll-skin"]` and exposed as `html[data-scroll-skin]`; it changes only the
+ruler thumb variables, never reader geometry. The page ruler remains always active. The purple skin
+restores round ruler end caps, the narrow divider, and the accent ramp.
