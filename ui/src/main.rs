@@ -149,6 +149,7 @@ pub(crate) async fn settle(value: JsValue) -> Result<JsValue, JsValue> {
 fn App() -> impl IntoView {
     crate::panel::apply_page_bar_side(&crate::panel::read_page_bar_side());
     crate::panel::apply_scroll_skin(&crate::panel::read_scroll_skin());
+    crate::panel::apply_page_ruler_visible(crate::panel::read_page_ruler_visible());
     let page = RwSignal::new(1_u32);
     let pages = RwSignal::new(0_u32);
     let page_sizes = RwSignal::new(Vec::<PageSize>::new());

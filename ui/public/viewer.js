@@ -2935,6 +2935,16 @@ window.PDFScope = {
     return true;
   },
 
+  /// Toggles the page marks only. The custom thumb stays the scrollbar in either state.
+  setPageRulerVisible(visible) {
+    pageRulerVisible = Boolean(visible);
+    if (!pageRulerVisible) {
+      hidePageRulerHover();
+    } else if (pageRuler) {
+      renderReferenceBands();
+    }
+  },
+
   /// Rust publishes on-reference/focus changes; bands are page-normalised and persist until replaced.
   setReferenceBands(bands) {
     const next = Array.isArray(bands) ? bands : [];
@@ -3556,9 +3566,12 @@ function stopZoom() {
 // are drawn on one canvas, so scrolling only updates the thumb and the current-page line.
 let pageRuler = null;
 let pendingReferenceBands = [];
+let pageRulerVisible =
+  (typeof document !== "undefined" && document.documentElement?.dataset.pageRuler) !== "off";
 
 function initPageRuler() {
   if (pageRuler) return;
+  pageRulerVisible = document.documentElement?.dataset.pageRuler !== "off";
   const shell = document.querySelector(".stage-shell");
   if (!shell) {
     setTimeout(initPageRuler, 50);
@@ -3701,7 +3714,7 @@ function renderReferenceBands() {
   if (!ruler?.bandsLayer) return;
   const layer = ruler.bandsLayer;
   layer.replaceChildren();
-  if (ruler.referenceBands.length === 0 || ruler.marks.length === 0) return;
+  if (!pageRulerVisible || ruler.referenceBands.length === 0 || ruler.marks.length === 0) return;
   const marks = new Map(ruler.marks.map((mark) => [mark.number, mark]));
   const total = Math.max(1, ruler.total);
   const track = ruler.trackHeight;
@@ -3980,6 +3993,10 @@ function placePageRulerPair(y) {
 function updatePageRulerHover(event) {
   const ruler = pageRuler;
   if (!ruler || ruler.drag || ruler.marks.length === 0) return;
+  if (!pageRulerVisible) {
+    hidePageRulerHover();
+    return;
+  }
   const rect = ruler.element.getBoundingClientRect();
   const y = clamp(event.clientY - rect.top, 0, ruler.trackHeight);
   ruler.hoverY = y;

@@ -10,6 +10,8 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- A "显示页面标尺" switch hides ruler marks, hover previews and reference bands while keeping the
+  ruler thumb as the scrollbar.
 - Persistent page-ruler reference bands with rest/hover/focus states, shared by page frames, context
   chips, history rows and `@` pills; context clicks focus refs, preview images/files, navigate pages
   or report unavailable references.

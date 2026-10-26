@@ -66,6 +66,7 @@ pub(crate) const RESUME_PREFERENCE_KEY: &str = "pdfscope.resume-pinned";
 pub(crate) const PAGE_REPEAT_KEY: &str = "pdfscope.page-repeat";
 pub(crate) const PAGE_BAR_SIDE_KEY: &str = "pdfscope.page-bar-side";
 pub(crate) const SCROLL_SKIN_KEY: &str = "pdfscope.scroll-skin";
+pub(crate) const PAGE_RULER_KEY: &str = "pdfscope.page-ruler";
 
 /// Appearance preference for the custom page-ruler scrollbar. Future skins are new values here plus
 /// one CSS block keyed by `data-scroll-skin`; the reader layout does not change.
@@ -98,6 +99,35 @@ pub(crate) fn write_scroll_skin(value: &str) {
         let _ = storage.set_item(SCROLL_SKIN_KEY, value);
     }
     apply_scroll_skin(value);
+}
+
+/// Page-ruler visibility. The custom rail keeps owning scrolling and the thumb; turning this off
+/// removes the marks, hover preview and reference bands, not the scrollbar itself.
+pub(crate) fn read_page_ruler_visible() -> bool {
+    web_sys::window()
+        .and_then(|window| window.local_storage().ok().flatten())
+        .and_then(|storage| storage.get_item(PAGE_RULER_KEY).ok().flatten())
+        .as_deref()
+        != Some("off")
+}
+
+pub(crate) fn apply_page_ruler_visible(visible: bool) {
+    if let Some(root) = web_sys::window()
+        .and_then(|window| window.document())
+        .and_then(|document| document.document_element())
+    {
+        let _ = root.set_attribute("data-page-ruler", if visible { "on" } else { "off" });
+    }
+    let _ = crate::call("setPageRulerVisible", &[JsValue::from_bool(visible)]);
+}
+
+pub(crate) fn write_page_ruler_visible(visible: bool) {
+    if let Some(storage) =
+        web_sys::window().and_then(|window| window.local_storage().ok().flatten())
+    {
+        let _ = storage.set_item(PAGE_RULER_KEY, if visible { "on" } else { "off" });
+    }
+    apply_page_ruler_visible(visible);
 }
 
 /// Reading preference: place the page-range bar on the left, right, both sides or nowhere.
