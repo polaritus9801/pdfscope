@@ -660,3 +660,24 @@ are muted and indented, each row shows its target page, and the current section 
 Outline destinations that arrive as PDF page references (`{num, gen}`) are now resolved through
 `getPageIndex` rather than coerced to a number; previously every such entry became page 0, which
 made the whole TOC appear disabled and page numbers blank.
+
+## 2026-10-26 — page ruler, manager drag and navigation scrollbars
+
+**Page ruler.** 设置 → 阅读 → **PDF 滚动条** offers the page ruler (default) and the system scrollbar.
+The ruler is a 16 px overlay at the reader's right edge; the native vertical scrollbar is hidden in
+ruler mode while the horizontal scrollbar remains for zoomed pages. It draws page ticks, a longer
+major tick every 10 pages, quiet accent bands for depth-0 outline entries, the current-page line and
+a draggable viewport thumb. Geometry is read from the rendered page rectangles and refreshed on
+render, resize, page-mode change and zoom settle. Hovering the rail shows the page number, nearest
+outline title, a hover tick and after 160 ms a cached page preview. Clicking centres a page, the thumb
+drags, the wheel scrolls the reader, and Arrow/Page/Home/End work when focused. The rail is an ARIA
+scrollbar with page-valued text and a visible focus ring. The choice is stored as
+`localStorage["pdfscope.scroll-style"]` (`ruler` / `native`).
+
+**Manager drag.** The manager grid owns pointer capture and hit-tests with `elementFromPoint`; native
+image drag is suppressed, so dragging a card does not start the app's file-drop layer. A click toggles
+one page, a real drag paints a live range preview and commits one add/subtract range, and Alt
+subtracts. No hover translate or shadow is applied to manager cards.
+
+**Navigation scrollbars.** 目录 and 缩略图 use the AI-panel recipe: 4 px, transparent track, rounded
+`--border-strong` thumb, no accent/hover variant.

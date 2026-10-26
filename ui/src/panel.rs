@@ -65,6 +65,39 @@ fn format_moment_full(timestamp: f64) -> String {
 pub(crate) const RESUME_PREFERENCE_KEY: &str = "pdfscope.resume-pinned";
 pub(crate) const PAGE_REPEAT_KEY: &str = "pdfscope.page-repeat";
 pub(crate) const PAGE_BAR_SIDE_KEY: &str = "pdfscope.page-bar-side";
+pub(crate) const SCROLL_STYLE_KEY: &str = "pdfscope.scroll-style";
+
+/// Reading preference: the custom page ruler, or the platform scrollbar for comparison.
+pub(crate) fn read_scroll_style() -> String {
+    web_sys::window()
+        .and_then(|window| window.local_storage().ok().flatten())
+        .and_then(|storage| storage.get_item(SCROLL_STYLE_KEY).ok().flatten())
+        .filter(|value| matches!(value.as_str(), "ruler" | "native"))
+        .unwrap_or_else(|| "ruler".to_owned())
+}
+
+pub(crate) fn apply_scroll_style(value: &str) {
+    if let Some(root) = web_sys::window()
+        .and_then(|window| window.document())
+        .and_then(|document| document.document_element())
+    {
+        let _ = root.set_attribute("data-scroll-style", value);
+    }
+}
+
+pub(crate) fn write_scroll_style(value: &str) {
+    let value = if matches!(value, "ruler" | "native") {
+        value
+    } else {
+        "ruler"
+    };
+    if let Some(storage) =
+        web_sys::window().and_then(|window| window.local_storage().ok().flatten())
+    {
+        let _ = storage.set_item(SCROLL_STYLE_KEY, value);
+    }
+    apply_scroll_style(value);
+}
 
 /// Reading preference: place the page-range bar on the left, right, both sides or nowhere.
 pub(crate) fn read_page_bar_side() -> String {

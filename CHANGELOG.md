@@ -10,6 +10,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Reader page ruler: canvas page/chapter ticks, current-page line, draggable viewport thumb,
+  hover page/section preview, click/drag/wheel/keyboard navigation and an ARIA scrollbar. The
+  navigation pane and manager now use the quiet 4 px scrollbar treatment, and manager card drags
+  cannot fall through to the file-drop layer.
 - Page reference ranges now use one wide continuous bar per committed range (43.2 px, square ends,
   deep-body `#cbb8ec` with `#7f5cbf` end transitions) instead of a thin per-page line. The page
   actions are the supplied SVGs exposed directly at 3/4 bar width, white and shadowed rather than
