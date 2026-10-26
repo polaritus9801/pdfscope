@@ -735,3 +735,10 @@ pages for repeated-endpoint extension, and derives base caps from visual base ne
 page extends through the gap without a bottom cap. Paged/spread metrics carry visible flags and are
 refreshed after navigation, so hidden pages cannot be hit. The parity matrix and the baseline probe
 cover these cases.
+
+### Ruler preview pair
+
+The ruler preview image is placed above the pointer and the page/section label below it, with a
+16 px gap centred on the pointer. The pair is clamped as one block inside the rail when space is
+short. The composer placeholder now tests for a structurally empty document (one empty textblock),
+not `textContent === ""`, so blank paragraphs and spaces do not show it.

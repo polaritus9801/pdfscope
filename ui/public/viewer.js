@@ -3853,11 +3853,41 @@ function hidePageRulerHover() {
   pageRuler.preview.hidden = true;
 }
 
+const RULER_PREVIEW_GAP = 16;
+const RULER_EDGE = 4;
+
+/// Places the preview image and section label as one pair around the pointer: image above the
+/// pointer, label below, with the 16 px air gap centred on the pointer. When the pair does not fit,
+/// clamp the pair as a whole so it never leaves the rail.
+function placePageRulerPair(y) {
+  const ruler = pageRuler;
+  if (!ruler) return;
+  const tooltipHeight = ruler.tooltip.offsetHeight;
+  if (ruler.preview.hidden) {
+    ruler.tooltip.style.top = `${clamp(y + RULER_PREVIEW_GAP / 2, RULER_EDGE, ruler.trackHeight - tooltipHeight - RULER_EDGE)}px`;
+    return;
+  }
+  const imageHeight = ruler.preview.offsetHeight;
+  const total = imageHeight + RULER_PREVIEW_GAP + tooltipHeight;
+  const maxTop = ruler.trackHeight - total - RULER_EDGE;
+  let top = y - RULER_PREVIEW_GAP / 2 - imageHeight;
+  if (maxTop >= RULER_EDGE) {
+    top = clamp(top, RULER_EDGE, maxTop);
+  } else {
+    // A pair taller than the rail: keep the label readable and let the image use the remaining
+    // space, rather than drawing either one outside the rail.
+    top = RULER_EDGE;
+  }
+  ruler.preview.style.top = `${top}px`;
+  ruler.tooltip.style.top = `${top + imageHeight + RULER_PREVIEW_GAP}px`;
+}
+
 function updatePageRulerHover(event) {
   const ruler = pageRuler;
   if (!ruler || ruler.drag || ruler.marks.length === 0) return;
   const rect = ruler.element.getBoundingClientRect();
   const y = clamp(event.clientY - rect.top, 0, ruler.trackHeight);
+  ruler.hoverY = y;
   const mark = pageMarkAtY(y);
   if (!mark) {
     hidePageRulerHover();
@@ -3871,10 +3901,7 @@ function updatePageRulerHover(event) {
   ruler.hoverLine.hidden = false;
 
   if (mark.number === ruler.hoverPage && !ruler.tooltip.hidden) {
-    ruler.tooltip.style.top = `${Math.max(
-      4,
-      Math.min(y + 14, ruler.trackHeight - ruler.tooltip.offsetHeight - 4),
-    )}px`;
+    placePageRulerPair(y);
     return;
   }
 
@@ -3888,10 +3915,7 @@ function updatePageRulerHover(event) {
   ruler.tooltipSection.textContent = section?.title ?? "";
   ruler.tooltipSection.hidden = !section?.title;
   ruler.tooltip.hidden = false;
-  ruler.tooltip.style.top = `${Math.max(
-    4,
-    Math.min(y + 14, ruler.trackHeight - ruler.tooltip.offsetHeight - 4),
-  )}px`;
+  placePageRulerPair(y);
 
   const token = ruler.previewToken;
   ruler.previewTimer = setTimeout(async () => {
@@ -3909,15 +3933,8 @@ function updatePageRulerHover(event) {
       ) {
         return;
       }
-      const previewHeight = ruler.preview.offsetHeight;
-      let previewTop = y - previewHeight - 14;
-      if (previewTop < 4) {
-        previewTop = y + 14 + ruler.tooltip.offsetHeight + 8;
-      }
-      ruler.preview.style.top = `${Math.max(
-        4,
-        Math.min(previewTop, ruler.trackHeight - previewHeight - 4),
-      )}px`;
+      // Use the latest pointer position: a same-page move may have happened while the image decoded.
+      placePageRulerPair(ruler.hoverY ?? y);
     };
     if (ruler.previewImage.decode) {
       ruler.previewImage.decode().then(placePreview).catch(placePreview);
