@@ -89,6 +89,11 @@ minor releases may contain breaking changes; they are always called out.
 - Completed the page-range parity audit: repeated endpoint extension again uses the document page
   count, base segment caps/gaps use visual base neighbours (including an open committed page), and
   paged/spread actions only target visible sheets. Details in `docs/perf/overlay-parity.md`.
+- The page-ruler hover pair now straddles the pointer: the preview image sits above it and the
+  section label below, with the 16 px gap centred on the pointer. When the pair does not fit, it is
+  clamped as a whole inside the rail.
+- The composer placeholder now disappears for structurally non-empty documents (blank paragraphs,
+  spaces, hard breaks), not only when `doc.textContent` is non-empty.
 - Page-bar action icons now appear in place with no opacity transition or hover-shadow swap; the old
   0.16s fade plus one-vs-two-layer shadow read as a tiny upward jump on all three buttons.
 - The composer resize handle is now a square-ended border segment shown only while the handle itself

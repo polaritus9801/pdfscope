@@ -84,7 +84,10 @@ than blocking input. Currency false positives are acceptable because the reader 
 off with the dot.
 
 Mod-B/Mod-I/Mod-E wrap/unwrap the source selection in `**`, `*` or backticks by inserting literal
-markers. The placeholder is inset 12px, matching the editor content padding.
+markers. The placeholder is inset 12px, matching the editor content padding. It is shown only while
+the document is structurally empty: exactly one textblock with no inline content. Blank paragraphs,
+spaces, hard breaks and mentions are content, so they suppress the placeholder even though
+ProseMirror's `textContent` can still be empty.
 
 ## Resizing
 

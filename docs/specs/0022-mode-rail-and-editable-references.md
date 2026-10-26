@@ -761,7 +761,9 @@ the rendered page rectangles on render, resize, page-mode change and zoom settle
 and panel reflow are correct. Clicking a page tick centres that page; dragging the thumb centres the
 content under the pointer. Hovering the rail finds the page by its centred tick, shows the page
 number plus the nearest outline title, draws a hover tick, and after 160 ms shows a cached page
-preview. Clicking centres that page; the thumb drags; the wheel over the ruler scrolls the reader;
+preview. The preview image sits above the pointer and the section label below it; the 16 px air gap
+between them is centred on the pointer. When the pair cannot fit, it is clamped as one block inside
+the rail rather than letting either half leave the rail. Clicking centres that page; the thumb drags; the wheel over the ruler scrolls the reader;
 Arrow/Page/Home/End work when the ruler is focused. The ruler is a scrollbar role with
 `aria-valuemin/max/now`, page-valued text and an accessible focus ring. Ruler mode reads
 `localStorage["pdfscope.scroll-skin"]`; both skins use the same ruler and geometry.

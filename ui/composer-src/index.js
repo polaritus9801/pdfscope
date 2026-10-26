@@ -177,7 +177,17 @@ function hasMention(doc) {
 
 function syncEmpty() {
   if (!root || !view) return;
-  const empty = view.state.doc.textContent === "" && !hasMention(view.state.doc);
+  // Blank paragraphs have no text nodes, so `textContent` stays empty even after the user has
+  // created real blank lines. The placeholder belongs only on the initial, structurally empty
+  // document: one paragraph with no inline content. A format-only line, a space, a hard break or a
+  // mention all count as content here.
+  const doc = view.state.doc;
+  const first = doc.firstChild;
+  const structurallyEmpty =
+    doc.childCount === 1 &&
+    Boolean(first?.isTextblock) &&
+    first.content.size === 0;
+  const empty = structurallyEmpty && !hasMention(doc);
   root.classList.toggle("is-editor-empty", empty);
 }
 
