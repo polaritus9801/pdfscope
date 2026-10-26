@@ -1141,6 +1141,37 @@ pub fn AiPanel(
     let model_menu = RwSignal::new(false);
     let request_started = RwSignal::new(0_u64);
     let next_file = RwSignal::new(0_u64);
+    // Screenshots and images share one strip, so remember one insertion order across the two
+    // signals. The effect also repairs the order after restoring a saved question.
+    let media_order = RwSignal::new(Vec::<String>::new());
+    Effect::new(move |_| {
+        let regions_now = regions.get();
+        let images_now = images.get();
+        let mut next = media_order.get_untracked();
+        next.retain(|key| {
+            regions_now
+                .iter()
+                .any(|region| key == &format!("r:{}", region.id))
+                || images_now
+                    .iter()
+                    .any(|image| key == &format!("img:{}", image.id))
+        });
+        for region in &regions_now {
+            let key = format!("r:{}", region.id);
+            if !next.contains(&key) {
+                next.push(key);
+            }
+        }
+        for image in &images_now {
+            let key = format!("img:{}", image.id);
+            if !next.contains(&key) {
+                next.push(key);
+            }
+        }
+        if next != media_order.get_untracked() {
+            media_order.set(next);
+        }
+    });
     let editor_ref = NodeRef::<leptos::html::Div>::new();
     let failed = RwSignal::new(false);
     let notice = RwSignal::new(Option::<String>::None);
@@ -3244,6 +3275,7 @@ pub fn AiPanel(
         forget_reference(&key);
         undo_push.run(());
         regions.update(|list| list.retain(|entry| entry.id != id));
+        media_order.update(|order| order.retain(|entry| entry != &key));
     };
     let remove_file = move |id: u64| {
         let key = format!("file:{id}");
@@ -3256,6 +3288,7 @@ pub fn AiPanel(
         mark_orphan(&key);
         forget_reference(&key);
         images.update(|list| list.retain(|entry| entry.id != id));
+        media_order.update(|order| order.retain(|entry| entry != &key));
     };
     let remove_answer = move |id: u64| {
         let key = format!("a:{id}");
@@ -4417,9 +4450,16 @@ pub fn AiPanel(
                                                 let click_key = key.clone();
                                                 let hover_class = key.clone();
                                                 let selected_class = key.clone();
+                                                let order_key = key.clone();
                                                 view! {
                                                     <div
                                                         class="ref-media-thumb"
+                                                        style:order=move || media_order
+                                                            .get()
+                                                            .iter()
+                                                            .position(|entry| entry == &order_key)
+                                                            .unwrap_or(usize::MAX)
+                                                            .to_string()
                                                         class:reference-hover=move || hover_reference.get().as_deref() == Some(hover_class.as_str())
                                                         class:selected=move || active_reference.get().as_deref() == Some(selected_class.as_str())
                                                         draggable="true"
@@ -4465,9 +4505,16 @@ pub fn AiPanel(
                                                 let click_key = key.clone();
                                                 let hover_class = key.clone();
                                                 let selected_class = key.clone();
+                                                let order_key = key.clone();
                                                 view! {
                                                     <div
                                                         class="ref-media-thumb"
+                                                        style:order=move || media_order
+                                                            .get()
+                                                            .iter()
+                                                            .position(|entry| entry == &order_key)
+                                                            .unwrap_or(usize::MAX)
+                                                            .to_string()
                                                         class:reference-hover=move || hover_reference.get().as_deref() == Some(hover_class.as_str())
                                                         class:selected=move || active_reference.get().as_deref() == Some(selected_class.as_str())
                                                         title=picture.name.clone()
@@ -4731,6 +4778,7 @@ pub fn AiPanel(
                                                 passages.set(Vec::new());
                                                 regions.set(Vec::new());
                                                 images.set(Vec::new());
+                                                media_order.set(Vec::new());
                                                 files.set(Vec::new());
                                                 sources.set(Vec::new());
                                                 answers.set(Vec::new());

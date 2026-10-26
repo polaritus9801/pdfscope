@@ -24,6 +24,14 @@ Media items use the order they were added. Screenshots carry a purple crop badge
 
 `UserFile` gains a `size: u64` with serde default for old conversations. `readOneAttachment()` reports the original byte size. The file card formats it as B/KB/MB; old records show no size.
 
+## Acceptance
+
+- Screenshots and external images interleave by insertion order in one square, horizontally scrolling strip.
+- A text or answer reference clamps to three lines; the list height caps and scrolls vertically.
+- File cards show type icon, name and formatted size, and old conversations without size remain loadable.
+- The page row is present with an empty set and stays synchronized with valid page-range edits.
+- Invalid page ranges do not mutate `page_set`.
+
 ## Constraints
 
 - Existing reference click/hover/focus/drag/remove behavior is preserved.

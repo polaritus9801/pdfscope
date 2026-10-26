@@ -107,7 +107,7 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
-- The composer context shelf now groups references by kind: square screenshot/image media,
+- The composer context shelf now groups references by kind: square screenshot/image media in insertion order,
   three-line clamped text/answer rows, file cards with type/name/size, and an always-visible
   page-reference row with a synchronized range input and the page manager. File attachments now
   carry their original byte size; OOBE uses the new PDF mark.
