@@ -750,3 +750,9 @@ the page ruler, with rest/hover/focus alpha, full width and no pointer intercept
 shared by page frames, context chips, historical reference rows and `@` pills; focus keeps its band.
 Context clicks focus text/box references, navigate pages, scroll answer references, open real
 image/file previews, or report orphan/unknown references. The old hover-only purple dot is removed.
+
+### Page-rail hover marker
+
+The navigation rail shows a small marker at the hovered page's position while the page bar is
+hovered, so the hovered page is visible even when the rail is scrolled away from it. The marker is
+pointer-transparent and does not change scroll position.

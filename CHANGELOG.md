@@ -10,6 +10,8 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- The navigation rail shows a pointer-transparent marker at the hovered page while the page bar is
+  hovered.
 - Thumbnail rails and the page-reference manager now fit each page inside a common square bound while
   preserving its own aspect ratio, then wrap the tiles continuously: landscape pages become shorter
   full-width tiles, A4 becomes a narrower full-height tile, and no internal letterbox bands remain.
