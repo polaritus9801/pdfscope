@@ -10,6 +10,9 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Zoom placement is now one continuous function: the page blends from fit centring to the pointer
+  anchor with a scale-free smoothstep weight, so crossing fit width no longer changes the page's
+  pivot in one frame. Panel-drag geometry remains unchanged.
 - The reader's horizontal axis keeps the system scrollbar when the zoomed page overflows sideways;
   only the native vertical track is hidden by the page ruler.
 - The navigation rail shows a pointer-transparent marker at the hovered page while the page bar is

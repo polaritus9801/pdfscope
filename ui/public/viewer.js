@@ -790,6 +790,55 @@ function applyPan() {
   }
 }
 
+/// Removes the visual placement offset without changing layout or scroll. It is reset before every
+/// measurement so the next frame starts from the real layout rect, not from the previous transform.
+function resetZoomPlacement(pages = pagesElement()) {
+  if (!pages) return;
+  pages.style.setProperty("--page-offset-x", "0px");
+  pages.style.setProperty("--page-offset-y", "0px");
+}
+
+/// A single continuous horizontal placement. `center` is the fit-layout position; `pointer` is the
+/// exact gesture anchor. The blend weight uses the real overflow and the pointer's distance from
+/// the fit centre, so there is no hard-coded scale band or one-frame ownership switch.
+function zoomHorizontalOffset(stage, pages, origin, point, scale) {
+  const stageRect = stage.getBoundingClientRect();
+  const padding = stagePadding(stage);
+  const contentWidth = stageContentWidth(stage);
+  const rect = pages.getBoundingClientRect();
+  if (contentWidth <= 0 || rect.width <= 0) return 0;
+  const center = stageRect.left + padding.left + (contentWidth - rect.width) / 2;
+  const pointer = origin.x - point.x * scale;
+  // Distance from the pointer to the content centre. Using the distance of the pointer from the
+  // fit centre (not its distance from the page edge) keeps the transition scale-free and starts
+  // with zero velocity at the fit boundary.
+  const centre = stageRect.left + padding.left + contentWidth / 2;
+  const distance = Math.max(1, Math.abs(origin.x - centre));
+  const overflow = Math.max(0, rect.width - contentWidth);
+  const q = overflow / (overflow + distance);
+  const weight = q * q * (3 - 2 * q);
+  return center + (pointer - center) * weight - rect.left;
+}
+
+/// Same contract vertically. Long documents are almost always overflowing, so the weight is close
+/// to one and this is just the stable pointer anchor; short documents transition smoothly from the
+/// centred fit position instead of snapping when they start to overflow.
+function zoomVerticalOffset(stage, pages, origin, point, scale) {
+  const stageRect = stage.getBoundingClientRect();
+  const padding = stagePadding(stage);
+  const contentHeight = stageContentHeight(stage);
+  const rect = pages.getBoundingClientRect();
+  if (contentHeight <= 0 || rect.height <= 0) return 0;
+  const center = stageRect.top + padding.top + (contentHeight - rect.height) / 2;
+  const pointer = origin.y - point.y * scale;
+  const centre = stageRect.top + padding.top + contentHeight / 2;
+  const distance = Math.max(1, Math.abs(origin.y - centre));
+  const overflow = Math.max(0, rect.height - contentHeight);
+  const q = overflow / (overflow + distance);
+  const weight = q * q * (3 - 2 * q);
+  return center + (pointer - center) * weight - rect.top;
+}
+
 /// Applies a new visual scale without reflowing the pages. The point under `origin` is restored by
 /// measuring the transformed column before and after, so scrollbar rounding cannot accumulate.
 function applyDisplayScale(scale, origin) {
@@ -798,6 +847,7 @@ function applyDisplayScale(scale, origin) {
   const scaler = scalerElement();
   if (!stage || !pages || !scaler || baseWidth <= 0 || baseHeight <= 0) return;
 
+  resetZoomPlacement(pages);
   if (Math.abs(scale - displayScale) > 1e-7) {
     const before = pages.getBoundingClientRect();
     const point = {
@@ -822,15 +872,24 @@ function applyDisplayScale(scale, origin) {
     const after = pages.getBoundingClientRect();
     stage.scrollLeft += after.left + point.x * displayScale - origin.x;
     stage.scrollTop += after.top + point.y * displayScale - origin.y;
+
+    const placed = pages.getBoundingClientRect();
+    if (placed.width <= stageContentWidth(stage)) {
+      stage.scrollLeft = 0;
+    }
+
+    // Keep the 020 panel-drag path untouched. The continuous placement is a zoom-gesture concern;
+    // panel drag has its own fixed reading anchor and must keep its old page geometry.
+    if (!document.body.classList.contains("panel-dragging")) {
+      const horizontal = zoomHorizontalOffset(stage, pages, origin, point, scale);
+      const vertical = zoomVerticalOffset(stage, pages, origin, point, scale);
+      pages.style.setProperty("--page-offset-x", `${horizontal}px`);
+      pages.style.setProperty("--page-offset-y", `${vertical}px`);
+    }
   }
 
   applyPan();
   schedulePageRulerViewport();
-
-  // When the column is narrower than the stage, auto margins centre it and scrollLeft must be 0.
-  if (scaler.offsetWidth <= stageContentWidth(stage) + 0.5) {
-    stage.scrollLeft = 0;
-  }
 
   if (!document.body.classList.contains("panel-dragging")) syncCurrentPage();
   scheduleUpdate(false);
@@ -839,6 +898,38 @@ function applyDisplayScale(scale, origin) {
 function scheduleSettle() {
   clearSettle();
   settleTimer = setTimeout(finishZoom, SETTLE_MS);
+}
+
+/// Folds the visual placement offset back into the integer scroll position before the gesture is
+/// committed. The page is already at the target scale; this transaction keeps its screen rect fixed
+/// while removing the temporary transform. If scroll clamping prevents a full fold, the remainder
+/// stays in the same transform, so there is still no visual jump.
+function settleZoomPlacement() {
+  const stage = stageElement();
+  const pages = pagesElement();
+  if (!stage || !pages) return;
+  const style = getComputedStyle(pages);
+  const ox = Number.parseFloat(style.getPropertyValue("--page-offset-x")) || 0;
+  const oy = Number.parseFloat(style.getPropertyValue("--page-offset-y")) || 0;
+  if (Math.abs(ox) < 0.001 && Math.abs(oy) < 0.001) {
+    resetZoomPlacement(pages);
+    return;
+  }
+  const before = pages.getBoundingClientRect();
+  resetZoomPlacement(pages);
+  if (Math.abs(ox) >= 0.001) {
+    const max = Math.max(0, stage.scrollWidth - stage.clientWidth);
+    stage.scrollLeft = Math.max(0, Math.min(stage.scrollLeft - ox, max));
+  }
+  if (Math.abs(oy) >= 0.001) {
+    const max = Math.max(0, stage.scrollHeight - stage.clientHeight);
+    stage.scrollTop = Math.max(0, Math.min(stage.scrollTop - oy, max));
+  }
+  const after = pages.getBoundingClientRect();
+  const dx = before.left - after.left;
+  const dy = before.top - after.top;
+  if (Math.abs(dx) > 0.001) pages.style.setProperty("--page-offset-x", `${dx}px`);
+  if (Math.abs(dy) > 0.001) pages.style.setProperty("--page-offset-y", `${dy}px`);
 }
 
 function finishZoom() {
@@ -853,16 +944,19 @@ function finishZoom() {
   updateScalerSize();
   zooming = false;
   reportZoom(true);
-  centerAtRest();
+  // Keep the painted screen rect while the base margins and integer scroll are committed.
+  centerAtRest(false);
+  settleZoomPlacement();
   refreshPageRuler();
   updateWindow(true).catch(() => {});
   pagesElement()?.classList.remove("zooming");
 }
 
-function centerAtRest() {
+function centerAtRest(resetPlacement = true) {
   const stage = stageElement();
   const scaler = scalerElement();
   if (!stage || !scaler) return;
+  if (resetPlacement) resetZoomPlacement();
 
   const available = stageContentHeight(stage);
   const scaledHeight = baseHeight * displayScale;
@@ -3554,6 +3648,7 @@ function stopZoom() {
   zooming = false;
   gesture = null;
   zoomOrigin = null;
+  resetZoomPlacement();
   pendingPanX = 0;
   pendingPanY = 0;
   pagesElement()?.classList.remove("zooming");

@@ -315,15 +315,10 @@ html.ruler-ready .stage {
   overflow-x: auto;
 }
 
-/* Hide only the vertical native track; the horizontal system scrollbar remains. */
+/* Hide only the vertical native track; the horizontal system scrollbar remains untouched. */
 html.ruler-ready .stage::-webkit-scrollbar:vertical {
   display: none;
   width: 0;  /* size */
-}
-
-html.ruler-ready .stage::-webkit-scrollbar:horizontal {
-  display: block;
-  height: 16px;  /* size */
 }
 
 .page-ruler {
@@ -494,7 +489,9 @@ html[data-scroll-skin="gray"] .page-ruler {
 
 .pages {
   width: 100%;
-  transform: scale(var(--view-scale, 1));
+  transform:
+    translate3d(var(--page-offset-x, 0px), var(--page-offset-y, 0px), 0)
+    scale(var(--view-scale, 1));
   transform-origin: 0 0;
   display: flex;
   flex-direction: column;
