@@ -2737,6 +2737,17 @@ function beginPanelResize() {
     width: panel.getBoundingClientRect().width,
     baseScale: displayScale,
     baseWidth,
+    // The content point currently at the stage content centre. It is a fraction of the page
+    // width, so it survives the base-layout reflow as well as the temporary visual scale.
+    horizontalFraction: (() => {
+      const pages = pagesElement();
+      const rect = pages?.getBoundingClientRect();
+      if (!rect || rect.width <= 0) return 0.5;
+      const stageRect = stage.getBoundingClientRect();
+      const padding = stagePadding(stage);
+      const centre = stageRect.left + padding.left + stageContentWidth(stage) / 2;
+      return Math.max(0, Math.min(1, (centre - rect.left) / rect.width));
+    })(),
   };
   document.body.classList.add("panel-dragging");
   document.documentElement.classList.add("resizing");
@@ -2768,6 +2779,26 @@ function restorePdfDragAnchor(anchor) {
   stage.scrollTop += current - target;
 }
 
+/// Keeps the content point that was at the stage centre on pointer-down at the new stage centre.
+/// It deliberately does not force the PDF's own centre to the viewport centre: the page can stay
+/// off-centre while the same visible column follows the divider.
+function restorePanelHorizontalAnchor(fraction, stage = panelDrag?.stage, pages = pagesElement()) {
+  if (!stage || !pages) return;
+  const stageRect = stage.getBoundingClientRect();
+  const padding = stagePadding(stage);
+  const contentWidth = stageContentWidth(stage);
+  const rect = pages.getBoundingClientRect();
+  if (rect.width <= contentWidth) {
+    stage.scrollLeft = 0;
+    return;
+  }
+  const contentCentre = stageRect.left + padding.left + contentWidth / 2;
+  const desiredLeft = contentCentre - fraction * rect.width;
+  const delta = rect.left - desiredLeft;
+  const max = Math.max(0, stage.scrollWidth - stage.clientWidth);
+  stage.scrollLeft = Math.max(0, Math.min(stage.scrollLeft + delta, max));
+}
+
 function applyPanelResize() {
   panelDragFrame = 0;
   if (!panelDrag) return;
@@ -2796,6 +2827,7 @@ function applyPanelResize() {
       y: stageBox.top + readingOffset(),
     });
     restorePdfDragAnchor(panelDrag.pdfAnchor);
+    restorePanelHorizontalAnchor(panelDrag.horizontalFraction);
   } else {
     stage.scrollLeft = Math.max(0, panelDrag.anchorX - stage.clientWidth / 2);
   }
@@ -2838,6 +2870,7 @@ function commitPanelResize() {
   // layout first and resetting the visual scale second would make the two frames disagree and
   // produce the old release jump.
   const anchor = panelDrag.pdfAnchor ?? readAnchor();
+  const horizontalFraction = panelDrag.horizontalFraction;
   const panelAnchor = capturePanelAnchor();
   const width = Math.round(panelDrag.width);
   const finalScale = panelDrag.baseScale;
@@ -2863,6 +2896,7 @@ function commitPanelResize() {
   targetScale = finalScale;
   updateScalerSize();
   scrollToAnchor(anchor);
+  restorePanelHorizontalAnchor(horizontalFraction, stageElement(), pagesElement());
   centerAtRest();
   refreshPageRuler();
   reportZoom(true);

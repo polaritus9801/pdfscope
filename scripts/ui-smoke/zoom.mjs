@@ -332,6 +332,86 @@ try {
   const maxPanelRectCalls = Math.max(...panelRectCalls);
   check(maxPanelRectCalls < PAGE_COUNT / 2, "panel drag layout reads stay bounded", String(maxPanelRectCalls));
 
+  // At high zoom, the divider path must hold the page's horizontal centre on the stage content
+  // centre instead of preserving an arbitrary pointer scroll offset.
+  await evaluate(`(() => {
+    const button = [...document.querySelectorAll("button")].find((node) => node.textContent.trim() === "适应宽度");
+    button?.click();
+    return !!button;
+  })()`);
+  await waitFor(
+    `!document.querySelector("#pages").classList.contains("zooming") &&
+     Number.parseFloat(getComputedStyle(document.querySelector("#pages")).getPropertyValue("--view-scale")) <= 1.001`,
+    "fit width before high-zoom panel drag",
+    10_000,
+  );
+  await sleep(200);
+  await evaluate(`(async () => {
+    const stage = document.querySelector(".stage");
+    for (let index = 0; index < 28; index += 1) {
+      stage.dispatchEvent(new WheelEvent("wheel", {
+        bubbles: true, cancelable: true, ctrlKey: true, deltaY: -5, deltaMode: 0,
+        clientX: 800, clientY: 420,
+      }));
+      await new Promise((resolveFrame) => requestAnimationFrame(resolveFrame));
+    }
+    return true;
+  })()`);
+  await waitFor(
+    `!document.querySelector("#pages").classList.contains("zooming")`,
+    "high-zoom settle",
+    10_000,
+  );
+  const highZoom = await evaluate(`(() => {
+    const pages = document.querySelector("#pages");
+    return Number.parseFloat(getComputedStyle(pages).getPropertyValue("--view-scale"));
+  })()`);
+  check(highZoom > 1.5, "high-zoom panel fixture is overflowing horizontally", String(highZoom));
+  const anchorFraction = await evaluate(`(() => {
+    const stage = document.querySelector(".stage");
+    const pages = document.querySelector("#pages");
+    const style = getComputedStyle(stage);
+    const stageRect = stage.getBoundingClientRect();
+    const pageRect = pages.getBoundingClientRect();
+    const contentWidth = stage.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    const centre = stageRect.left + parseFloat(style.paddingLeft) + contentWidth / 2;
+    return (centre - pageRect.left) / pageRect.width;
+  })()`);
+  await evaluate(`window.PDFScope.beginPanelResize()`);
+  const panelLeft = await evaluate(`document.querySelector(".panel").getBoundingClientRect().left`);
+  await evaluate(`window.dispatchEvent(new PointerEvent("pointermove", {
+    bubbles: true, clientX: ${panelLeft - 100}, clientY: 300, pointerId: 1, pointerType: "mouse",
+  }))`);
+  await sleep(180);
+  const centeredDuring = await evaluate(`(() => {
+    const stage = document.querySelector(".stage");
+    const pages = document.querySelector("#pages");
+    const style = getComputedStyle(stage);
+    const stageRect = stage.getBoundingClientRect();
+    const pageRect = pages.getBoundingClientRect();
+    const contentWidth = stage.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    return {
+      anchorX: pageRect.left + ${anchorFraction} * pageRect.width,
+      stageCenter: stageRect.left + parseFloat(style.paddingLeft) + contentWidth / 2,
+    };
+  })()`);
+  await evaluate(`window.PDFScope.finishPanelResize()`);
+  await sleep(350);
+  const centeredAfter = await evaluate(`(() => {
+    const stage = document.querySelector(".stage");
+    const pages = document.querySelector("#pages");
+    const style = getComputedStyle(stage);
+    const stageRect = stage.getBoundingClientRect();
+    const pageRect = pages.getBoundingClientRect();
+    const contentWidth = stage.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    return {
+      anchorX: pageRect.left + ${anchorFraction} * pageRect.width,
+      stageCenter: stageRect.left + parseFloat(style.paddingLeft) + contentWidth / 2,
+    };
+  })()`);
+  check(Math.abs(centeredDuring.anchorX - centeredDuring.stageCenter) < 2, "high-zoom panel keeps the viewport anchor during drag", JSON.stringify(centeredDuring));
+  check(Math.abs(centeredAfter.anchorX - centeredAfter.stageCenter) < 2, "high-zoom panel keeps the viewport anchor after release", JSON.stringify(centeredAfter));
+
   const errors = await evaluate(`window.__testErrors ?? []`);
   check(errors.length === 0, "no uncaught page errors", JSON.stringify(errors));
 

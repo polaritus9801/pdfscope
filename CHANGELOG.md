@@ -107,6 +107,9 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- High-zoom panel drags keep the visible content point that started at the viewport centre on the
+  new viewport centre. The page's own centre is not forced to the viewport centre. Fit-width
+  panel behaviour is unchanged.
 - Page-ruler marks are derived from cached page metrics instead of reading every page rect, and
   full ruler measurement is skipped during an AI-panel drag. A headless smoke check guards the
   layout-read count.
