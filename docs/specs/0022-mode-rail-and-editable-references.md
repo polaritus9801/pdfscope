@@ -705,3 +705,12 @@ load. In-flight or completed renders from a previous document are rejected by th
 connection guard, and the ruler's page marks/section token reset with the document. Page actions are
 mounted lazily only for visible pages; the global overlay keeps the two hit strips and action
 toolbars, so a 3000-page document does not attach three buttons to every page.
+
+### Global page-range overlay
+
+Page range bars, outlines and action toolbars are rendered once in a single overlay inside the
+page column rather than once per page. Two full-height hit strips own pointer input; page metrics
+come from the renderer, and the visual bar is built from the committed page set. Add, subtract,
+open-anchor and ghost previews use the same state machine as before. The overlay keeps DOM cost flat
+for 1000/3000-page documents; the performance harness records load, hover, 500-page preview/commit
+and heap for both sizes.

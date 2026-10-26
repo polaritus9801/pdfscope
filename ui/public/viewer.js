@@ -530,12 +530,32 @@ function measureBaseLayout(force = false) {
   return true;
 }
 
+/// The Rust page-range overlay owns page bars and actions; it only needs the unscaled page boxes.
+/// Report them after each layout change rather than letting it measure every page on hover.
+function reportPageMetrics() {
+  const payload = {
+    epoch: documentEpoch,
+    width: baseWidth,
+    pages: metrics.map((metric, index) => ({
+      page: index + 1,
+      top: metric.top,
+      height: metric.height,
+    })),
+  };
+  try {
+    window.__pdfscopePageMetrics?.(JSON.stringify(payload));
+  } catch {
+    /* the UI may be between mounts */
+  }
+}
+
 function rebuildMetrics() {
   const stage = stageElement();
   const pages = pagesElement();
   if (!stage || !pages || baseWidth <= 0 || displayScale <= 0) {
     metrics = [];
     metricsDirty = false;
+    reportPageMetrics();
     return;
   }
 
@@ -548,6 +568,7 @@ function rebuildMetrics() {
     };
   });
   metricsDirty = false;
+  reportPageMetrics();
 }
 
 function pageAtBase(baseY) {

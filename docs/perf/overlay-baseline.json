@@ -1,0 +1,78 @@
+{
+  "generatedAt": "2026-10-25T20:42:44.609Z",
+  "app": "http://127.0.0.1:49486/",
+  "browser": "headless Chrome (CDP)",
+  "viewport": "1440x950",
+  "counts": [
+    1000,
+    3000
+  ],
+  "results": [
+    {
+      "pages": 1000,
+      "loadMs": 716,
+      "dom": {
+        "pageShells": 1000,
+        "domNodes": 2270,
+        "overlayHits": 2,
+        "overlayActions": 2,
+        "rangeBars": 0,
+        "selectionOutlines": 0,
+        "oldActionHits": 0,
+        "oldPageBars": 0,
+        "errors": []
+      },
+      "hover": {
+        "ms": 9,
+        "activeActions": 1,
+        "previewOutlines": 1,
+        "visibleBars": 2
+      },
+      "preview": {
+        "ms": 33.299999952316284,
+        "targetPage": 500,
+        "previewOutlines": 500,
+        "visibleBars": 2
+      },
+      "commit": {
+        "ms": 32.09999990463257,
+        "selectionOutlines": 500,
+        "visibleBars": 2
+      },
+      "heapUsedMb": 6.4
+    },
+    {
+      "pages": 3000,
+      "loadMs": 1662,
+      "dom": {
+        "pageShells": 3000,
+        "domNodes": 6285,
+        "overlayHits": 2,
+        "overlayActions": 2,
+        "rangeBars": 0,
+        "selectionOutlines": 0,
+        "oldActionHits": 0,
+        "oldPageBars": 0,
+        "errors": []
+      },
+      "hover": {
+        "ms": 5.5,
+        "activeActions": 1,
+        "previewOutlines": 1,
+        "visibleBars": 2
+      },
+      "preview": {
+        "ms": 30.299999952316284,
+        "targetPage": 500,
+        "previewOutlines": 500,
+        "visibleBars": 2
+      },
+      "commit": {
+        "ms": 38.39999985694885,
+        "selectionOutlines": 500,
+        "visibleBars": 2
+      },
+      "heapUsedMb": 17.5
+    }
+  ]
+}

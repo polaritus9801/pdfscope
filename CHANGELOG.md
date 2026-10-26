@@ -10,6 +10,9 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Page-range bars and action toolbars now live in one global overlay with two full-height hit strips,
+  keeping the old range state machine while removing per-page action DOM. A release-mode 1000/3000-page
+  performance baseline covers load, hover, 500-page preview/commit and heap.
 - Page-ruler and reference previews are scoped to the current document and cached; in-flight renders
   from a previous PDF are discarded. Page actions are lazy and only mounted for visible pages.
 - Appearance now offers grey and purple page-ruler skins (`pdfscope.scroll-skin`); the ruler remains
