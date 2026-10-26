@@ -683,10 +683,14 @@ pointer. Reading `scrollWidth` before assigning `scrollLeft` forces the new rang
 there is no first-frame clamp or twist. The page bar's side preference is not consulted anywhere in
 this path.
 
-**Scrollbar hint.** The purple page marker moved off the AI-panel divider. It is now a 4×12 px tick
-at `right: 3px` inside the reader shell, riding the native reader scrollbar and positioned by
-`(page - 0.5) / totalPages`. The divider no longer grows a dot. The reader's own scrollbar keeps its
-native width.
+**Reference bands.** The tiny purple page marker is gone. Page-backed references (text, box
+selection and page ranges) paint a persistent full-width translucent rectangle on the page ruler.
+Its top and bottom come from the reference's page-normalised rect (page top/bottom for a page
+range), never from a hover-derived page fraction. Rest is accent 10%; hover is 18% plus a 1px inset
+outline; focus is 28% plus a stronger inset outline. Focus is sticky, hover is transient, and a
+focused reference ignores hover for its own band. Bands have no inset, radius, or pointer target, so
+they cannot steal ruler clicks; nested references simply composite darker. The old
+`.stage-scroll-marker` and its CSS are removed.
 
 **Navigation scrollbars.** 目录 and 缩略图 lists use a 4 px WebKit scrollbar (thin native scrollbar on
 Firefox), independent of the reader scrollbar. The manager grid keeps its normal scrollbar.
@@ -831,3 +835,36 @@ reproducible measurement is [`docs/perf/overlay-baseline.md`](../perf/overlay-ba
 settle; scroll updates move the thumb only. Tick drawing is capped/sampled as documented above.
 
 The full old-to-global rule audit is in [`docs/perf/overlay-parity.md`](../perf/overlay-parity.md).
+
+
+## Reference bands, shared hover/focus and context activation
+
+**Band data.** Rust publishes `window.PDFScope.setReferenceBands(...)` from an effect over passages,
+regions, page ranges and the shared hover/focus keys. A band is
+`{ key, startPage, endPage, startTop, endBottom, state }`, where `startTop`/`endBottom` are
+page-normalised. The viewer maps those values through the ruler's page marks, so scrolling only
+moves the thumb; zoom, page-mode and resize redraw from the same data. Bands are always visible while
+the reference exists, not only while hovered.
+
+**Shared key.** Page text is `p:{id}`, a box is `r:{id}`, a page range is `page:{start}`, an image is
+`img:{id}`, a file is `file:{id}`, an answer is `a:{id}`. Hover from a page frame, the context shelf,
+a historical reference popover or an `@` mention writes the same hover key; focus from them writes
+the same focused key.
+Hovering a page frame highlights the shelf/@ representation, and hovering a shelf/@ representation
+sets the page frame's active state. Focus from the context shelf or an `@` mention sets
+`focused_ref`, which is the existing editable-frame path (text frame and box handles).
+
+**Activation.** Context chips resolve through one key dispatcher:
+
+- text/box: focus the existing page reference, scroll to the reference rect and show its handles;
+- page/range: navigate to the start page and focus the band, no editing handles;
+- image: open an in-app lightbox with the actual image data URL;
+- file: open an in-app preview of the actual extracted text;
+- answer: scroll the matching transcript turn and flash it, or report that it is unavailable;
+- source/URL: open externally;
+- orphan/unknown: report that the reference cannot be located instead of doing nothing.
+
+The image/file preview is a modal (`role=dialog`), closes on Escape or backdrop click, and never
+replaces the reader page. It is not a page thumbnail. The file model currently stores extracted
+text, so its real preview is that text; a future binary/PDF attachment reuses the same dialog with a
+PDF body.

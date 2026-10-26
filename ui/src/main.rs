@@ -1639,20 +1639,6 @@ fn App() -> impl IntoView {
                     }}
 
                 </main>
-                    {move || {
-                        hovered
-                            .get()
-                            .map(|(target, _)| {
-                                let total = pages.get().max(1) as f64;
-                                let top = (target as f64 - 0.5) / total * 100.0;
-                                view! {
-                                    <div
-                                        class="stage-scroll-marker"
-                                        style=format!("top:{top:.2}%")
-                                    ></div>
-                                }
-                            })
-                    }}
                     </div>
                     <div class="oobe-overlay" class:hidden=move || ready.get()>
                         <div
@@ -2005,6 +1991,8 @@ fn App() -> impl IntoView {
                     next_answer=next_answer
                     next_ref=next_ref
                     document_key=file_name
+                    active_ref=active_ref
+                    focused_ref=focused_ref
                 />
                 </div>
             </div>

@@ -10,6 +10,14 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- The page ruler now shows persistent page-backed reference bands instead of a hover-only purple
+  dot: full-rail translucent rectangles at the reference's actual page-rect top/bottom, with
+  rest/hover/focus alpha levels. Nested references darken by compositing, bands never intercept
+  ruler clicks, page/text/box focus keeps its band, and the old `.stage-scroll-marker` is gone.
+- Reference hover and focus are shared by page frames, the context shelf, historical reference
+  popovers and `@` pills. A context
+  click now focuses text/box refs through the existing handles, opens real image/file previews,
+  navigates page references, scrolls answer references, and reports orphan/unknown references.
 - Page reference ranges now use one wide continuous bar per committed range (43.2 px, square ends,
   deep-body `#cbb8ec` with `#7f5cbf` end transitions) instead of a thin per-page line. The page
   actions are the supplied SVGs exposed directly at 3/4 bar width, white and shadowed rather than
