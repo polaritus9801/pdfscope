@@ -2887,6 +2887,67 @@ mark.find-hit {
   display: none;
 }
 
+/* Invisible full-column hit surfaces. Only the hovered page mounts the SVG action visual; this
+   removes thousands of buttons/SVGs from long documents while keeping the three third-zones. */
+.page-action-hits {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(-1 * var(--page-range-center) - var(--page-range-width) / 2);
+  z-index: 7;
+  display: none;
+  flex-direction: column;
+  width: var(--page-range-width);
+}
+
+.page-action-hit {
+  flex: 1;
+  width: 100%;
+  padding: 0;
+  color: transparent;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.page-action-hit:focus-visible {
+  outline: 2px solid var(--accent);  /* size */
+  outline-offset: -2px;  /* size */
+}
+
+.page-action-hits.range-right {
+  left: auto;
+  right: calc(-1 * var(--page-range-center) - var(--page-range-width) / 2);
+  display: flex;
+}
+
+.page-bar-actions.visual {
+  pointer-events: none;
+}
+
+.page-bar-actions.visual .page-bar-btn {
+  opacity: 0;
+}
+
+.page-bar-actions.visual[data-kind="0"] .page-bar-start,
+.page-bar-actions.visual[data-kind="1"] .page-bar-end,
+.page-bar-actions.visual[data-kind="2"] .page-bar-single {
+  opacity: 1;
+}
+
+html[data-range-side="left"] .page-action-hits.range-left {
+  display: flex;
+}
+
+html[data-range-side="left"] .page-action-hits.range-right,
+html[data-range-side="none"] .page-action-hits {
+  display: none;
+}
+
+html[data-range-side="both"] .page-action-hits.range-left {
+  display: flex;
+}
+
 .page-bar-btn {
   display: flex;
   align-items: center;

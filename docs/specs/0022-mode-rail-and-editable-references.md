@@ -697,3 +697,11 @@ picker: 灰色 is the platform-scrollbar grey, 紫色 follows the accent. The ch
 `localStorage["pdfscope.scroll-skin"]` and exposed as `html[data-scroll-skin]`; it changes only the
 ruler thumb variables, never reader geometry. The page ruler remains always active. The purple skin
 restores round ruler end caps, the narrow divider, and the accent ramp.
+
+### Document-scoped previews and lazy page actions
+
+Page-ruler hover previews and reference popover previews are cached per document and discarded on
+load. In-flight or completed renders from a previous document are rejected by the document epoch and
+connection guard, and the ruler's page marks/section token reset with the document. Page actions are
+mounted lazily only for visible pages; the global overlay keeps the two hit strips and action
+toolbars, so a 3000-page document does not attach three buttons to every page.

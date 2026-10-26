@@ -10,6 +10,8 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Page-ruler and reference previews are scoped to the current document and cached; in-flight renders
+  from a previous PDF are discarded. Page actions are lazy and only mounted for visible pages.
 - Appearance now offers grey and purple page-ruler skins (`pdfscope.scroll-skin`); the ruler remains
   always active and skins only swap thumb variables, never reader geometry. Purple restores the
   accent ramp, round end caps and narrow divider.
