@@ -107,6 +107,9 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Page-ruler marks are derived from cached page metrics instead of reading every page rect, and
+  full ruler measurement is skipped during an AI-panel drag. A headless smoke check guards the
+  layout-read count.
 - A tiny top-right dot toggles Markdown live preview. Raw Markdown remains the document; whole-line
   syntax reveals on the active line, inline delimiters hide elsewhere, the preference is persisted,
   and the composer supports headings, quotes, hanging-indent lists, fenced code, links and inline

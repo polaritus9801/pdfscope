@@ -2864,6 +2864,7 @@ function commitPanelResize() {
   updateScalerSize();
   scrollToAnchor(anchor);
   centerAtRest();
+  refreshPageRuler();
   reportZoom(true);
 
   if (reflowed) {
@@ -3716,8 +3717,12 @@ async function loadPageRulerSections() {
 
 function schedulePageRulerMeasure() {
   if (!pageRuler || pageRuler.measureFrame) return;
+  // The panel drag changes only the width/visual scale; the cached base metrics are still valid.
+  // Measuring 3000 page rects on every ResizeObserver callback is the dominant panel-drag cost.
+  if (document.body.classList.contains("panel-dragging")) return;
   pageRuler.measureFrame = requestAnimationFrame(() => {
     pageRuler.measureFrame = 0;
+    if (document.body.classList.contains("panel-dragging")) return;
     measurePageRuler();
   });
 }
@@ -3792,22 +3797,27 @@ function measurePageRuler() {
   const pagesTop = pagesRect.top - stageRect.top + stage.scrollTop;
   ruler.total = Math.max(1, stage.scrollHeight);
   const maxScroll = Math.max(0, ruler.total - stage.clientHeight);
-  ruler.marks = pageElements
-    .map((page) => {
-      const number = Number(page.dataset.page);
-      const rect = page.getBoundingClientRect();
-      const top = pagesTop + (rect.top - pagesRect.top);
+
+  // Metrics are base-layout coordinates, independent of the visual scale. Reuse them instead of
+  // asking WebKit for 3000 page rects on every resize/zoom settle. `metricsDirty` is the existing
+  // boundary for a base-layout reflow; only that path needs a fresh layout read.
+  if (metricsDirty || metrics.length !== pageElements.length) rebuildMetrics();
+  ruler.marks = metrics
+    .map((metric, index) => {
+      const number = index + 1;
+      const top = pagesTop + metric.top * displayScale;
+      const height = metric.height * displayScale;
       // The page tick is placed where the viewport must be positioned to centre this page in the
       // reader. That makes the tick line up with the middle of the scrollbar thumb, not its top.
       const centerScroll = clamp(
-        top + rect.height / 2 - stage.clientHeight / 2,
+        top + height / 2 - stage.clientHeight / 2,
         0,
         maxScroll,
       );
       return {
         number,
         top,
-        height: rect.height,
+        height,
         centerScroll,
         centerFraction: clamp(
           (centerScroll + stage.clientHeight / 2) / ruler.total,

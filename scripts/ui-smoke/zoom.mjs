@@ -31,7 +31,8 @@ const FAKE_TAURI = readFileSync(join(HERE, "fake-tauri.js"), "utf8");
 if (!existsSync(join(DIST, "index.html"))) throw new Error("run `cd ui && trunk build` first");
 mkdirSync("/tmp", { recursive: true });
 
-const fixture = makePerfPdf(20);
+const PAGE_COUNT = Number(process.env.ZOOM_PAGES ?? 200);
+const fixture = makePerfPdf(PAGE_COUNT);
 const MIME = {
   ".css": "text/css; charset=utf-8",
   ".html": "text/html; charset=utf-8",
@@ -169,7 +170,7 @@ try {
     return true;
   })()`);
   await waitFor(
-    `document.querySelectorAll(".page[data-page]").length === 20 &&
+    `document.querySelectorAll(".page[data-page]").length === ${PAGE_COUNT} &&
      document.querySelector("#page-1[data-rendered=\\"true\\"]") !== null`,
     "the zoom fixture",
     20_000,
@@ -295,13 +296,26 @@ try {
     const stage = document.querySelector(".stage");
     return { clientWidth: stage.clientWidth, pageLeft: document.querySelector("#pages").getBoundingClientRect().left };
   })()`);
+  await evaluate(`(() => {
+    const original = Element.prototype.getBoundingClientRect;
+    window.__rectCalls = 0;
+    window.__restoreRect = () => { Element.prototype.getBoundingClientRect = original; };
+    Element.prototype.getBoundingClientRect = function () {
+      window.__rectCalls += 1;
+      return original.call(this);
+    };
+    return true;
+  })()`);
   await evaluate(`window.PDFScope.beginPanelResize()`);
+  const panelRectCalls = [];
   for (const x of [800, 700, 600]) {
-    await evaluate(`window.dispatchEvent(new PointerEvent("pointermove", {
+    await evaluate(`window.__rectCalls = 0; window.dispatchEvent(new PointerEvent("pointermove", {
       bubbles: true, clientX: ${x}, clientY: 300, pointerId: 1, pointerType: "mouse",
     }))`);
     await sleep(70);
+    panelRectCalls.push(await evaluate(`window.__rectCalls`));
   }
+  await evaluate(`window.__restoreRect()`);
   const duringPanel = await evaluate(`(() => {
     const stage = document.querySelector(".stage");
     return { clientWidth: stage.clientWidth, pageLeft: document.querySelector("#pages").getBoundingClientRect().left };
@@ -315,6 +329,8 @@ try {
   check(afterPanel.clientWidth < beforePanel.clientWidth, "panel drag narrows the stage");
   check(Math.abs(duringPanel.pageLeft - beforePanel.pageLeft) < 2, "panel drag keeps the PDF left gutter");
   check(Math.abs(afterPanel.pageLeft - beforePanel.pageLeft) < 2, "panel release keeps the PDF left gutter");
+  const maxPanelRectCalls = Math.max(...panelRectCalls);
+  check(maxPanelRectCalls < PAGE_COUNT / 2, "panel drag layout reads stay bounded", String(maxPanelRectCalls));
 
   const errors = await evaluate(`window.__testErrors ?? []`);
   check(errors.length === 0, "no uncaught page errors", JSON.stringify(errors));
