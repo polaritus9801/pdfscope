@@ -218,7 +218,7 @@ async function renderThumbnail(element) {
       const base = page.getViewport({ scale: 1 });
       const scale = 200 / base.width;
       const viewport = page.getViewport({ scale });
-      element.style.setProperty("--thumb-aspect", `${base.width} / ${base.height}`);
+      element.style.setProperty("--thumb-ratio", String(base.width / base.height));
       const canvas = document.createElement("canvas");
       canvas.width = Math.max(1, Math.ceil(viewport.width));
       canvas.height = Math.max(1, Math.ceil(viewport.height));
@@ -3030,7 +3030,7 @@ window.PDFScope = {
       const number = Number(target.dataset.page);
       const size = pageSizes[number - 1];
       if (size?.width > 0 && size?.height > 0) {
-        target.style.setProperty("--thumb-aspect", `${size.width} / ${size.height}`);
+        target.style.setProperty("--thumb-ratio", String(size.width / size.height));
       }
       target.dataset.queued = "1";
       thumbnailObserver.observe(target);

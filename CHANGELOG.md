@@ -10,6 +10,9 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Thumbnail rails and the page-reference manager now fit each page inside a common square bound while
+  preserving its own aspect ratio, then wrap the tiles continuously: landscape pages become shorter
+  full-width tiles, A4 becomes a narrower full-height tile, and no internal letterbox bands remain.
 - A "显示页面标尺" switch hides ruler marks, hover previews and reference bands while keeping the
   ruler thumb as the scrollbar.
 - Persistent page-ruler reference bands with rest/hover/focus states, shared by page frames, context
