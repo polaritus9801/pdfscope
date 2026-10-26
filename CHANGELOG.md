@@ -10,6 +10,9 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Pinch startup no longer paints a queued previous-zoom frame; the first gesture sample is eased
+  over one frame. Visual placement is folded into the scroll every frame, so the system horizontal
+  thumb tracks the gesture and no longer jumps only when the pinch is released.
 - Zoom placement is now one continuous function: the page blends from fit centring to the pointer
   anchor with a scale-free smoothstep weight, so crossing fit width no longer changes the page's
   pivot in one frame. Panel-drag geometry remains unchanged.

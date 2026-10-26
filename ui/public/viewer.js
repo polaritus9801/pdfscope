@@ -885,6 +885,10 @@ function applyDisplayScale(scale, origin) {
       const vertical = zoomVerticalOffset(stage, pages, origin, point, scale);
       pages.style.setProperty("--page-offset-x", `${horizontal}px`);
       pages.style.setProperty("--page-offset-y", `${vertical}px`);
+      // Fold the visual offset into the integer scroll now, not only at release. The page rect is
+      // preserved, while the system scrollbar thumb follows the gesture continuously and has no
+      // last-frame jump when the offset is committed.
+      settleZoomPlacement();
     }
   }
 
@@ -1446,7 +1450,13 @@ function gestureOrigin(event) {
 function onGestureStart(event) {
   if (!document_) return;
   event.preventDefault();
-  gesture = { startScale: displayScale, origin: gestureOrigin(event) };
+  // A frame left over from the previous zoom can still be queued. Cancel it before recording the
+  // new gesture; otherwise that old target is painted as the first frame of the pinch.
+  if (zoomFrame) cancelAnimationFrame(zoomFrame);
+  zoomFrame = 0;
+  targetScale = displayScale;
+  zoomDirect = false;
+  gesture = { startScale: displayScale, origin: gestureOrigin(event), warmup: true };
   zooming = true;
   clearSettle();
   pagesElement()?.classList.add("zooming");
@@ -1458,13 +1468,20 @@ function onGestureChange(event) {
   if (!(event.scale > 0)) return;
   const origin = gestureOrigin(event);
   gesture.origin = origin;
-  setZoomTarget(gesture.startScale * event.scale, { direct: true, origin });
+  // The first WebKit gesturechange can jump by several percent. Let the existing easing spread
+  // that first sample over one frame, then follow the fingers directly as before.
+  const warmup = gesture.warmup;
+  gesture.warmup = false;
+  setZoomTarget(gesture.startScale * event.scale, { direct: !warmup, origin });
 }
 
 function onGestureEnd(event) {
   if (!gesture) return;
   event.preventDefault();
   gesture = null;
+  // If the last gesture sample has not reached the screen yet, ease the remainder instead of
+  // applying it as one final snap.
+  zoomDirect = false;
   if (Math.abs(targetScale - displayScale) < 0.0005) scheduleSettle();
   else requestZoomFrame();
 }

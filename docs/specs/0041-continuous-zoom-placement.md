@@ -43,6 +43,10 @@ page is continuous through settle.
   path.
 - The page ruler keeps its viewport refresh hooks; the native horizontal scrollbar is untouched
   (`overflow-x: auto`). Only the native vertical track is hidden.
+- A queued frame from a previous zoom is cancelled at gesture start; the first gesture sample is
+  eased over one frame, and a remainder at gesture end eases instead of snapping.
+- The placement offset is folded into the integer scroll every zoom frame. The page rect is
+  preserved; the system scrollbar thumb follows continuously instead of jumping only at release.
 - No CSS transition, camera, fixed anchor mode or hardcoded fit-width threshold is used.
 
 ## Acceptance
