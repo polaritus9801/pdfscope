@@ -2779,24 +2779,20 @@ function restorePdfDragAnchor(anchor) {
   stage.scrollTop += current - target;
 }
 
-/// Keeps the content point that was at the stage centre on pointer-down at the new stage centre.
-/// It deliberately does not force the PDF's own centre to the viewport centre: the page can stay
-/// off-centre while the same visible column follows the divider.
-function restorePanelHorizontalAnchor(fraction, stage = panelDrag?.stage, pages = pagesElement()) {
-  if (!stage || !pages) return;
-  const stageRect = stage.getBoundingClientRect();
-  const padding = stagePadding(stage);
+/// Keeps the content point captured at the viewport centre on the new viewport centre. The target
+/// is computed from the content width and the current visual scale only; it does not read or
+/// correct against the current page left.
+function restorePanelHorizontalAnchor(fraction, stage = panelDrag?.stage) {
+  if (!stage || baseWidth <= 0 || displayScale <= 0) return;
   const contentWidth = stageContentWidth(stage);
-  const rect = pages.getBoundingClientRect();
-  if (rect.width <= contentWidth) {
+  const pageWidth = baseWidth * displayScale;
+  if (pageWidth <= contentWidth) {
     stage.scrollLeft = 0;
     return;
   }
-  const contentCentre = stageRect.left + padding.left + contentWidth / 2;
-  const desiredLeft = contentCentre - fraction * rect.width;
-  const delta = rect.left - desiredLeft;
+  const target = fraction * pageWidth - contentWidth / 2;
   const max = Math.max(0, stage.scrollWidth - stage.clientWidth);
-  stage.scrollLeft = Math.max(0, Math.min(stage.scrollLeft + delta, max));
+  stage.scrollLeft = Math.max(0, Math.min(target, max));
 }
 
 function applyPanelResize() {
@@ -2896,7 +2892,7 @@ function commitPanelResize() {
   targetScale = finalScale;
   updateScalerSize();
   scrollToAnchor(anchor);
-  restorePanelHorizontalAnchor(horizontalFraction, stageElement(), pagesElement());
+  restorePanelHorizontalAnchor(horizontalFraction, stageElement());
   centerAtRest();
   refreshPageRuler();
   reportZoom(true);

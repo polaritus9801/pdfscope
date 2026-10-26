@@ -22,12 +22,14 @@ fraction = (stageContentCentre - page.left) / page.width
 ```
 
 Every panel-resize frame, after the visual scale and vertical reading anchor are applied, set
-`scrollLeft` so that the same fraction lands on the new stage content centre:
+`scrollLeft` directly from the viewport content width and visual page width:
 
 ```text
-desiredLeft = stageContentCentre - fraction * page.width
-scrollLeft += page.left - desiredLeft
+pageWidth = baseWidth * displayScale
+scrollLeft = clamp(fraction * pageWidth - contentWidth / 2, 0, maxScroll)
 ```
+
+No current `page.left` read or per-frame correction is involved.
 
 When the page fits horizontally, auto margins own its centring and `scrollLeft` stays zero. The
 normal zoom path is unchanged. The base-layout commit reuses the same fraction after the reflow,
