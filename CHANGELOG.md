@@ -10,13 +10,15 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
-- Thumbnail rails and the page-reference manager now use uniform square slots with the page fitted
-  inside (`object-fit: contain`), so tall A4 pages and landscape pages show the same slot area and
-  row count instead of letting the page aspect change the grid height.
+- Thumbnail rails and the page-reference manager now fit each page inside a square bound while
+  preserving its own aspect ratio, then wrap the tiles continuously. A 16:9 row stays full-width
+  and compact; A4 becomes a narrower, full-height tile with no letterbox bands.
 - "显示页面标尺" (default on) toggles the page-ruler marks, hover preview and reference bands while
   keeping the custom scrollbar thumb usable.
-- Continuous zoom captures one fixed document-space anchor at gesture start instead of re-basing on
-  the previous frame, removing slow downward drift during trackpad pinch and ctrl/cmd-wheel zoom.
+- Continuous zoom captures one fixed horizontal and vertical document-space anchor at gesture start
+  instead of re-basing on the previous frame. This removes slow downward drift during trackpad pinch
+  and ctrl/cmd-wheel zoom, and keeps horizontal zoom around the pointer instead of snapping overflow
+  to the page centre.
 - The page ruler now shows persistent page-backed reference bands instead of a hover-only purple
   dot: full-rail translucent rectangles at the reference's actual page-rect top/bottom, with
   rest/hover/focus alpha levels. Nested references darken by compositing, bands never intercept

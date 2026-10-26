@@ -2430,14 +2430,13 @@ mark.find-hit {
 }
 
 .thumb-list {
-  display: grid;
+  display: flex;
   flex: 1;
   min-height: 0;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-auto-rows: max-content;
+  flex-wrap: wrap;
   gap: var(--space-2);
-  align-content: start;
-  align-items: start;
+  align-content: flex-start;
+  align-items: flex-start;
   overflow: auto;
   padding: var(--space-2);
   overscroll-behavior: contain;
@@ -2448,9 +2447,13 @@ mark.find-hit {
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  /* Every page gets the same square slot. The page's own aspect only changes the letterboxing,
-     so a tall A4 and a landscape page occupy the same row area and the grid stays uniform. */
-  aspect-ratio: 1 / 1;
+  /* Fit the page into a square bound without reserving that square: the short side is derived
+     from the page ratio, so a 16:9 row is full-width and compact while A4 becomes a narrower,
+     taller tile. Flex-wrap packs the resulting aspect boxes continuously. */
+  --thumb-bound: calc((100% - var(--space-2)) / 2);
+  width: min(var(--thumb-bound), calc(var(--thumb-bound) * var(--thumb-ratio, 0.75)));
+  aspect-ratio: var(--thumb-ratio, 0.75);
+  flex: 0 0 auto;
   padding: 0;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -3066,14 +3069,13 @@ html[data-range-side="both"] .page-bar-actions.range-right {
 }
 
 .manager-grid {
-  display: grid;
+  display: flex;
   flex: 1;
   min-height: 0;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));  /* size */
-  grid-auto-rows: max-content;
+  flex-wrap: wrap;
   gap: var(--space-3);
-  align-content: start;
-  align-items: start;
+  align-content: flex-start;
+  align-items: flex-start;
   overflow: auto;
   padding: var(--space-4);
   overscroll-behavior: contain;
@@ -3084,7 +3086,16 @@ html[data-range-side="both"] .page-bar-actions.range-right {
   display: flex;
   align-items: center;
   justify-content: center;
-  aspect-ratio: 1 / 1;
+  /* Six landscape columns on the widest manager, never larger than 180 px, with a readable
+     minimum before the flex row drops a column. */
+  --thumb-bound: clamp(
+    140px,  /* size */
+    calc((100% - var(--space-3) * 5) / 6),
+    180px  /* size */
+  );
+  width: min(var(--thumb-bound), calc(var(--thumb-bound) * var(--thumb-ratio, 0.75)));
+  aspect-ratio: var(--thumb-ratio, 0.75);
+  flex: 0 0 auto;
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);

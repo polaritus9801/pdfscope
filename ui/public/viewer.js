@@ -221,6 +221,7 @@ async function renderThumbnail(element) {
       const base = page.getViewport({ scale: 1 });
       const scale = 200 / base.width;
       const viewport = page.getViewport({ scale });
+      element.style.setProperty("--thumb-ratio", String(base.width / base.height));
       const canvas = document.createElement("canvas");
       canvas.width = Math.max(1, Math.ceil(viewport.width));
       canvas.height = Math.max(1, Math.ceil(viewport.height));
@@ -723,8 +724,8 @@ function requestZoomFrame() {
   zoomFrame = requestAnimationFrame(zoomStep);
 }
 
-/// Captures the screen origin and its unscaled content Y once. Every zoom frame restores this same
-/// content point, rather than deriving a fresh anchor from the previous frame's scroll position.
+/// Captures the screen origin and its unscaled content X/Y once. Every zoom frame restores this
+/// same content point, rather than deriving a fresh anchor from the previous frame's scroll position.
 function captureZoomAnchor(origin) {
   const pages = pagesElement();
   if (!pages || displayScale <= 0) return null;
@@ -732,6 +733,7 @@ function captureZoomAnchor(origin) {
   return {
     x: origin.x,
     y: origin.y,
+    contentX: (origin.x - rect.left) / displayScale,
     contentY: (origin.y - rect.top) / displayScale,
   };
 }
@@ -821,11 +823,12 @@ function applyDisplayScale(scale, origin) {
   const scaler = scalerElement();
   if (!stage || !pages || !scaler || baseWidth <= 0 || baseHeight <= 0) return;
 
+  let anchor = null;
   if (Math.abs(scale - displayScale) > 1e-7) {
-    // Horizontal zoom is always page-centred. Vertical zoom follows one fixed document-space
-    // anchor captured at gesture start; using the latest frame as the next baseline accumulated
-    // scrollbar rounding at slow pinch/wheel speeds.
-    const anchor = zoomAnchor ?? captureZoomAnchor(origin);
+    // Vertical and horizontal both follow one fixed document-space anchor captured at gesture
+    // start; using the latest frame as the next baseline accumulated scrollbar rounding at slow
+    // pinch/wheel speeds.
+    anchor = zoomAnchor ?? captureZoomAnchor(origin);
 
     setDisplayScale(scale);
     updateScalerSize();
@@ -848,21 +851,19 @@ function applyDisplayScale(scale, origin) {
   }
 
   applyPan();
-  centerHorizontally();
-  schedulePageRulerViewport();
 
-  function centerHorizontally() {
-    // Auto margins centre the column while it still fits inside the full stage (including the
-    // gutters). Once it is wider than the stage, scroll the overflow half-and-half instead.
-    // Reading scrollWidth forces the new scroll range to be known before scrollLeft is assigned;
+  // Auto margins centre the column while it fits. Once it is wider than the stage, preserve the
+  // pointer's horizontal document coordinate instead of snapping the overflow back to the centre.
+  if (scaler.offsetWidth <= stage.clientWidth + 0.5) {
+    stage.scrollLeft = 0;
+  } else if (anchor) {
+    // Reading scrollWidth forces the new range to be known before scrollLeft is assigned;
     // otherwise the first frame past the stage width clamps the correction and jitters.
-    if (scaler.offsetWidth <= stage.clientWidth + 0.5) {
-      stage.scrollLeft = 0;
-    } else {
-      void stage.scrollWidth;
-      stage.scrollLeft = (scaler.offsetWidth - stage.clientWidth) / 2;
-    }
+    void stage.scrollWidth;
+    const after = pages.getBoundingClientRect();
+    stage.scrollLeft += after.left + anchor.contentX * scale - anchor.x;
   }
+  schedulePageRulerViewport();
 
   if (!document.body.classList.contains("panel-dragging")) syncCurrentPage();
   scheduleUpdate(false);
@@ -886,13 +887,14 @@ function finishZoom() {
   zoomAnchor = null;
   zooming = false;
   reportZoom(true);
-  centerAtRest();
+  // The zoom anchor already chose the horizontal scroll position; recenter vertically only.
+  centerAtRest(false);
   refreshPageRuler();
   updateWindow(true).catch(() => {});
   pagesElement()?.classList.remove("zooming");
 }
 
-function centerAtRest() {
+function centerAtRest(forceHorizontal = true) {
   const stage = stageElement();
   const scaler = scalerElement();
   if (!stage || !scaler) return;
@@ -904,7 +906,7 @@ function centerAtRest() {
 
   if (scaler.offsetWidth <= stage.clientWidth + 0.5) {
     stage.scrollLeft = 0;
-  } else {
+  } else if (forceHorizontal) {
     void stage.scrollWidth;
     stage.scrollLeft = (scaler.offsetWidth - stage.clientWidth) / 2;
   }
@@ -3063,6 +3065,11 @@ window.PDFScope = {
     }
 
     for (const target of targets) {
+      const number = Number(target.dataset.page);
+      const size = pageSizes[number - 1];
+      if (size?.width > 0 && size?.height > 0) {
+        target.style.setProperty("--thumb-ratio", String(size.width / size.height));
+      }
       target.dataset.queued = "1";
       thumbnailObserver.observe(target);
     }
