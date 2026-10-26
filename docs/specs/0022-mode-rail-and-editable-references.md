@@ -714,3 +714,16 @@ come from the renderer, and the visual bar is built from the committed page set.
 open-anchor and ghost previews use the same state machine as before. The overlay keeps DOM cost flat
 for 1000/3000-page documents; the performance harness records load, hover, 500-page preview/commit
 and heap for both sizes.
+
+### Page-action flicker
+
+The action toolbar no longer transitions opacity or swaps its shadow on hover. The toolbar is
+pointer-transparent; the full-height hit strips own all mouse input. A click suppresses the same
+page/kind/side zone until the pointer moves to another zone, so the button cannot reappear under a
+stationary pointer.
+
+### Post-click hover suppression
+
+After a page action is committed, a tuple of page, action kind and side is suppressed. The toolbar
+and preview remain hidden while the pointer stays in that zone; moving to another page/kind/side
+rear­ms normal hover.

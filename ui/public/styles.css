@@ -5717,7 +5717,9 @@ html[data-range-side="both"] .page-overlay-hit.range-left {
 .page-overlay-actions.active,
 .page-overlay-actions:focus-within {
   opacity: 1;
-  pointer-events: auto;
+  /* The hit strip underneath owns every mouse event. A pointer-active toolbar would steal
+     pointerleave from the strip and make the bar flicker as soon as it appears. */
+  pointer-events: none;
 }
 
 .page-overlay-actions[data-kind="0"] .page-bar-start,

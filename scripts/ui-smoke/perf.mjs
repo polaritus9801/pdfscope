@@ -200,16 +200,64 @@ try {
       const hr = hit.getBoundingClientRect();
       const x = hr.left + hr.width / 2;
       const y = pr.top + pr.height / 2;
-      const started = performance.now();
+      const samples = [];
+      let counts = null;
+      for (let run = 0; run < 5; run += 1) {
+        const started = performance.now();
+        hit.dispatchEvent(new PointerEvent("pointermove", {
+          bubbles: true, clientX: x, clientY: y, pointerType: "mouse",
+        }));
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        samples.push(performance.now() - started);
+        counts = {
+          activeActions: document.querySelectorAll(".page-overlay-actions.active").length,
+          previewOutlines: document.querySelectorAll(".page-overlay-preview").length,
+          visibleBars: document.querySelectorAll(".page-range-bar.global.visible").length,
+          toolbarPointerEvents: (() => {
+            const toolbar = document.querySelector(".page-overlay-actions.active");
+            return toolbar ? getComputedStyle(toolbar).pointerEvents : "";
+          })(),
+          elementAtPointer: document.elementFromPoint(x, y)?.className ?? "",
+        };
+        hit.dispatchEvent(new PointerEvent("pointerleave", {
+          bubbles: true, pointerType: "mouse",
+        }));
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      }
+      samples.sort((a, b) => a - b);
+
+      // Post-click suppression: after toggling page 1, a pointermove inside the same third must not
+      // re-open the action or its hover preview. Toggle it back off so the rest of the fixture is clean.
       hit.dispatchEvent(new PointerEvent("pointermove", {
         bubbles: true, clientX: x, clientY: y, pointerType: "mouse",
       }));
       await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      hit.dispatchEvent(new MouseEvent("click", {
+        bubbles: true, clientX: x, clientY: y,
+      }));
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      const afterClickActive = document.querySelectorAll(".page-overlay-actions.active").length;
+      const afterClickPreview = document.querySelectorAll(".page-overlay-preview").length;
+      hit.dispatchEvent(new PointerEvent("pointermove", {
+        bubbles: true, clientX: x + 1, clientY: y + 1, pointerType: "mouse",
+      }));
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      const sameZoneActive = document.querySelectorAll(".page-overlay-actions.active").length;
+      const sameZonePreview = document.querySelectorAll(".page-overlay-preview").length;
+      hit.dispatchEvent(new MouseEvent("click", { bubbles: true, clientX: x, clientY: y }));
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
       return {
-        ms: performance.now() - started,
-        activeActions: document.querySelectorAll(".page-overlay-actions.active").length,
-        previewOutlines: document.querySelectorAll(".page-overlay-preview").length,
-        visibleBars: document.querySelectorAll(".page-range-bar.global.visible").length,
+        ms: samples[Math.floor(samples.length / 2)],
+        samples,
+        suppression: {
+          afterClickActive,
+          afterClickPreview,
+          sameZoneActive,
+          sameZonePreview,
+          selectedAfterCleanup: document.querySelectorAll(".page.in-scope").length,
+        },
+        ...counts,
       };
     })()`);
     await evaluate(`document.querySelector(".page-overlay-hit.range-right")
@@ -274,6 +322,23 @@ try {
     if (dom.errors.length) failures.push(`${count}: ${dom.errors.join("; ")}`);
     if (hover.activeActions < 1 || hover.previewOutlines < 1) {
       failures.push(`${count}: hover did not reveal the action/preview`);
+    }
+    if (hover.toolbarPointerEvents !== "none") {
+      failures.push(`${count}: active toolbar captures pointer (${hover.toolbarPointerEvents})`);
+    }
+    if (!hover.elementAtPointer.includes("page-overlay-hit")) {
+      failures.push(`${count}: hit strip is not the pointer target (${hover.elementAtPointer})`);
+    }
+    if (
+      hover.suppression.afterClickActive !== 0 ||
+      hover.suppression.afterClickPreview !== 0 ||
+      hover.suppression.sameZoneActive !== 0 ||
+      hover.suppression.sameZonePreview !== 0
+    ) {
+      failures.push(`${count}: post-click hover suppression failed`);
+    }
+    if (hover.suppression.selectedAfterCleanup !== 0) {
+      failures.push(`${count}: post-click cleanup left a selection`);
     }
     if (preview.previewOutlines !== preview.targetPage) {
       failures.push(`${count}: preview outlined ${preview.previewOutlines}/${preview.targetPage}`);

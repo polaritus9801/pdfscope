@@ -10,6 +10,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- A committed page action suppresses the same page/kind/side zone until the pointer moves to another
+  zone, preventing the button and preview from reappearing under a stationary pointer.
+- Page-range action buttons no longer flicker under the pointer: the toolbar is pointer-transparent,
+  hit strips own mouse input, and the clicked zone stays suppressed until the pointer changes zone.
 - Page-range bars and action toolbars now live in one global overlay with two full-height hit strips,
   keeping the old range state machine while removing per-page action DOM. A release-mode 1000/3000-page
   performance baseline covers load, hover, 500-page preview/commit and heap.
