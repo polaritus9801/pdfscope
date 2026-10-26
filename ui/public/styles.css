@@ -3574,6 +3574,339 @@ body.composer-resizing * {
   gap: var(--space-2);
 }
 
+/* Media references: screenshots and external images share one square strip. */
+.ref-media-strip {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  padding-bottom: 2px;  /* size */
+  scrollbar-width: none;
+}
+
+.ref-media-strip::-webkit-scrollbar,
+.ref-file-strip::-webkit-scrollbar,
+.ref-text-list::-webkit-scrollbar,
+.ref-page-input::-webkit-scrollbar {
+  display: none;
+}
+
+.ref-media-thumb {
+  position: relative;
+  flex: none;
+  width: 64px;  /* size */
+  height: 64px;  /* size */
+  overflow: hidden;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.ref-media-thumb.reference-hover,
+.ref-text-row.reference-hover,
+.ref-file-card.reference-hover {
+  outline: 1px solid var(--accent-strong);  /* size */
+  outline-offset: 1px;  /* size */
+}
+
+.ref-media-thumb.selected,
+.ref-text-row.selected,
+.ref-file-card.selected {
+  outline: 2px solid var(--accent-strong);  /* size */
+  outline-offset: 1px;  /* size */
+}
+
+.ref-media-thumb > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ref-media-badge {
+  position: absolute;
+  right: 3px;  /* size */
+  bottom: 3px;  /* size */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;  /* size */
+  height: 18px;  /* size */
+  color: var(--accent);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, transparent);
+  border-radius: 5px;  /* size */
+  box-shadow: var(--shadow-1);
+}
+
+.ref-media-badge .ref-icon {
+  width: 12px;  /* size */
+  height: 12px;  /* size */
+}
+
+.ref-media-remove,
+.ref-file-remove,
+.ref-text-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  color: var(--ink-faint);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+}
+
+.ref-media-remove {
+  position: absolute;
+  top: 2px;  /* size */
+  right: 2px;  /* size */
+  width: 16px;  /* size */
+  height: 16px;  /* size */
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  opacity: 0;
+}
+
+.ref-media-thumb:hover .ref-media-remove,
+.ref-media-thumb:focus-within .ref-media-remove {
+  opacity: 1;
+}
+
+.ref-media-remove:hover,
+.ref-file-remove:hover,
+.ref-text-remove:hover {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* Text and previous-answer references: full-width quote rows, three-line clamp. */
+.ref-text-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-height: min(240px, 34vh);  /* size */
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.ref-text-row {
+  display: flex;
+  flex: none;
+  align-items: flex-start;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  color: var(--ink);
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.ref-text-row:hover,
+.ref-text-row.selected {
+  background: color-mix(in srgb, var(--accent) 13%, var(--surface));
+}
+
+.ref-text-kind {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 18px;  /* size */
+  height: 18px;  /* size */
+  margin-top: 1px;  /* size */
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-radius: var(--radius-xs);
+}
+
+.ref-text-copy {
+  display: -webkit-box;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.ref-text-page {
+  flex: none;
+  padding-top: 1px;  /* size */
+  color: var(--ink-faint);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+.ref-text-remove {
+  flex: none;
+  width: 18px;  /* size */
+  height: 18px;  /* size */
+  margin-top: 1px;  /* size */
+}
+
+/* File references: one horizontal strip of white bordered cards. */
+.ref-file-strip {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  padding-bottom: 2px;  /* size */
+  scrollbar-width: none;
+}
+
+.ref-file-card {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  max-width: 260px;  /* size */
+  height: 34px;  /* size */
+  padding: 0 var(--space-2) 0 var(--space-1);
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.ref-file-card:hover,
+.ref-file-card.selected {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 4%, var(--surface));
+}
+
+.ref-file-icon {
+  flex: none;
+  width: 22px;  /* size */
+  height: 22px;  /* size */
+  object-fit: contain;
+}
+
+.ref-file-name {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ref-file-size {
+  flex: none;
+  color: var(--ink-faint);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+.ref-file-remove {
+  flex: none;
+  width: 18px;  /* size */
+  height: 18px;  /* size */
+}
+
+/* Page references stay visible even when the set is empty. */
+.ref-page-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;  /* size */
+}
+
+.ref-page-box {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  padding: 3px;  /* size */
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--accent) 14%, var(--border));
+  border-radius: var(--radius-md);
+}
+
+.ref-page-button {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-1);
+  height: 26px;  /* size */
+  padding: 0 var(--space-2);
+  color: var(--accent);
+  font-size: var(--text-xs);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.ref-page-button:hover {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.ref-page-icon {
+  width: 15px;  /* size */
+  height: 15px;  /* size */
+}
+
+.ref-page-input {
+  flex: 1;
+  min-width: 0;
+  height: 26px;  /* size */
+  padding: 0 var(--space-1);
+  overflow-x: auto;
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--text-xs);
+  line-height: 26px;  /* size */
+  white-space: nowrap;
+  background: transparent;
+  border: 0;
+  outline: none;
+  scrollbar-width: none;
+}
+
+.ref-page-input::placeholder {
+  color: var(--ink-faint);
+}
+
+.ref-page-error {
+  margin: 0 0 0 var(--space-2);
+  color: var(--danger);
+  font-size: var(--text-xs);
+}
+
+/* Icons supplied for references are recoloured as purple masks. */
+.ref-icon {
+  display: inline-block;
+  flex: none;
+  background: currentColor;
+  -webkit-mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+}
+
+.ref-icon-crop {
+  -webkit-mask-image: url("/ref-icons/crop.svg");
+  mask-image: url("/ref-icons/crop.svg");
+}
+
+.ref-icon-image {
+  -webkit-mask-image: url("/ref-icons/image.svg");
+  mask-image: url("/ref-icons/image.svg");
+}
+
+.ref-icon-page {
+  -webkit-mask-image: url("/ref-icons/page.svg");
+  mask-image: url("/ref-icons/page.svg");
+}
+
+.ref-page-button .ref-page-icon {
+  color: var(--accent);
+}
+
 .shelf-row {
   display: flex;
   align-items: center;

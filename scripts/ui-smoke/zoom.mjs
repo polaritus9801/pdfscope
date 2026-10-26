@@ -195,6 +195,98 @@ try {
   check(!initial.customBar, "no custom horizontal scrollbar");
   check(initial.ruler, "the page ruler exists");
 
+  // The page row is always present and its synchronized input is atomic.
+  const pageInput = await evaluate(`(() => {
+    const input = document.querySelector(".ref-page-input");
+    return {
+      exists: !!input,
+      placeholder: input?.getAttribute("placeholder") ?? "",
+      button: !!document.querySelector(".ref-page-button"),
+    };
+  })()`);
+  check(pageInput.exists, "the page reference row is visible without references");
+  check(pageInput.button, "the page reference manager button is in the row");
+  await evaluate(`(() => {
+    const input = document.querySelector(".ref-page-input");
+    input.value = "1-3, 5";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("blur", { bubbles: true }));
+    return true;
+  })()`);
+  await sleep(100);
+  check(
+    await evaluate(`document.querySelector(".shelf-title")?.textContent?.includes("4 项") === true`),
+    "valid page ranges commit",
+  );
+  await evaluate(`(() => {
+    const input = document.querySelector(".ref-page-input");
+    input.value = "5-3";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("blur", { bubbles: true }));
+    return true;
+  })()`);
+  await sleep(100);
+  check(
+    await evaluate(`document.querySelector(".ref-page-error")?.textContent?.includes("起点大于终点") === true`),
+    "invalid page ranges keep the previous set and show an error",
+  );
+  await evaluate(`(() => {
+    const input = document.querySelector(".ref-page-input");
+    input.value = "";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("blur", { bubbles: true }));
+    return true;
+  })()`);
+  await sleep(100);
+  check(
+    await evaluate(`document.querySelector(".shelf-title")?.textContent?.includes("0 项") === true`),
+    "empty page ranges clear the set",
+  );
+
+  // File cards carry type, name and original size; image attachments use the square media strip.
+  await evaluate(`(() => {
+    const files = [
+      new File(["hello"], "sample.rs", { type: "text/plain" }),
+    ];
+    const transfer = new DataTransfer();
+    for (const file of files) transfer.items.add(file);
+    const input = document.getElementById("attach-input");
+    input.files = transfer.files;
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    return true;
+  })()`);
+  await waitFor(`document.querySelectorAll(".ref-file-card").length === 1`, "the file card", 10_000);
+  const fileCard = await evaluate(`(() => {
+    const card = document.querySelector(".ref-file-card");
+    const icon = card?.querySelector(".ref-file-icon");
+    return { text: card?.innerText ?? "", icon: icon?.getAttribute("src") ?? "" };
+  })()`);
+  check(fileCard.text.includes("sample.rs") && fileCard.text.includes("5 B"), "file card shows name and size", JSON.stringify(fileCard));
+  check(fileCard.icon.includes("code/rust.svg"), "file card uses the language icon", fileCard.icon);
+  await evaluate(`document.querySelector(".ref-file-remove")?.click()`);
+  await sleep(100);
+
+  await evaluate(`(() => {
+    const raw = atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZQmcAAAAASUVORK5CYII=");
+    const bytes = Uint8Array.from(raw, (character) => character.charCodeAt(0));
+    const transfer = new DataTransfer();
+    transfer.items.add(new File([bytes], "pixel.png", { type: "image/png" }));
+    const input = document.getElementById("attach-input");
+    input.files = transfer.files;
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    return true;
+  })()`);
+  await waitFor(`document.querySelectorAll(".ref-media-thumb").length === 1`, "the image tile", 10_000);
+  const imageTile = await evaluate(`(() => {
+    const tile = document.querySelector(".ref-media-thumb");
+    const rect = tile?.getBoundingClientRect();
+    return { width: rect?.width ?? 0, height: rect?.height ?? 0, badge: tile?.querySelector(".ref-media-badge")?.getAttribute("title") ?? "" };
+  })()`);
+  check(Math.abs(imageTile.width - imageTile.height) < 1, "image reference is square", JSON.stringify(imageTile));
+  check(imageTile.badge === "图片", "image reference has the image badge", imageTile.badge);
+  await evaluate(`document.querySelector(".ref-media-remove")?.click()`);
+  await sleep(100);
+
   await evaluate(`(async () => {
     const stage = document.querySelector(".stage");
     for (let index = 0; index < 10; index += 1) {

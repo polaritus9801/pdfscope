@@ -2041,23 +2041,23 @@ async function readOneAttachment(file) {
   }
 
   if (extension === "pdf") {
-    return { kind: "text", name: file.name, data: await readPdfText(file) };
+    return { kind: "text", name: file.name, size: file.size, data: await readPdfText(file) };
   }
   if (extension === "docx") {
-    return { kind: "text", name: file.name, data: await readOfficeText(file, "docx") };
+    return { kind: "text", name: file.name, size: file.size, data: await readOfficeText(file, "docx") };
   }
   if (extension === "pptx") {
-    return { kind: "text", name: file.name, data: await readOfficeText(file, "pptx") };
+    return { kind: "text", name: file.name, size: file.size, data: await readOfficeText(file, "pptx") };
   }
   if (extension === "xlsx") {
-    return { kind: "text", name: file.name, data: await readOfficeText(file, "xlsx") };
+    return { kind: "text", name: file.name, size: file.size, data: await readOfficeText(file, "xlsx") };
   }
   if (file.type.startsWith("text/") || TEXT_EXTENSIONS.has(extension)) {
     if (file.size > ATTACHMENT_FILE_LIMIT) {
       throw new Error("文本文件太大，请换一个小于 25MB 的");
     }
     const data = await file.text();
-    return { kind: "text", name: file.name, data: clampText(data) };
+    return { kind: "text", name: file.name, size: file.size, data: clampText(data) };
   }
 
   throw new Error(`暂不支持 .${extension || "未知"} 文件`);

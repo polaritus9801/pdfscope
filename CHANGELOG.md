@@ -107,6 +107,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- The composer context shelf now groups references by kind: square screenshot/image media,
+  three-line clamped text/answer rows, file cards with type/name/size, and an always-visible
+  page-reference row with a synchronized range input and the page manager. File attachments now
+  carry their original byte size; OOBE uses the new PDF mark.
 - High-zoom panel drags keep the visible content point that started at the viewport centre on the
   new viewport centre. The page's own centre is not forced to the viewport centre. Fit-width
   panel behaviour is unchanged.

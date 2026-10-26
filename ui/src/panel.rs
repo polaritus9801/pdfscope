@@ -171,14 +171,141 @@ fn resume_prefers_pinned() -> bool {
 
 /// Consecutive page numbers collapsed into inclusive ranges.
 fn page_ranges(pages: &[u32]) -> Vec<(u32, u32)> {
+    let mut pages = pages.to_vec();
+    pages.sort_unstable();
+    pages.dedup();
     let mut ranges: Vec<(u32, u32)> = Vec::new();
-    for &page in pages {
+    for page in pages {
         match ranges.last_mut() {
             Some((_, end)) if *end + 1 == page => *end = page,
             _ => ranges.push((page, page)),
         }
     }
     ranges
+}
+
+/// Canonical text for the page-reference input.
+fn format_page_ranges(pages: &[u32]) -> String {
+    page_ranges(pages)
+        .into_iter()
+        .map(|(start, end)| {
+            if start == end {
+                start.to_string()
+            } else {
+                format!("{start}-{end}")
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// Parse the page input atomically. Empty text is a valid empty set; any malformed token rejects
+/// the entire edit so the committed page_set never silently changes.
+fn parse_page_ranges(input: &str, total: u32) -> Result<Vec<u32>, String> {
+    let input = input.trim();
+    if input.is_empty() {
+        return Ok(Vec::new());
+    }
+    if total == 0 {
+        return Err("还没有打开文档".to_owned());
+    }
+    let mut pages = Vec::new();
+    for raw in input.split([',', '，']) {
+        let token = raw.trim();
+        if token.is_empty() {
+            return Err("页码范围里有空项".to_owned());
+        }
+        let (start, end) =
+            if let Some((left, right)) = token.split_once('-').or_else(|| token.split_once('–')) {
+                let start = left
+                    .trim()
+                    .parse::<u32>()
+                    .map_err(|_| format!("无法识别：{token}"))?;
+                let end = right
+                    .trim()
+                    .parse::<u32>()
+                    .map_err(|_| format!("无法识别：{token}"))?;
+                if start > end {
+                    return Err(format!("区间起点大于终点：{token}"));
+                }
+                (start, end)
+            } else {
+                let page = token
+                    .parse::<u32>()
+                    .map_err(|_| format!("无法识别：{token}"))?;
+                (page, page)
+            };
+        if start == 0 || end > total {
+            return Err(format!("页码必须在 1-{total} 之间：{token}"));
+        }
+        pages.extend(start..=end);
+    }
+    pages.sort_unstable();
+    pages.dedup();
+    Ok(pages)
+}
+
+/// Static file-type mark used by the composer file cards.
+fn file_icon_path(name: &str) -> &'static str {
+    let extension = name
+        .rsplit_once('.')
+        .map(|(_, extension)| extension.to_ascii_lowercase())
+        .unwrap_or_default();
+    match extension.as_str() {
+        "rs" => "/file-icons/code/rust.svg",
+        "ts" | "tsx" => "/file-icons/code/typescript.svg",
+        "js" | "jsx" | "mjs" | "cjs" => "/file-icons/code/javascript.svg",
+        "py" => "/file-icons/code/python.svg",
+        "java" => "/file-icons/code/java.svg",
+        "kt" | "kts" => "/file-icons/code/kotlin.svg",
+        "c" | "h" => "/file-icons/code/c.svg",
+        "cc" | "cpp" | "cxx" | "hpp" | "hh" => "/file-icons/code/cpp.svg",
+        "cs" => "/file-icons/code/csharp.svg",
+        "go" => "/file-icons/code/go.svg",
+        "rb" => "/file-icons/code/ruby.svg",
+        "php" => "/file-icons/code/php.svg",
+        "swift" => "/file-icons/code/swift.svg",
+        "sh" | "bash" | "zsh" | "fish" => "/file-icons/code/shell.svg",
+        "ps1" => "/file-icons/code/powershell.svg",
+        "sql" => "/file-icons/code/sql.svg",
+        "css" => "/file-icons/code/css.svg",
+        "scss" | "sass" | "less" => "/file-icons/code/css.svg",
+        "vue" => "/file-icons/code/vue.svg",
+        "svelte" => "/file-icons/code/svelte.svg",
+        "html" | "htm" => "/file-icons/file-type/html.svg",
+        "json" | "jsonl" => "/file-icons/code/json.svg",
+        "yaml" | "yml" => "/file-icons/code/yaml.svg",
+        "toml" => "/file-icons/code/toml.svg",
+        "xml" => "/file-icons/code/xml.svg",
+        "ini" => "/file-icons/code/ini.svg",
+        "md" | "mdx" | "markdown" => "/file-icons/file-type/markdown.svg",
+        "pdf" => "/file-icons/file-type/pdf.svg",
+        "doc" | "docx" | "rtf" | "odt" | "pages" => "/file-icons/file-type/word.svg",
+        "ppt" | "pptx" | "key" => "/file-icons/file-type/ppt.svg",
+        "xls" | "xlsx" | "xlsm" | "xlsb" | "xlt" | "csv" | "tsv" => {
+            "/file-icons/file-type/excel.svg"
+        }
+        "png" | "jpg" | "jpeg" | "gif" | "webp" | "svg" | "avif" | "bmp" => {
+            "/file-icons/file-type/image.svg"
+        }
+        "mp4" | "mov" | "m4v" | "webm" | "mkv" | "avi" | "mpg" | "mpeg" => {
+            "/file-icons/file-type/video.svg"
+        }
+        _ => "/file-icons/file-type/other.svg",
+    }
+}
+
+fn file_size_label(size: u64) -> String {
+    if size == 0 {
+        return String::new();
+    }
+    if size >= 1024 * 1024 {
+        format!("{:.1} MB", size as f64 / (1024.0 * 1024.0))
+    } else if size >= 1024 {
+        format!("{:.1} KB", size as f64 / 1024.0)
+    } else {
+        format!("{size} B")
+    }
 }
 
 /// A compact icon action with a tooltip and an accessible name.
@@ -909,6 +1036,8 @@ fn ensure_tree(conversation: &mut Conversation) {
 struct UserFile {
     id: u64,
     name: String,
+    #[serde(default)]
+    size: u64,
     text: String,
 }
 
@@ -1188,6 +1317,7 @@ pub fn AiPanel(
             list.push(UserFile {
                 id,
                 name: file.name.clone(),
+                size: file.size,
                 text: file.text.clone(),
             });
         });
@@ -1346,6 +1476,7 @@ pub fn AiPanel(
                     list.push(UserFile {
                         id,
                         name: file.name.clone(),
+                        size: file.size,
                         text: file.text.clone(),
                     });
                 });
@@ -1671,6 +1802,46 @@ pub fn AiPanel(
     });
 
     let manager_open = RwSignal::new(false);
+    let page_input = RwSignal::new(String::new());
+    let page_input_dirty = RwSignal::new(false);
+    let page_input_error = RwSignal::new(Option::<String>::None);
+    let commit_page_input = move || {
+        if !page_input_dirty.get_untracked() {
+            return;
+        }
+        let raw = page_input.get_untracked();
+        let total = pages.get_untracked();
+        let next = match parse_page_ranges(&raw, total) {
+            Ok(pages) => pages,
+            Err(message) => {
+                page_input_error.set(Some(message));
+                return;
+            }
+        };
+        let previous = page_set.get_untracked();
+        if previous != next {
+            undo_push.run(());
+            for page in &previous {
+                if !next.contains(page) {
+                    let key = format!("page:{page}");
+                    mark_orphan(&key);
+                    forget_reference(&key);
+                }
+            }
+            page_set.set(next.clone());
+        }
+        page_input.set(format_page_ranges(&next));
+        page_input_dirty.set(false);
+        page_input_error.set(None);
+    };
+    // Keep the text canonical when PageManager, the reader or clear/undo changes page_set. While
+    // the field has an unsaved draft, leave the user's text and cursor alone.
+    Effect::new(move |_| {
+        let set = page_set.get();
+        if !page_input_dirty.get_untracked() {
+            page_input.set(format_page_ranges(&set));
+        }
+    });
     let reference_count = move || {
         passages.get().len()
             + regions.get().len()
@@ -4224,17 +4395,6 @@ pub fn AiPanel(
                             let pictures = images.get();
                             let documents = files.get();
                             let citations = sources.get();
-                            if quotes.is_empty()
-                                && shots.is_empty()
-                                && pictures.is_empty()
-                                && documents.is_empty()
-                                && citations.is_empty()
-                                && pages_selected.is_empty()
-                                && cited.is_empty()
-                            {
-                                return ().into_any();
-                            }
-
                             let total = quotes.len()
                                 + shots.len()
                                 + pictures.len()
@@ -4243,277 +4403,287 @@ pub fn AiPanel(
                                 + pages_selected.len()
                                 + cited.len();
 
-                            let quote_row = (!quotes.is_empty()).then(|| {
+                            let media_row = (!shots.is_empty() || !pictures.is_empty()).then(|| {
                                 view! {
-                                    <div class="shelf-row">
-                                        <span class="shelf-label">{icon("quote", 12)}<span>文字</span></span>
-                                        <div class="shelf-track">
-                                            {quotes
-                                                .into_iter()
-                                                .map(|passage| {
-                                                    let page_number = passage.page;
-                                                    let id = passage.id;
-                                                    let key = format!("p:{id}");
-                                                    let hover_key = key.clone();
-                                                    let leave_key = key.clone();
-                                                    let click_key = key.clone();
-                                                    let hover_class = key.clone();
-                                                    let selected_class = key.clone();
-                                                    view! {
-                                                        <div
-                                                            class="attach-chip"
-                                                            class:reference-hover=move || hover_reference.get().as_deref() == Some(hover_class.as_str())
-                                                            class:selected=move || active_reference.get().as_deref() == Some(selected_class.as_str())
-                                                            draggable="true"
-                                                            title=passage.quote.clone()
-                                                            on:mouseenter=move |_| hover_reference_on.run(hover_key.clone())
-                                                            on:mouseleave=move |_| hover_reference_off.run(leave_key.clone())
-                                                            on:click=move |_| focus_reference.run(click_key.clone())
-                                                            on:dragstart=move |event: web_sys::DragEvent| {
-                                                                if let Some(data) = event.data_transfer() {
-                                                                    let _ = data.set_data(
-                                                                        "text/plain",
-                                                                        &format!("p:{}\np.{}", id, page_number),
-                                                                    );
-                                                                    data.set_effect_allowed("copy");
-                                                                }
+                                    <div class="ref-media-strip" aria-label="截图和图片引用">
+                                        {shots
+                                            .into_iter()
+                                            .map(|region| {
+                                                let page_number = region.page;
+                                                let id = region.id;
+                                                let key = format!("r:{id}");
+                                                let hover_key = key.clone();
+                                                let leave_key = key.clone();
+                                                let click_key = key.clone();
+                                                let hover_class = key.clone();
+                                                let selected_class = key.clone();
+                                                view! {
+                                                    <div
+                                                        class="ref-media-thumb"
+                                                        class:reference-hover=move || hover_reference.get().as_deref() == Some(hover_class.as_str())
+                                                        class:selected=move || active_reference.get().as_deref() == Some(selected_class.as_str())
+                                                        draggable="true"
+                                                        title=format!("p.{} · 截图", region.page)
+                                                        on:mouseenter=move |_| hover_reference_on.run(hover_key.clone())
+                                                        on:mouseleave=move |_| hover_reference_off.run(leave_key.clone())
+                                                        on:click=move |_| focus_reference.run(click_key.clone())
+                                                        on:dragstart=move |event: web_sys::DragEvent| {
+                                                            if let Some(data) = event.data_transfer() {
+                                                                let _ = data.set_data(
+                                                                    "text/plain",
+                                                                    &format!("r:{}\n图 p.{}", id, page_number),
+                                                                );
+                                                                data.set_effect_allowed("copy");
+                                                            }
+                                                        }
+                                                    >
+                                                        <img src=region.image.clone() alt="" />
+                                                        <span class="ref-media-badge" title="框选截图">
+                                                            <span class="ref-icon ref-icon-crop"></span>
+                                                        </span>
+                                                        <button
+                                                            class="ref-media-remove"
+                                                            title="移除"
+                                                            on:click=move |event: web_sys::MouseEvent| {
+                                                                event.stop_propagation();
+                                                                remove_region(id);
                                                             }
                                                         >
-                                                            <span class="chip-kind">"文"</span>
-                                                            <span class="chip-text">{truncate(&passage.quote, 36)}</span>
-                                                            <span class="chip-page">{format!("p.{page_number}")}</span>
-                                                            <span
-                                                                class="chip-x"
-                                                                title="移除"
-                                                                on:click=move |event: web_sys::MouseEvent| {
-                                                                    event.stop_propagation();
-                                                                    remove_passage(id);
-                                                                }
-                                                            >
-                                                                {icon("close", 12)}
-                                                            </span>
-                                                        </div>
-                                                    }
-                                                })
-                                                .collect_view()}
-                                        </div>
-                                    </div>
-                                }
-                            });
-
-                            let shot_row = (!shots.is_empty()).then(|| {
-                                view! {
-                                    <div class="shelf-row">
-                                        <span class="shelf-label">{icon("image", 12)}<span>截图</span></span>
-                                        <div class="shelf-track">
-                                            {shots
-                                                .into_iter()
-                                                .map(|region| {
-                                                    let page_number = region.page;
-                                                    let id = region.id;
-                                                    let key = format!("r:{id}");
-                                                    let hover_key = key.clone();
-                                                    let leave_key = key.clone();
-                                                    let click_key = key.clone();
-                                                    let hover_class = key.clone();
-                                                    let selected_class = key.clone();
-                                                    view! {
-                                                        <div
-                                                            class="attach-thumb"
-                                                            class:reference-hover=move || hover_reference.get().as_deref() == Some(hover_class.as_str())
-                                                            class:selected=move || active_reference.get().as_deref() == Some(selected_class.as_str())
-                                                            draggable="true"
-                                                            title=format!("p.{} · 截图", region.page)
-                                                            on:mouseenter=move |_| hover_reference_on.run(hover_key.clone())
-                                                            on:mouseleave=move |_| hover_reference_off.run(leave_key.clone())
-                                                            on:click=move |_| focus_reference.run(click_key.clone())
-                                                            on:dragstart=move |event: web_sys::DragEvent| {
-                                                                if let Some(data) = event.data_transfer() {
-                                                                    let _ = data.set_data(
-                                                                        "text/plain",
-                                                                        &format!("r:{}\n图 p.{}", id, page_number),
-                                                                    );
-                                                                    data.set_effect_allowed("copy");
-                                                                }
+                                                            {icon("close", 10)}
+                                                        </button>
+                                                    </div>
+                                                }
+                                            })
+                                            .collect_view()}
+                                        {pictures
+                                            .into_iter()
+                                            .map(|picture| {
+                                                let id = picture.id;
+                                                let key = format!("img:{id}");
+                                                let hover_key = key.clone();
+                                                let leave_key = key.clone();
+                                                let click_key = key.clone();
+                                                let hover_class = key.clone();
+                                                let selected_class = key.clone();
+                                                view! {
+                                                    <div
+                                                        class="ref-media-thumb"
+                                                        class:reference-hover=move || hover_reference.get().as_deref() == Some(hover_class.as_str())
+                                                        class:selected=move || active_reference.get().as_deref() == Some(selected_class.as_str())
+                                                        title=picture.name.clone()
+                                                        on:mouseenter=move |_| hover_reference_on.run(hover_key.clone())
+                                                        on:mouseleave=move |_| hover_reference_off.run(leave_key.clone())
+                                                        on:click=move |_| focus_reference.run(click_key.clone())
+                                                    >
+                                                        <img src=picture.image.clone() alt="" />
+                                                        <span class="ref-media-badge" title="图片">
+                                                            <span class="ref-icon ref-icon-image"></span>
+                                                        </span>
+                                                        <button
+                                                            class="ref-media-remove"
+                                                            title="移除"
+                                                            on:click=move |event: web_sys::MouseEvent| {
+                                                                event.stop_propagation();
+                                                                remove_image(id);
                                                             }
                                                         >
-                                                            <img src=region.image.clone() alt="" />
-                                                            <span
-                                                                class="chip-x thumb-x"
-                                                                title="移除"
-                                                                on:click=move |event: web_sys::MouseEvent| {
-                                                                    event.stop_propagation();
-                                                                    remove_region(id);
-                                                                }
-                                                            >
-                                                                {icon("close", 12)}
-                                                            </span>
-                                                        </div>
-                                                    }
-                                                })
-                                                .collect_view()}
-                                        </div>
+                                                            {icon("close", 10)}
+                                                        </button>
+                                                    </div>
+                                                }
+                                            })
+                                            .collect_view()}
                                     </div>
                                 }
+                                .into_any()
                             });
 
-                            let image_row = (!pictures.is_empty()).then(|| {
+                            let text_row = (!quotes.is_empty() || !cited.is_empty()).then(|| {
                                 view! {
-                                    <div class="shelf-row">
-                                        <span class="shelf-label">{icon("image", 12)}<span>图片</span></span>
-                                        <div class="shelf-track">
-                                            {pictures
-                                                .into_iter()
-                                                .map(|picture| {
-                                                    let id = picture.id;
-                                                    let key = format!("img:{id}");
-                                                    let hover_key = key.clone();
-                                                    let leave_key = key.clone();
-                                                    let click_key = key.clone();
-                                                    let hover_class = key.clone();
-                                                    let selected_class = key.clone();
-                                                    view! {
-                                                        <div
-                                                            class="attach-thumb"
-                                                            class:reference-hover=move || hover_reference.get().as_deref() == Some(hover_class.as_str())
-                                                            class:selected=move || active_reference.get().as_deref() == Some(selected_class.as_str())
-                                                            title=picture.name.clone()
-                                                            on:mouseenter=move |_| hover_reference_on.run(hover_key.clone())
-                                                            on:mouseleave=move |_| hover_reference_off.run(leave_key.clone())
-                                                            on:click=move |_| focus_reference.run(click_key.clone())
+                                    <div class="ref-text-list" aria-label="文字和回答引用">
+                                        {quotes
+                                            .into_iter()
+                                            .map(|passage| {
+                                                let page_number = passage.page;
+                                                let id = passage.id;
+                                                let key = format!("p:{id}");
+                                                let hover_key = key.clone();
+                                                let leave_key = key.clone();
+                                                let click_key = key.clone();
+                                                let hover_class = key.clone();
+                                                let selected_class = key.clone();
+                                                view! {
+                                                    <div
+                                                        class="ref-text-row"
+                                                        class:reference-hover=move || hover_reference.get().as_deref() == Some(hover_class.as_str())
+                                                        class:selected=move || active_reference.get().as_deref() == Some(selected_class.as_str())
+                                                        draggable="true"
+                                                        title=passage.quote.clone()
+                                                        on:mouseenter=move |_| hover_reference_on.run(hover_key.clone())
+                                                        on:mouseleave=move |_| hover_reference_off.run(leave_key.clone())
+                                                        on:click=move |_| focus_reference.run(click_key.clone())
+                                                        on:dragstart=move |event: web_sys::DragEvent| {
+                                                            if let Some(data) = event.data_transfer() {
+                                                                let _ = data.set_data(
+                                                                    "text/plain",
+                                                                    &format!("p:{}\np.{}", id, page_number),
+                                                                );
+                                                                data.set_effect_allowed("copy");
+                                                            }
+                                                        }
+                                                    >
+                                                        <span class="ref-text-kind">{icon("quote", 12)}</span>
+                                                        <span class="ref-text-copy">{passage.quote.clone()}</span>
+                                                        <span class="ref-text-page">{format!("p.{page_number}")}</span>
+                                                        <button
+                                                            class="ref-text-remove"
+                                                            title="移除"
+                                                            on:click=move |event: web_sys::MouseEvent| {
+                                                                event.stop_propagation();
+                                                                remove_passage(id);
+                                                            }
                                                         >
-                                                            <img src=picture.image.clone() alt="" />
-                                                            <span
-                                                                class="chip-x thumb-x"
-                                                                title="移除"
-                                                                on:click=move |event: web_sys::MouseEvent| {
-                                                                    event.stop_propagation();
-                                                                    remove_image(id);
-                                                                }
-                                                            >
-                                                                {icon("close", 12)}
-                                                            </span>
-                                                        </div>
-                                                    }
-                                                })
-                                                .collect_view()}
-                                        </div>
+                                                            {icon("close", 11)}
+                                                        </button>
+                                                    </div>
+                                                }
+                                            })
+                                            .collect_view()}
+                                        {cited
+                                            .into_iter()
+                                            .map(|answer| {
+                                                let id = answer.id;
+                                                let key = format!("a:{id}");
+                                                let hover_key = key.clone();
+                                                let leave_key = key.clone();
+                                                let click_key = key.clone();
+                                                let hover_class = key.clone();
+                                                let selected_class = key.clone();
+                                                view! {
+                                                    <div
+                                                        class="ref-text-row"
+                                                        class:reference-hover=move || hover_reference.get().as_deref() == Some(hover_class.as_str())
+                                                        class:selected=move || active_reference.get().as_deref() == Some(selected_class.as_str())
+                                                        draggable="true"
+                                                        title=answer.quote.clone()
+                                                        on:mouseenter=move |_| hover_reference_on.run(hover_key.clone())
+                                                        on:mouseleave=move |_| hover_reference_off.run(leave_key.clone())
+                                                        on:click=move |_| focus_reference.run(click_key.clone())
+                                                        on:dragstart=move |event: web_sys::DragEvent| {
+                                                            if let Some(data) = event.data_transfer() {
+                                                                let _ = data.set_data(
+                                                                    "text/plain",
+                                                                    &format!("a:{}\n{}", id, answer.label),
+                                                                );
+                                                                data.set_effect_allowed("copy");
+                                                            }
+                                                        }
+                                                    >
+                                                        <span class="ref-text-kind">{icon("sparkle", 12)}</span>
+                                                        <span class="ref-text-copy">{answer.quote.clone()}</span>
+                                                        <span class="ref-text-page">{answer.label.clone()}</span>
+                                                        <button
+                                                            class="ref-text-remove"
+                                                            title="移除"
+                                                            on:click=move |event: web_sys::MouseEvent| {
+                                                                event.stop_propagation();
+                                                                remove_answer(id);
+                                                            }
+                                                        >
+                                                            {icon("close", 11)}
+                                                        </button>
+                                                    </div>
+                                                }
+                                            })
+                                            .collect_view()}
                                     </div>
                                 }
+                                .into_any()
                             });
 
                             let file_row = (!documents.is_empty()).then(|| {
                                 view! {
-                                    <div class="shelf-row">
-                                        <span class="shelf-label">{icon("file", 12)}<span>文件</span></span>
-                                        <div class="shelf-track">
-                                            {documents
-                                                .into_iter()
-                                                .map(|file| {
-                                                    let id = file.id;
-                                                    let key = format!("file:{id}");
-                                                    let hover_key = key.clone();
-                                                    let leave_key = key.clone();
-                                                    let click_key = key.clone();
-                                                    let hover_class = key.clone();
-                                                    let selected_class = key.clone();
-                                                    view! {
-                                                        <div
-                                                            class="attach-chip"
-                                                            class:reference-hover=move || hover_reference.get().as_deref() == Some(hover_class.as_str())
-                                                            class:selected=move || active_reference.get().as_deref() == Some(selected_class.as_str())
-                                                            title=file.name.clone()
-                                                            on:mouseenter=move |_| hover_reference_on.run(hover_key.clone())
-                                                            on:mouseleave=move |_| hover_reference_off.run(leave_key.clone())
-                                                            on:click=move |_| focus_reference.run(click_key.clone())
-                                                        >
-                                                            <span class="chip-kind">"件"</span>
-                                                            <span class="chip-text">{file.name.clone()}</span>
-                                                            <span class="chip-page">
-                                                                {format!("{} 字", file.text.chars().count())}
-                                                            </span>
-                                                            <span
-                                                                class="chip-x"
-                                                                title="移除"
-                                                                on:click=move |event: web_sys::MouseEvent| {
-                                                                    event.stop_propagation();
-                                                                    remove_file(id);
-                                                                }
-                                                            >
-                                                                {icon("close", 12)}
-                                                            </span>
-                                                        </div>
-                                                    }
-                                                })
-                                                .collect_view()}
-                                        </div>
-                                    </div>
-                                }
-                            });
-
-                            let ranges = page_ranges(&pages_selected);
-                            let page_row = (!ranges.is_empty()).then(|| {
-                                view! {
-                                    <div class="shelf-row">
-                                        <span class="shelf-label">{icon("pages", 12)}<span>"页面"</span></span>
-                                        <div class="shelf-track">
-                                            {ranges
-                                                .into_iter()
-                                                .map(|(start, end)| {
-                                                    let label = if start == end {
-                                                        format!("p.{start}")
-                                                    } else {
-                                                        format!("p.{start}–{end}")
-                                                    };
-                                                    let drag_key = format!("page:{start}\np.{start}");
-                                                    let key = format!("page:{start}");
-                                                    let hover_key = key.clone();
-                                                    let leave_key = key.clone();
-                                                    let click_key = key.clone();
-                                                    let hover_class = key.clone();
-                                                    let selected_class = key.clone();
-                                                    view! {
-                                                        <div
-                                                            class="attach-chip"
-                                                            class:reference-hover=move || hover_reference.get().as_deref() == Some(hover_class.as_str())
-                                                            class:selected=move || active_reference.get().as_deref() == Some(selected_class.as_str())
-                                                            draggable="true"
-                                                            on:mouseenter=move |_| hover_reference_on.run(hover_key.clone())
-                                                            on:mouseleave=move |_| hover_reference_off.run(leave_key.clone())
-                                                            on:click=move |_| focus_reference.run(click_key.clone())
-                                                            on:dragstart=move |event: web_sys::DragEvent| {
-                                                                if let Some(data) = event.data_transfer() {
-                                                                    let _ = data.set_data("text/plain", &drag_key);
-                                                                    data.set_effect_allowed("copy");
-                                                                }
+                                    <div class="ref-file-strip" aria-label="文件引用">
+                                        {documents
+                                            .into_iter()
+                                            .map(|file| {
+                                                let id = file.id;
+                                                let key = format!("file:{id}");
+                                                let hover_key = key.clone();
+                                                let leave_key = key.clone();
+                                                let click_key = key.clone();
+                                                let hover_class = key.clone();
+                                                let selected_class = key.clone();
+                                                let size = file_size_label(file.size);
+                                                view! {
+                                                    <div
+                                                        class="ref-file-card"
+                                                        class:reference-hover=move || hover_reference.get().as_deref() == Some(hover_class.as_str())
+                                                        class:selected=move || active_reference.get().as_deref() == Some(selected_class.as_str())
+                                                        title=file.name.clone()
+                                                        on:mouseenter=move |_| hover_reference_on.run(hover_key.clone())
+                                                        on:mouseleave=move |_| hover_reference_off.run(leave_key.clone())
+                                                        on:click=move |_| focus_reference.run(click_key.clone())
+                                                    >
+                                                        <img class="ref-file-icon" src=file_icon_path(&file.name) alt="" />
+                                                        <span class="ref-file-name">{file.name.clone()}</span>
+                                                        <span class="ref-file-size">{size}</span>
+                                                        <button
+                                                            class="ref-file-remove"
+                                                            title="移除"
+                                                            on:click=move |event: web_sys::MouseEvent| {
+                                                                event.stop_propagation();
+                                                                remove_file(id);
                                                             }
                                                         >
-                                                            <span class="chip-kind">{icon("page", 12)}</span>
-                                                            <span class="chip-page">{label}</span>
-                                                            <span
-                                                                class="chip-x"
-                                                                title="移除"
-                                                                on:click=move |event: web_sys::MouseEvent| {
-                                                                    event.stop_propagation();
-                                                                    undo_push.run(());
-                                                                    for page in start..=end {
-                                                                        let key = format!("page:{page}");
-                                                                        mark_orphan(&key);
-                                                                        forget_reference(&key);
-                                                                    }
-                                                                    page_set.update(|set| set.retain(|page| *page < start || *page > end));
-                                                                }
-                                                            >
-                                                                {icon("close", 11)}
-                                                            </span>
-                                                        </div>
-                                                    }
-                                                })
-                                                .collect_view()}
-                                        </div>
+                                                            {icon("close", 11)}
+                                                        </button>
+                                                    </div>
+                                                }
+                                            })
+                                            .collect_view()}
                                     </div>
                                 }
+                                .into_any()
                             });
+
+                            let page_row = view! {
+                                <div class="ref-page-wrap">
+                                    <div class="ref-page-box">
+                                        <button
+                                            class="ref-page-button"
+                                            title="管理页面引用"
+                                            on:click=move |_| manager_open.set(true)
+                                        >
+                                            <span class="ref-page-icon ref-icon ref-icon-page"></span>
+                                            <span>"页面引用"</span>
+                                        </button>
+                                        <input
+                                            class="ref-page-input"
+                                            type="text"
+                                            spellcheck="false"
+                                            aria-label="页面引用"
+                                            placeholder="1-3, 4, 6-8"
+                                            prop:value=move || page_input.get()
+                                            on:input=move |event: web_sys::Event| {
+                                                page_input.set(event_target_value(&event));
+                                                page_input_dirty.set(true);
+                                                page_input_error.set(None);
+                                            }
+                                            on:blur=move |_| commit_page_input()
+                                            on:keydown=move |event: web_sys::KeyboardEvent| {
+                                                if event.key() == "Enter" {
+                                                    event.prevent_default();
+                                                    commit_page_input();
+                                                }
+                                            }
+                                        />
+                                    </div>
+                                    {move || page_input_error.get().map(|message| view! {
+                                        <p class="ref-page-error">{message}</p>
+                                    })}
+                                </div>
+                            };
 
                             let source_row = (!citations.is_empty()).then(|| {
                                 view! {
@@ -4547,62 +4717,6 @@ pub fn AiPanel(
                                 }
                             });
 
-                            let answer_row = (!cited.is_empty()).then(|| {
-                                view! {
-                                    <div class="shelf-row">
-                                        <span class="shelf-label">{icon("sparkle", 12)}<span>回答</span></span>
-                                        <div class="shelf-track">
-                                            {cited
-                                                .into_iter()
-                                                .map(|answer| {
-                                                    let id = answer.id;
-                                                    let key = format!("a:{id}");
-                                                    let hover_key = key.clone();
-                                                    let leave_key = key.clone();
-                                                    let click_key = key.clone();
-                                                    let hover_class = key.clone();
-                                                    let selected_class = key.clone();
-                                                    view! {
-                                                        <div
-                                                            class="attach-chip"
-                                                            class:reference-hover=move || hover_reference.get().as_deref() == Some(hover_class.as_str())
-                                                            class:selected=move || active_reference.get().as_deref() == Some(selected_class.as_str())
-                                                            draggable="true"
-                                                            title=answer.quote.clone()
-                                                            on:mouseenter=move |_| hover_reference_on.run(hover_key.clone())
-                                                            on:mouseleave=move |_| hover_reference_off.run(leave_key.clone())
-                                                            on:click=move |_| focus_reference.run(click_key.clone())
-                                                            on:dragstart=move |event: web_sys::DragEvent| {
-                                                                if let Some(data) = event.data_transfer() {
-                                                                    let _ = data.set_data(
-                                                                        "text/plain",
-                                                                        &format!("a:{}\n{}", id, answer.label),
-                                                                    );
-                                                                    data.set_effect_allowed("copy");
-                                                                }
-                                                            }
-                                                        >
-                                                            <span class="chip-kind">{icon("sparkle", 12)}</span>
-                                                            <span class="chip-text">{truncate(&answer.quote, 32)}</span>
-                                                            <span
-                                                                class="chip-x"
-                                                                title="移除"
-                                                                on:click=move |event: web_sys::MouseEvent| {
-                                                                    event.stop_propagation();
-                                                                    remove_answer(id);
-                                                                }
-                                                            >
-                                                                {icon("close", 12)}
-                                                            </span>
-                                                        </div>
-                                                    }
-                                                })
-                                                .collect_view()}
-                                        </div>
-                                    </div>
-                                }
-                            });
-
                             view! {
                                 <div class="context-shelf">
                                     <div class="shelf-head">
@@ -4621,6 +4735,9 @@ pub fn AiPanel(
                                                 sources.set(Vec::new());
                                                 answers.set(Vec::new());
                                                 page_set.update(|set| set.clear());
+                                                page_input.set(String::new());
+                                                page_input_dirty.set(false);
+                                                page_input_error.set(None);
                                                 // The shelf is the source of truth; the editor must not keep
                                                 // pills whose attachment no longer exists.
                                                 let _ = composer("clearTokens", &[]);
@@ -4630,13 +4747,11 @@ pub fn AiPanel(
                                             "清空"
                                         </button>
                                     </div>
-                                    {quote_row}
-                                    {shot_row}
-                                    {image_row}
+                                    {media_row}
+                                    {text_row}
                                     {file_row}
-                                    {source_row}
                                     {page_row}
-                                    {answer_row}
+                                    {source_row}
                                 </div>
                             }
                                 .into_any()
@@ -5008,8 +5123,11 @@ pub fn AiPanel(
                                                     "text" if !data.trim().is_empty() => {
                                                         let id = next_file.get() + 1;
                                                         next_file.set(id);
+                                                        let size = crate::model::read_number(&entry, "size")
+                                                            .unwrap_or(0.0)
+                                                            .max(0.0) as u64;
                                                         files.update(|list| {
-                                                            list.push(UserFile { id, name, text: data })
+                                                            list.push(UserFile { id, name, size, text: data })
                                                         });
                                                     }
                                                     "error" => {
@@ -5074,13 +5192,6 @@ pub fn AiPanel(
                                     </span>
                                 </button>
                             </div>
-                            <button
-                                class="icon-button"
-                                title="管理页面引用"
-                                on:click=move |_| manager_open.set(true)
-                            >
-                                {icon("book", 17)}
-                            </button>
                             <span class="toolbar-grow"></span>
                             <div class="send-wrap">
                                 <button

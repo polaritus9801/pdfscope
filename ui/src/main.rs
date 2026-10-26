@@ -1721,7 +1721,7 @@ fn App() -> impl IntoView {
                                                 return view! {
                                                     <div class="recent-empty">
                                                         <span class="recent-empty-icon">
-                                                            {icons::pdf_file(24)}
+                                                            {icons::pdf_mark(24)}
                                                         </span>
                                                         <p>"还没有打开过文档"</p>
                                                         <small>"打开一本 PDF，下次它会出现在这里。"</small>
@@ -1755,7 +1755,7 @@ fn App() -> impl IntoView {
                                                             }
                                                         >
                                                             <span class="file-icon">
-                                                                {icons::pdf_file(18)}
+                                                                {icons::pdf_mark(18)}
                                                             </span>
                                                             <span class="file-copy">
                                                                 <span class="file-name">{name.clone()}</span>
@@ -1838,7 +1838,7 @@ fn App() -> impl IntoView {
                                                 return view! {
                                                     <div class="recent-empty compact">
                                                         <span class="recent-empty-icon">
-                                                            {icons::pdf_file(24)}
+                                                            {icons::pdf_mark(24)}
                                                         </span>
                                                         <p>"还没有可推荐的 PDF"</p>
                                                         <small>"把文件放进下载、桌面或文稿目录，这里会自动出现。"</small>
@@ -1869,7 +1869,7 @@ fn App() -> impl IntoView {
                                                             }
                                                         >
                                                             <span class="file-icon">
-                                                                {icons::pdf_file(18)}
+                                                                {icons::pdf_mark(18)}
                                                             </span>
                                                             <span class="file-copy">
                                                                 <span class="file-name">{name.clone()}</span>

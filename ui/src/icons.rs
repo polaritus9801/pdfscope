@@ -192,8 +192,21 @@ pub(crate) fn paperclip() -> impl IntoView {
     }
 }
 
-/// The red PDF file mark used by the recent/recommended shelves. Every entry is a PDF, but the
-/// shelf still shows its type at a glance.
+/// The compact PDF mark used by OOBE and the recent/recommended shelves.
+pub(crate) fn pdf_mark(size: u32) -> impl IntoView {
+    view! {
+        <img
+            src="/file-icons/file-type/pdf.svg"
+            width=size
+            height=size
+            alt=""
+            draggable="false"
+        />
+    }
+}
+
+/// The previous red PDF mark, retained temporarily for rollback.
+#[allow(dead_code)]
 pub(crate) fn pdf_file(size: u32) -> impl IntoView {
     view! {
         <svg
