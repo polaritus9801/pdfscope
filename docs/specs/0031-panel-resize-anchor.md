@@ -38,6 +38,11 @@ every release jumped once and repeated drags accumulated a vertical drift.
   choose a new anchor).
 - The panel width is rounded only after the final frame; the ≤1 px difference is absorbed by the
   anchor restoration.
+- Horizontally, the page's screen centre at pointer-down is held for the drag, clamped when the
+  shrinking stage can no longer contain the page. The page does **not** re-centre on every frame
+  (that made the document slide left with the divider), and the normal centred layout resumes on
+  commit. This is the visual complement to the fixed page/fraction vertical anchor.
+
 - The page gap is part of the base layout. It is stored as a ratio captured from the initial CSS gap
   (`16 / 1032` in the probe) and applied as `ratio × baseWidth` on every reflow. During a drag the
   whole column is transformed, so the visual gap is `baseGap × dragScale`; after reflow the new base

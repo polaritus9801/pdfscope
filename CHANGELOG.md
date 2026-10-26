@@ -10,6 +10,9 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Dragging the AI panel divider keeps the PDF page's screen centre from pointer-down, clamped at
+  the stage edge, instead of re-centring the page on every frame. The page no longer slides left
+  with the divider; normal centred placement resumes on release.
 - Zoom returns to the single `0208612` scroll-following feel, replacing the `fe6ee81` forced-centre
   regression: pointer `pointX/pointY` is measured every frame, auto margins centre only while the
   page fits, and overflow keeps the pointer's scroll. Sub-pixel `scrollTop` and first-overflow

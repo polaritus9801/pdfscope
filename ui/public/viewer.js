@@ -2759,6 +2759,14 @@ function beginPanelResize() {
     width: panel.getBoundingClientRect().width,
     baseScale: displayScale,
     baseWidth,
+    // The divider drag used to keep the PDF page's screen centre stable, only clamping it when
+    // the shrinking stage no longer contains the page. Re-centering the page on every frame made
+    // the PDF slide left with the divider; preserve the old visual anchor instead.
+    pageCenterX: (() => {
+      const page = pagesElement();
+      const rect = page?.getBoundingClientRect();
+      return rect && rect.width > 0 ? rect.left + rect.width / 2 : null;
+    })(),
   };
   document.body.classList.add("panel-dragging");
   document.documentElement.classList.add("resizing");
@@ -2790,6 +2798,30 @@ function restorePdfDragAnchor(anchor) {
   stage.scrollTop += current - target;
 }
 
+/// Keeps the PDF page's screen centre where it was at pointer-down. The old panel-drag fix did
+/// this implicitly; re-centering on every frame made the document slide left as the panel grew.
+function restorePdfHorizontalCenter() {
+  const drag = panelDrag;
+  if (!drag || drag.pageCenterX == null) return;
+  const pages = pagesElement();
+  const stage = drag.stage;
+  if (!pages || !stage) return;
+  const rect = pages.getBoundingClientRect();
+  const stageRect = stage.getBoundingClientRect();
+  const width = rect.width;
+  if (width <= 0) return;
+  const desiredLeft = clamp(
+    drag.pageCenterX - width / 2,
+    stageRect.left,
+    stageRect.right - width,
+  );
+  const dx = desiredLeft - rect.left;
+  if (Math.abs(dx) > 0.01) {
+    pageOffsetX += dx;
+    pages.style.setProperty("--page-offset-x", `${pageOffsetX}px`);
+  }
+}
+
 function applyPanelResize() {
   panelDragFrame = 0;
   if (!panelDrag) return;
@@ -2818,6 +2850,7 @@ function applyPanelResize() {
       y: stageBox.top + readingOffset(),
     });
     restorePdfDragAnchor(panelDrag.pdfAnchor);
+    restorePdfHorizontalCenter();
   } else {
     stage.scrollLeft = Math.max(0, panelDrag.anchorX - stage.clientWidth / 2);
   }
