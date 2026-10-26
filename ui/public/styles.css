@@ -2448,7 +2448,9 @@ mark.find-hit {
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  aspect-ratio: var(--thumb-aspect, 3 / 4);
+  /* Every page gets the same square slot. The page's own aspect only changes the letterboxing,
+     so a tall A4 and a landscape page occupy the same row area and the grid stays uniform. */
+  aspect-ratio: 1 / 1;
   padding: 0;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -3079,6 +3081,10 @@ html[data-range-side="both"] .page-bar-actions.range-right {
 
 .manager-thumb {
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1 / 1;
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -3097,6 +3103,10 @@ html[data-range-side="both"] .page-bar-actions.range-right {
 }
 
 .manager-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
   -webkit-user-drag: none;
   user-select: none;
   pointer-events: none;
@@ -5855,4 +5865,25 @@ html[data-range-side="both"] .page-overlay-hit.range-left {
 @keyframes answer-reference-flash {
   0% { background: color-mix(in srgb, var(--accent) 16%, transparent); }
   100% { background: transparent; }
+}
+
+/* Page-ruler visibility. The thumb remains the scrollbar; only marks and their overlays go away. */
+html[data-page-ruler="off"] .page-ruler canvas,
+html[data-page-ruler="off"] .page-ruler-bands,
+html[data-page-ruler="off"] .page-ruler-hover-line,
+html[data-page-ruler="off"] .page-ruler-tooltip,
+html[data-page-ruler="off"] .page-ruler-preview {
+  display: none;
+}
+
+.settings-row input.settings-checkbox {
+  flex: 0 0 auto;
+  width: 16px;  /* size */
+  height: 16px;  /* size */
+  min-width: 0;
+  max-width: none;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  accent-color: var(--accent);
 }

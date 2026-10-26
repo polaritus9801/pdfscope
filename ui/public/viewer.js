@@ -52,6 +52,9 @@ let baseDirty = true;
 let displayScale = 1;
 let targetScale = 1;
 let zoomOrigin = null;
+/// Fixed document-space point under the zoom pointer for the whole gesture. Re-measuring the
+/// previous frame made sub-pixel scrollbar rounding accumulate into a slow vertical drift.
+let zoomAnchor = null;
 let zoomDirect = false;
 let zoomFrame = 0;
 let zoomLastTime = 0;
@@ -218,7 +221,6 @@ async function renderThumbnail(element) {
       const base = page.getViewport({ scale: 1 });
       const scale = 200 / base.width;
       const viewport = page.getViewport({ scale });
-      element.style.setProperty("--thumb-aspect", `${base.width} / ${base.height}`);
       const canvas = document.createElement("canvas");
       canvas.width = Math.max(1, Math.ceil(viewport.width));
       canvas.height = Math.max(1, Math.ceil(viewport.height));
@@ -721,11 +723,28 @@ function requestZoomFrame() {
   zoomFrame = requestAnimationFrame(zoomStep);
 }
 
+/// Captures the screen origin and its unscaled content Y once. Every zoom frame restores this same
+/// content point, rather than deriving a fresh anchor from the previous frame's scroll position.
+function captureZoomAnchor(origin) {
+  const pages = pagesElement();
+  if (!pages || displayScale <= 0) return null;
+  const rect = pages.getBoundingClientRect();
+  return {
+    x: origin.x,
+    y: origin.y,
+    contentY: (origin.y - rect.top) / displayScale,
+  };
+}
+
 function setZoomTarget(scale, { direct = false, origin = null } = {}) {
   if (!document_) return;
+  const resolved = resolveOrigin(origin);
+  if (!zoomAnchor || zoomAnchor.x !== resolved.x || zoomAnchor.y !== resolved.y) {
+    zoomAnchor = captureZoomAnchor(resolved);
+  }
   targetScale = clamp(scale, MIN_SCALE, MAX_SCALE);
   zoomDirect = direct;
-  zoomOrigin = resolveOrigin(origin);
+  zoomOrigin = resolved;
   zooming = true;
   clearSettle();
   pagesElement()?.classList.add("zooming");
@@ -794,8 +813,8 @@ function applyPan() {
   }
 }
 
-/// Applies a new visual scale without reflowing the pages. The point under `origin` is restored by
-/// measuring the transformed column before and after, so scrollbar rounding cannot accumulate.
+/// Applies a new visual scale without reflowing the pages. The point under `origin` is restored from
+/// the gesture's fixed document-space anchor, so scrollbar rounding cannot accumulate.
 function applyDisplayScale(scale, origin) {
   const stage = stageElement();
   const pages = pagesElement();
@@ -803,11 +822,10 @@ function applyDisplayScale(scale, origin) {
   if (!stage || !pages || !scaler || baseWidth <= 0 || baseHeight <= 0) return;
 
   if (Math.abs(scale - displayScale) > 1e-7) {
-    const before = pages.getBoundingClientRect();
-    // Horizontal zoom is always page-centred. Vertical zoom still follows the reading line/pointer.
-    // Using one owner for scrollLeft avoids the auto-margin→overflow jump (and its one-frame clamp)
-    // that made the page visibly twist as it crossed fit width.
-    const pointY = (origin.y - before.top) / displayScale;
+    // Horizontal zoom is always page-centred. Vertical zoom follows one fixed document-space
+    // anchor captured at gesture start; using the latest frame as the next baseline accumulated
+    // scrollbar rounding at slow pinch/wheel speeds.
+    const anchor = zoomAnchor ?? captureZoomAnchor(origin);
 
     setDisplayScale(scale);
     updateScalerSize();
@@ -823,8 +841,10 @@ function applyDisplayScale(scale, origin) {
       scaler.style.marginTop = "0px";
     }
 
-    const after = pages.getBoundingClientRect();
-    stage.scrollTop += after.top + pointY * displayScale - origin.y;
+    if (anchor) {
+      const after = pages.getBoundingClientRect();
+      stage.scrollTop += after.top + anchor.contentY * scale - anchor.y;
+    }
   }
 
   applyPan();
@@ -863,6 +883,7 @@ function finishZoom() {
   // epsilon. Any residual is sub-pixel; the reading line has already been anchored.
   setDisplayScale(targetScale);
   updateScalerSize();
+  zoomAnchor = null;
   zooming = false;
   reportZoom(true);
   centerAtRest();
@@ -2950,6 +2971,16 @@ window.PDFScope = {
     return true;
   },
 
+  /// Toggles the page marks only. The custom thumb stays the scrollbar in either state.
+  setPageRulerVisible(visible) {
+    pageRulerVisible = Boolean(visible);
+    if (!pageRulerVisible) {
+      hidePageRulerHover();
+    } else if (pageRuler) {
+      renderReferenceBands();
+    }
+  },
+
   /// Rust publishes on-reference/focus changes; bands are page-normalised and persist until replaced.
   setReferenceBands(bands) {
     const next = Array.isArray(bands) ? bands : [];
@@ -3032,11 +3063,6 @@ window.PDFScope = {
     }
 
     for (const target of targets) {
-      const number = Number(target.dataset.page);
-      const size = pageSizes[number - 1];
-      if (size?.width > 0 && size?.height > 0) {
-        target.style.setProperty("--thumb-aspect", `${size.width} / ${size.height}`);
-      }
       target.dataset.queued = "1";
       thumbnailObserver.observe(target);
     }
@@ -3559,6 +3585,7 @@ function stopZoom() {
   zooming = false;
   gesture = null;
   zoomOrigin = null;
+  zoomAnchor = null;
   pendingPanX = 0;
   pendingPanY = 0;
   pagesElement()?.classList.remove("zooming");
@@ -3571,9 +3598,12 @@ function stopZoom() {
 // are drawn on one canvas, so scrolling only updates the thumb and the current-page line.
 let pageRuler = null;
 let pendingReferenceBands = [];
+let pageRulerVisible =
+  (typeof document !== "undefined" && document.documentElement?.dataset.pageRuler) !== "off";
 
 function initPageRuler() {
   if (pageRuler) return;
+  pageRulerVisible = document.documentElement?.dataset.pageRuler !== "off";
   const shell = document.querySelector(".stage-shell");
   if (!shell) {
     setTimeout(initPageRuler, 50);
@@ -3716,7 +3746,7 @@ function renderReferenceBands() {
   if (!ruler?.bandsLayer) return;
   const layer = ruler.bandsLayer;
   layer.replaceChildren();
-  if (ruler.referenceBands.length === 0 || ruler.marks.length === 0) return;
+  if (!pageRulerVisible || ruler.referenceBands.length === 0 || ruler.marks.length === 0) return;
   const marks = new Map(ruler.marks.map((mark) => [mark.number, mark]));
   const total = Math.max(1, ruler.total);
   const track = ruler.trackHeight;
@@ -3995,6 +4025,10 @@ function placePageRulerPair(y) {
 function updatePageRulerHover(event) {
   const ruler = pageRuler;
   if (!ruler || ruler.drag || ruler.marks.length === 0) return;
+  if (!pageRulerVisible) {
+    hidePageRulerHover();
+    return;
+  }
   const rect = ruler.element.getBoundingClientRect();
   const y = clamp(event.clientY - rect.top, 0, ruler.trackHeight);
   ruler.hoverY = y;

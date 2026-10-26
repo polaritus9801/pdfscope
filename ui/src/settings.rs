@@ -2,14 +2,14 @@
 
 use leptos::prelude::*;
 use leptos::task::spawn_local;
-use wasm_bindgen::JsValue;
+use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 
 use crate::icons::{icon, provider_tile};
 use crate::panel::{
     PAGE_REPEAT_KEY, PRESET_LABELS, RESUME_PREFERENCE_KEY, apply_font_size, apply_theme, bridge,
-    flag_of, number_of, preset, read_page_bar_side, read_scroll_skin, text_of, write_page_bar_side,
-    write_scroll_skin,
+    flag_of, number_of, preset, read_page_bar_side, read_page_ruler_visible, read_scroll_skin,
+    text_of, write_page_bar_side, write_page_ruler_visible, write_scroll_skin,
 };
 
 /// Publishes the timeout to the bridge, in milliseconds; zero disables the watchdog.
@@ -117,6 +117,7 @@ pub(crate) fn SettingsSheet(
     let form_page_repeat = RwSignal::new(read_page_repeat_preference());
     let form_page_bar_side = RwSignal::new(read_page_bar_side());
     let form_scroll_skin = RwSignal::new(read_scroll_skin());
+    let form_page_ruler = RwSignal::new(read_page_ruler_visible());
     let form_page_limit = RwSignal::new(0_u32);
     let form_timeout = RwSignal::new("0".to_owned());
     let form_context_limit = RwSignal::new("128000".to_owned());
@@ -663,6 +664,29 @@ pub(crate) fn SettingsSheet(
                                         </label>
                                         <p class="settings-hint">
                                             "宽条和三个端点按钮会跟着移动；此选项立即生效。"
+                                        </p>
+
+                                        <label class="settings-row">
+                                            <span>"显示页面标尺"</span>
+                                            <input
+                                                class="settings-checkbox"
+                                                type="checkbox"
+                                                prop:checked=move || form_page_ruler.get()
+                                                on:change=move |event: web_sys::Event| {
+                                                    let checked = event
+                                                        .target()
+                                                        .and_then(|target| {
+                                                            target.dyn_into::<web_sys::HtmlInputElement>().ok()
+                                                        })
+                                                        .map(|input| input.checked())
+                                                        .unwrap_or(true);
+                                                    form_page_ruler.set(checked);
+                                                    write_page_ruler_visible(checked);
+                                                }
+                                            />
+                                        </label>
+                                        <p class="settings-hint">
+                                            "关闭后仍可拖动右侧滑块滚动，只隐藏页码刻度、章节、悬停预览和引用带；此选项立即生效。"
                                         </p>
 
                                         <label class="settings-row">
