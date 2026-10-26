@@ -10,10 +10,11 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
-- Zoom returns to the single original scroll-following feel. The fractional part of every
-  scrollTop correction is carried in a composited translate, so WebKit's whole-pixel scrollTop no
-  longer accumulates into downward drift. Horizontal anchoring uses one composited page offset
-  instead of per-frame margins, and the obsolete three-mode setting is removed.
+- Zoom returns to the single `0208612` scroll-following feel, replacing the `fe6ee81` forced-centre
+  regression: pointer `pointX/pointY` is measured every frame, auto margins centre only while the
+  page fits, and overflow keeps the pointer's scroll. Sub-pixel `scrollTop` and first-overflow
+  `scrollLeft` remainders are carried in a composited translate, removing drift without per-frame
+  margins or camera modes.
 - Thumbnail rails and the page-reference manager now fit each page inside a square bound while
   preserving its own aspect ratio, then wrap the tiles continuously. A 16:9 row stays full-width
   and compact; A4 becomes a narrower, full-height tile with no letterbox bands.

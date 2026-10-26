@@ -55,7 +55,8 @@ let zoomOrigin = null;
 /// WebKit rounds scrollTop to whole CSS pixels. Carrying the fractional part in a composited
 /// translate keeps the original per-frame baseline while preventing slow-scale downward drift.
 let scrollResidualY = 0;
-/// Horizontal visual offset. This replaces per-frame margin writes, which caused layout work.
+/// Visual carry used only when the new scroll range is one frame behind the newly scaled column.
+/// It stays zero while the page fits, so fit-width centring is still owned by auto margins.
 let pageOffsetX = 0;
 let zoomDirect = false;
 let zoomFrame = 0;
@@ -471,10 +472,8 @@ function stagePadding(stage) {
 }
 
 function stageContentWidth(stage) {
-  const style = getComputedStyle(stage);
   const padding = stagePadding(stage);
-  const gutter = Number.parseFloat(style.getPropertyValue("--reader-gutter")) || 0;
-  return Math.max(200, stage.clientWidth - padding.left - padding.right - gutter * 2);
+  return Math.max(200, stage.clientWidth - padding.left - padding.right);
 }
 
 function stageContentHeight(stage) {
@@ -799,37 +798,6 @@ function applyPan() {
   }
 }
 
-/// Places the scaled column without touching layout. A non-negative offset (or an undersized
-/// column) is a composited translate; a negative offset on an overflowing column becomes scrollLeft.
-/// The two branches agree at fit width, so this is continuous.
-function positionHorizontally(scale, anchor) {
-  const stage = stageElement();
-  const scaler = scalerElement();
-  const pages = pagesElement();
-  if (!stage || !scaler || !pages) return;
-  const viewport = stage.clientWidth;
-  const width = scaler.offsetWidth;
-  let left;
-  if (anchor) {
-    const stageRect = stage.getBoundingClientRect();
-    left = anchor.x - stageRect.left - anchor.contentX * scale;
-  } else {
-    left = (viewport - width) / 2;
-  }
-  if (left >= 0 || width <= viewport + 0.5) {
-    pageOffsetX = left;
-    stage.scrollLeft = 0;
-  } else {
-    void stage.scrollWidth;
-    const max = Math.max(0, stage.scrollWidth - viewport);
-    const desiredScroll = Math.min(-left, max);
-    const whole = Math.trunc(desiredScroll);
-    pageOffsetX = left + whole;
-    stage.scrollLeft = whole;
-  }
-  pages.style.setProperty("--page-offset-x", `${pageOffsetX}px`);
-}
-
 /// Applies a new visual scale without reflowing the pages. This intentionally re-measures the
 /// pointer's point each frame, matching the original feel. The fractional part of the resulting
 /// scroll correction is carried in a transform, so WebKit's whole-pixel scrollTop cannot accumulate
@@ -858,6 +826,24 @@ function applyDisplayScale(scale, origin) {
     }
 
     const after = pages.getBoundingClientRect();
+    // Normal horizontal positioning is the original pointer-following scroll. On the first frame
+    // where the column overflows, the browser can still expose the old scroll range; carry the
+    // clamped remainder as a visual offset and release it as the range catches up.
+    if (scaler.offsetWidth > stageContentWidth(stage) + 0.5) {
+      const contentLeft = stage.getBoundingClientRect().left + stagePadding(stage).left;
+      const desiredLeft = origin.x - pointX * scale;
+      void stage.scrollWidth;
+      const target = contentLeft - desiredLeft;
+      const max = Math.max(0, stage.scrollWidth - stage.clientWidth);
+      // scrollLeft is whole CSS pixels in WebKit; keep the sub-pixel remainder in the page offset.
+      const whole = Math.max(0, Math.min(Math.round(target), max));
+      stage.scrollLeft = whole;
+      pageOffsetX = whole - target;
+    } else {
+      stage.scrollLeft = 0;
+      pageOffsetX = 0;
+    }
+    pages.style.setProperty("--page-offset-x", `${pageOffsetX}px`);
     const delta = after.top + pointY * scale - origin.y;
     // A positive transform residual moves the column down; effective scroll is therefore
     // scrollTop - residual. Carry the fraction instead of letting WebKit round it away.
@@ -866,11 +852,16 @@ function applyDisplayScale(scale, origin) {
     scrollResidualY = whole - effective;
     stage.scrollTop = whole;
     pages.style.setProperty("--scroll-residual-y", `${scrollResidualY}px`);
-
-    positionHorizontally(scale, { x: origin.x, contentX: pointX });
   }
 
   applyPan();
+
+  // While the column still fits the padded content box, auto margins centre it and scrollLeft must
+  // be zero. Once it truly overflows, leave the pointer-adjusted scroll position alone; the earlier
+  // centerHorizontally() forced it back to the middle and was the regression introduced at fe6ee81.
+  if (scaler.offsetWidth <= stageContentWidth(stage) + 0.5) {
+    stage.scrollLeft = 0;
+  }
   schedulePageRulerViewport();
 
   if (!document.body.classList.contains("panel-dragging")) syncCurrentPage();
@@ -894,13 +885,13 @@ function finishZoom() {
   updateScalerSize();
   zooming = false;
   reportZoom(true);
-  centerAtRest(false);
+  centerAtRest();
   refreshPageRuler();
   updateWindow(true).catch(() => {});
   pagesElement()?.classList.remove("zooming");
 }
 
-function centerAtRest(forceHorizontal = true, centerVertical = true) {
+function centerAtRest() {
   const stage = stageElement();
   const scaler = scalerElement();
   if (!stage || !scaler) return;
@@ -908,11 +899,15 @@ function centerAtRest(forceHorizontal = true, centerVertical = true) {
   const available = stageContentHeight(stage);
   const scaledHeight = baseHeight * displayScale;
   scaler.style.marginTop =
-    centerVertical && scaledHeight + 0.5 < available
-      ? `${(available - scaledHeight) / 2}px`
-      : "0px";
+    scaledHeight + 0.5 < available ? `${(available - scaledHeight) / 2}px` : "0px";
 
-  if (forceHorizontal) positionHorizontally(displayScale, null);
+  // Only the fit case is centred by layout margins. Overflow keeps whatever scrollLeft the zoom
+  // pointer produced; snapping it back to the centre here is exactly what fe6ee81 did wrong.
+  if (scaler.offsetWidth <= stageContentWidth(stage) + 0.5) {
+    stage.scrollLeft = 0;
+    pageOffsetX = 0;
+    pagesElement()?.style.setProperty("--page-offset-x", "0px");
+  }
 }
 
 // ── Virtual rendering ─────────────────────────────────────────────────────────────────────────

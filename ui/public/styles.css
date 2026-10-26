@@ -271,12 +271,19 @@ body {
   overflow: auto;
   /* We own scroll anchoring during zoom; the browser must not adjust it as the scaler resizes. */
   overflow-anchor: none;
-  padding: var(--space-5) 0;
-  /* The gutter is an inset, not stage padding. The page column is therefore laid out in the full
-     stage width with auto margins, so it stays centred while it grows into the gutters; horizontal
-     scrolling only begins once the page itself is wider than the stage. The tool rail and range-bar
-     attachment slots are purely decorative overlays in these two lanes. */
-  --reader-gutter: 116px;  /* size */
+  padding: var(--space-5);
+  /* Reserve the left gutter for the wide page-range bar and its direct SVG actions. This is stage
+     padding, not an inset: the page column is centred in the content box, and the first pixel of
+     horizontal overflow is a real scrollable range. */
+  padding-left: calc(var(--space-5) * 4 + var(--space-4) + var(--space-1));
+  padding-right: 0;
+}
+
+/* Right-side range bar: the mirror gutter is padding as well, so the page stays centred in the
+   content box and zoom overflow uses the same scroll origin as the original model. */
+html[data-range-side="right"] .stage,
+html[data-range-side="both"] .stage {
+  padding-right: calc(var(--space-5) * 4 + var(--space-4) + var(--space-1));
 }
 
 /* Directory and thumbnail lists use exactly the AI panel's quiet scrollbar. */
@@ -477,13 +484,13 @@ html[data-scroll-skin="gray"] .page-ruler {
    around it carries the scaled scroll size, so no page reflows while the reader pinches. */
 .pages-scaler {
   position: relative;
-  margin: 0;
+  margin: 0 auto;
 }
 
 .pages {
   width: 100%;
-  /* Screen-space sub-pixel scroll and fit/anchor offset. Translation is outside scale so both
-     values are literal screen pixels; no layout/margin is touched by zoom. */
+  /* Horizontal carry only appears when the new scroll range is one frame behind; the normal fit
+     position is auto-margin centring. The vertical translate carries scrollTop's fractional part. */
   transform:
     translate3d(var(--page-offset-x, 0px), var(--scroll-residual-y, 0px), 0)
     scale(var(--view-scale, 1));
