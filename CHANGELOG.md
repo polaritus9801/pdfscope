@@ -10,6 +10,9 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- CI now runs JS parse/token checks and a headless zoom/panel smoke against the built UI, and the
+  spec gate covers `ui/public` changes. `just check` includes the JS parse check; `just smoke` runs
+  the browser test locally.
 - Zoom uses the scroll-anchored model: the page is centred only while it fits, and pointer-driven
   `scrollLeft` is left alone after overflow. The experimental forced-centre transform bridge and
   per-frame scroll fold are removed, so there is no final scrollbar or page transaction at release.

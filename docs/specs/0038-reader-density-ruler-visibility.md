@@ -1,5 +1,7 @@
 # Page-ruler visibility
 
+**Status:** accepted.
+
 Date: 2026-10-26
 
 ## Aspect-bounded thumbnail slots

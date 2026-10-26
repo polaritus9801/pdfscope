@@ -10,7 +10,7 @@ base="${1:?base commit required}"
 head="${2:?head commit required}"
 
 spec_dir="docs/specs"
-code_pattern='^(crates/[^/]+/src/|ui/src/)'
+code_pattern='^(crates/[^/]+/src/|ui/src/|ui/public/|ui/composer-src/)'
 
 changed=$(git diff --name-only "$base" "$head")
 

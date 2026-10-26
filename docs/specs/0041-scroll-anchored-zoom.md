@@ -1,5 +1,7 @@
 # Scroll-anchored zoom
 
+**Status:** accepted.
+
 Date: 2026-10-26
 
 ## Decision

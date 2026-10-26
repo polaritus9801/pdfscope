@@ -42,10 +42,14 @@ test:  # Run the test suite.
 doc:  # Build documentation, treating warnings as errors.
     RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps
 
+js-check:  # Parse-check the hand-written browser scripts.
+    node --check ui/public/viewer.js
+    node --check scripts/ui-smoke/zoom.mjs
+
 tokens:  # Fail if a component rule hard-codes a pixel value without saying why.
     node scripts/check-tokens.mjs
 
-check: ui tokens fmt-check lint test doc  # Everything CI runs, locally (UI first: the shell embeds it).
+check: ui js-check tokens fmt-check lint test doc  # Everything CI runs, locally (UI first: the shell embeds it).
     @printf '\nAll checks passed.\n'
 
 check-fast: fmt lint  # The cheap half, for a quick loop.
@@ -83,6 +87,9 @@ desktop-check: ui  # Type-check the desktop shell.
 perf-baseline:  # Build release UI and benchmark 1000/3000-page overlay performance.
     cd ui && trunk build --release
     node scripts/ui-smoke/perf.mjs
+
+smoke: ui  # Build the UI and run the headless zoom/panel smoke.
+    node scripts/ui-smoke/zoom.mjs
 
 new-spec name:  # Scaffold docs/specs/NNNN-name.md.
     @./scripts/new-doc.sh spec "{{name}}"
