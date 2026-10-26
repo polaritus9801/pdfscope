@@ -19,6 +19,9 @@ minor releases may contain breaking changes; they are always called out.
   instead of re-basing on the previous frame. This removes slow downward drift during trackpad pinch
   and ctrl/cmd-wheel zoom, and keeps horizontal zoom around the pointer instead of snapping overflow
   to the page centre.
+- Horizontal zoom placement now uses one margin/scroll offset model instead of switching between
+  auto-margin centring and scroll overflow at fit width, removing the snap when crossing fit width
+  during slow zoom.
 - The page ruler now shows persistent page-backed reference bands instead of a hover-only purple
   dot: full-rail translucent rectangles at the reference's actual page-rect top/bottom, with
   rest/hover/focus alpha levels. Nested references darken by compositing, bands never intercept

@@ -815,6 +815,35 @@ function applyPan() {
   }
 }
 
+/// Places the scaled column with one horizontal model instead of toggling between auto-margin
+/// centering and scroll overflow. Below fit width the column uses a margin offset (which can be
+/// negative while anchored); above it, the same visual offset is expressed as scrollLeft. The two
+/// branches agree at the exact fit width, so crossing it cannot jump.
+function positionHorizontally(scale, anchor) {
+  const stage = stageElement();
+  const scaler = scalerElement();
+  if (!stage || !scaler) return;
+  const viewport = stage.clientWidth;
+  const width = scaler.offsetWidth;
+  let left;
+  if (anchor) {
+    const stageRect = stage.getBoundingClientRect();
+    left = anchor.x - stageRect.left - anchor.contentX * scale;
+  } else {
+    left = (viewport - width) / 2;
+  }
+  if (left >= 0 || width <= viewport + 0.5) {
+    // Positive offset (and any undersized column) is expressed as a margin, including a negative
+    // margin when the anchor asks for a column that starts left of the stage.
+    scaler.style.marginLeft = `${left}px`;
+    stage.scrollLeft = 0;
+  } else {
+    scaler.style.marginLeft = "0px";
+    void stage.scrollWidth;
+    stage.scrollLeft = Math.min(-left, Math.max(0, stage.scrollWidth - viewport));
+  }
+}
+
 /// Applies a new visual scale without reflowing the pages. The point under `origin` is restored from
 /// the gesture's fixed document-space anchor, so scrollbar rounding cannot accumulate.
 function applyDisplayScale(scale, origin) {
@@ -851,18 +880,7 @@ function applyDisplayScale(scale, origin) {
   }
 
   applyPan();
-
-  // Auto margins centre the column while it fits. Once it is wider than the stage, preserve the
-  // pointer's horizontal document coordinate instead of snapping the overflow back to the centre.
-  if (scaler.offsetWidth <= stage.clientWidth + 0.5) {
-    stage.scrollLeft = 0;
-  } else if (anchor) {
-    // Reading scrollWidth forces the new range to be known before scrollLeft is assigned;
-    // otherwise the first frame past the stage width clamps the correction and jitters.
-    void stage.scrollWidth;
-    const after = pages.getBoundingClientRect();
-    stage.scrollLeft += after.left + anchor.contentX * scale - anchor.x;
-  }
+  if (anchor) positionHorizontally(scale, anchor);
   schedulePageRulerViewport();
 
   if (!document.body.classList.contains("panel-dragging")) syncCurrentPage();
@@ -904,12 +922,7 @@ function centerAtRest(forceHorizontal = true) {
   scaler.style.marginTop =
     scaledHeight + 0.5 < available ? `${(available - scaledHeight) / 2}px` : "0px";
 
-  if (scaler.offsetWidth <= stage.clientWidth + 0.5) {
-    stage.scrollLeft = 0;
-  } else if (forceHorizontal) {
-    void stage.scrollWidth;
-    stage.scrollLeft = (scaler.offsetWidth - stage.clientWidth) / 2;
-  }
+  if (forceHorizontal) positionHorizontally(displayScale, null);
 }
 
 // ── Virtual rendering ─────────────────────────────────────────────────────────────────────────

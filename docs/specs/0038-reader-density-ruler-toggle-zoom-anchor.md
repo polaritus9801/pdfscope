@@ -65,14 +65,43 @@ stage.scrollTop  += pages.top  + anchor.contentY * newScale - anchor.screenY
 stage.scrollLeft += pages.left + anchor.contentX * newScale - anchor.screenX
 ```
 
-Horizontal rules:
+Horizontal placement uses one signed offset relative to the stage:
 
-- while the scaled column fits the stage, auto margins keep it centred and `scrollLeft = 0`;
-- once it overflows, the pointer's horizontal content coordinate is preserved (clamped by the
-  scroll range), so zooming with the pointer on the left side stays on the left side;
-- `finishZoom` may re-centre vertically, but never snaps horizontal overflow back to the centre.
+```text
+left = anchor.screenX - stage.left - anchor.contentX * newScale
+```
+
+A non-negative offset (and any column narrower than the stage) is expressed as
+`margin-left`; a negative offset on an overflowing column is expressed as `scrollLeft`. At the
+exact fit width both forms agree (`left = 0`), so crossing fit width is continuous. This replaces
+the old two-mode layout — auto-margin centring below fit width, scroll-overflow above it — which
+caused a visible snap when a slow zoom crossed that threshold. When there is no pointer anchor
+(initial load, resize, explicit fit) the same helper centres the column.
+
+`finishZoom` may re-centre vertically, but never snaps horizontal overflow back to the centre.
 
 The anchor is recaptured only when the input origin moves (for example, the fingers move) and is
-cleared when the zoom settles or the document is torn down. This is a focused fix to anchor
-bookkeeping; the page layout, scale easing and render path are unchanged. It removes both the
-cumulative downward drift and the unnatural horizontal recentre.
+cleared when the zoom settles or the document is torn down. This is a focused fix to anchor and
+placement bookkeeping; the page layout, scale easing and render path are unchanged. It removes the
+cumulative downward drift, the fit-width snap and the unnatural horizontal recentre.
+
+## Mainstream reference
+
+The anchor model is the same one used by established viewers, not a bespoke formula:
+
+- [PDF.js `updateScale` with an `origin`](https://github.com/mozilla/pdf.js/commit/b7933d8750835d5743c4aa724b408701ded6588f)
+  preserves a document point and has integration tests for cursor/pinch origin. Its
+  [smooth trackpad-pinch commit](https://github.com/mozilla/pdf.js/commit/9899ae0453fb5952f472df4688f7467a68b15aca)
+  also accumulates fractional scale factors instead of discarding sub-percent ticks.
+- Chromium's PDF viewport tracks a `pinchPanVector` and combines it with the pinch centre in
+  `setPinchZoomInternal`; see the [pinch-zoom implementation review](https://codereview.chromium.org/2400743002)
+  and the [PDF viewport message bridge](https://chromium.googlesource.com/chromium/src/+/67ace07cb299e11dff5771497ec0698036477d3f/pdf/pdf_view_plugin_base.cc).
+- Native PDFKit/Preview sits on `NSScrollView`, whose
+  [`setMagnification(_:centeredAt:)`](https://developer.apple.com/documentation/appkit/nsscrollview/setmagnification(_:centeredat:))
+  is the canonical anchor-at-point magnification API. The scroll view provides simultaneous
+  magnification and pan without a layout threshold.
+
+A fully compositor-style camera (single affine transform over a fixed page canvas) is the other
+mature design. It is required for truly simultaneous pinch-and-pan on every input stack; the
+scroll/margin implementation above is the minimal continuous version that fits the existing
+virtualised DOM.
