@@ -727,3 +727,11 @@ stationary pointer.
 After a page action is committed, a tuple of page, action kind and side is suppressed. The toolbar
 and preview remain hidden while the pointer stays in that zone; moving to another page/kind/side
 rear­ms normal hover.
+
+### Page-range parity fixes
+
+The overlay preserves the clicked anchor cap even while the pointer end is light, uses document total
+pages for repeated-endpoint extension, and derives base caps from visual base neighbours so an open
+page extends through the gap without a bottom cap. Paged/spread metrics carry visible flags and are
+refreshed after navigation, so hidden pages cannot be hit. The parity matrix and the baseline probe
+cover these cases.

@@ -264,6 +264,9 @@ function applyPageMode() {
   requestAnimationFrame(() => {
     document.querySelector(".stage")?.scrollTo({ top: 0 });
     if (paged) pagedLayout();
+    // Paged layouts hide pages; refresh the metrics before the next pointer move so the overlay's
+    // visible-page guard sees the new display, not the continuous layout it was built from.
+    rebuildMetrics();
     refreshPageRuler();
   });
 }
@@ -330,6 +333,9 @@ function pagedLayout() {
     const shownFraction = (baseWidth * scale) / availableWidth;
     window.__pdfscopeZoom?.({ percent: Math.round(shownFraction * 100), settled: true });
   }
+  // Navigation in paged modes swaps which sheets are displayed; keep the action overlay's visible
+  // page metrics in sync with that swap.
+  rebuildMetrics();
 }
 
 function resetPageLayers() {
@@ -540,6 +546,7 @@ function reportPageMetrics() {
       page: index + 1,
       top: metric.top,
       height: metric.height,
+      visible: metric.visible !== false,
     })),
   };
   try {
@@ -565,6 +572,8 @@ function rebuildMetrics() {
     return {
       top: (rect.top - pagesRect.top) / displayScale,
       height: rect.height / displayScale,
+      // Paged/spread modes hide pages; the overlay must not turn their hit columns into actions.
+      visible: rect.width > 0 && rect.height > 0,
     };
   });
   metricsDirty = false;

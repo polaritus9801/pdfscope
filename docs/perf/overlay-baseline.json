@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-25T21:09:47.032Z",
-  "app": "http://127.0.0.1:49845/",
+  "generatedAt": "2026-10-25T21:27:59.222Z",
+  "app": "http://127.0.0.1:50075/",
   "browser": "headless Chrome (CDP)",
   "viewport": "1440x950",
   "counts": [
@@ -10,7 +10,7 @@
   "results": [
     {
       "pages": 1000,
-      "loadMs": 728,
+      "loadMs": 761,
       "dom": {
         "pageShells": 1000,
         "domNodes": 2270,
@@ -23,13 +23,13 @@
         "errors": []
       },
       "hover": {
-        "ms": 32.799999952316284,
+        "ms": 32.89999985694885,
         "samples": [
-          7.299999952316284,
-          32.799999952316284,
-          32.799999952316284,
-          33.200000047683716,
-          33.200000047683716
+          5.1000001430511475,
+          32.700000047683716,
+          32.89999985694885,
+          33.30000019073486,
+          33.30000019073486
         ],
         "suppression": {
           "afterClickActive": 0,
@@ -45,13 +45,14 @@
         "elementAtPointer": "page-overlay-hit range-right"
       },
       "preview": {
-        "ms": 33.299999952316284,
+        "ms": 33.40000009536743,
         "targetPage": 500,
         "previewOutlines": 500,
-        "visibleBars": 2
+        "visibleBars": 2,
+        "barBackground": "linear-gradient(to bottom, var(--deep-border) 0, var(--light-body) var(--range-end-fade), var(--light-body) calc(100% - var(--range-end-fade)), var(--light-border) 100%)"
       },
       "commit": {
-        "ms": 32.200000047683716,
+        "ms": 32.299999952316284,
         "selectionOutlines": 500,
         "visibleBars": 2
       },
@@ -59,7 +60,7 @@
     },
     {
       "pages": 3000,
-      "loadMs": 1437,
+      "loadMs": 1415,
       "dom": {
         "pageShells": 3000,
         "domNodes": 6285,
@@ -74,11 +75,11 @@
       "hover": {
         "ms": 33.39999985694885,
         "samples": [
-          18.800000190734863,
+          13.5,
           33.30000019073486,
           33.39999985694885,
           33.40000009536743,
-          34.09999990463257
+          33.799999952316284
         ],
         "suppression": {
           "afterClickActive": 0,
@@ -94,17 +95,18 @@
         "elementAtPointer": "page-overlay-hit range-right"
       },
       "preview": {
-        "ms": 33.59999990463257,
+        "ms": 31,
         "targetPage": 500,
         "previewOutlines": 500,
-        "visibleBars": 2
+        "visibleBars": 2,
+        "barBackground": "linear-gradient(to bottom, var(--deep-border) 0, var(--light-body) var(--range-end-fade), var(--light-body) calc(100% - var(--range-end-fade)), var(--light-border) 100%)"
       },
       "commit": {
-        "ms": 34.59999990463257,
+        "ms": 31.90000009536743,
         "selectionOutlines": 500,
         "visibleBars": 2
       },
-      "heapUsedMb": 17.1
+      "heapUsedMb": 9.2
     }
   ]
 }

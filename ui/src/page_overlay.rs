@@ -15,6 +15,12 @@ pub(crate) struct PageMetric {
     pub top: f64,
     #[serde(default)]
     pub height: f64,
+    #[serde(default = "visible_default")]
+    pub visible: bool,
+}
+
+fn visible_default() -> bool {
+    true
 }
 
 #[derive(Clone, Debug, Default, PartialEq, serde::Deserialize)]
@@ -130,6 +136,9 @@ fn open_gradient(kind: u8, placed: bool) -> String {
 fn page_span(layout: &PageGeometry, start: u32, end: u32) -> Option<(f64, f64)> {
     let first = layout.pages.get(start.checked_sub(1)? as usize)?;
     let last = layout.pages.get(end.checked_sub(1)? as usize)?;
+    if !first.visible || !last.visible {
+        return None;
+    }
     Some((first.top, (last.top + last.height - first.top).max(1.0)))
 }
 
@@ -209,6 +218,7 @@ fn adjust_same_endpoint(
     page: u32,
     kind: u8,
     page_set: RwSignal<Vec<u32>>,
+    total_pages: u32,
     undo_push: Callback<()>,
     scope_mode: RwSignal<u8>,
 ) {
@@ -244,11 +254,7 @@ fn adjust_same_endpoint(
                 Some((start, _)) => {
                     pdfscope_core::pages::add_range(&mut next, page, start.saturating_sub(1))
                 }
-                None => pdfscope_core::pages::add_range(
-                    &mut next,
-                    page,
-                    page_set.get_untracked().last().copied().unwrap_or(page),
-                ),
+                None => pdfscope_core::pages::add_range(&mut next, page, total_pages.max(page)),
             }
         }
     }
@@ -263,6 +269,7 @@ fn choose_endpoint(
     page: u32,
     kind: u8,
     page_set: RwSignal<Vec<u32>>,
+    total_pages: u32,
     anchor: RwSignal<Option<(u8, u32)>>,
     hover_page: RwSignal<Option<u32>>,
     hover_kind: RwSignal<Option<u8>>,
@@ -282,7 +289,7 @@ fn choose_endpoint(
                 if read_page_repeat() == "cancel" {
                     clear_draft(anchor, hover_page, hover_kind, hover_side);
                 } else {
-                    adjust_same_endpoint(page, kind, page_set, undo_push, scope_mode);
+                    adjust_same_endpoint(page, kind, page_set, total_pages, undo_push, scope_mode);
                     clear_draft(anchor, hover_page, hover_kind, hover_side);
                 }
             } else {
@@ -445,6 +452,28 @@ fn page_at_pointer(event: &web_sys::MouseEvent, layout: &PageGeometry) -> Option
         }
     }
     let metric = layout.pages.get(found)?;
+    if !metric.visible {
+        // Paged/spread layouts leave hidden pages at top 0, which can make the binary search land
+        // on a hidden page. Find the visible page under the pointer without doing this scan in the
+        // continuous case.
+        for (index, candidate) in layout.pages.iter().enumerate() {
+            if candidate.visible
+                && base_y >= candidate.top
+                && base_y <= candidate.top + candidate.height
+            {
+                let ratio = (base_y - candidate.top) / candidate.height.max(1.0);
+                let kind = if ratio < 1.0 / 3.0 {
+                    0
+                } else if ratio < 2.0 / 3.0 {
+                    2
+                } else {
+                    1
+                };
+                return Some(((index + 1) as u32, kind));
+            }
+        }
+        return None;
+    }
     if base_y < metric.top || base_y > metric.top + metric.height {
         return None;
     }
@@ -489,9 +518,30 @@ pub(crate) fn PageRangeOverlay(
             intervals = subtract_interval(&intervals, open_page, open_page);
         }
 
+        let subtract_pages = state.candidate.filter(|_| state.subtract);
+        let visual_base = |page: u32| {
+            set.binary_search(&page).is_ok()
+                && !subtract_pages
+                    .map(|(start, end)| page >= start && page <= end)
+                    .unwrap_or(false)
+        };
+
         let mut specs = Vec::new();
         for (start, end) in intervals {
-            if let Some((top, height)) = page_span(&layout, start, end) {
+            if let Some((top, mut height)) = page_span(&layout, start, end) {
+                // The old per-page base bar computed first/last from the *neighbour's base flag*,
+                // not from the visual range edges. An open page is still committed, so a base
+                // segment next to it has no cap and (when it is the left neighbour) extends through
+                // the page gap. Compute the same flags here.
+                let visual_first = start == 1 || !visual_base(start - 1);
+                let visual_last = !visual_base(end + 1);
+                if !visual_last {
+                    if let Some(next) = layout.pages.get(end as usize) {
+                        if next.visible {
+                            height = (next.top - top).max(height);
+                        }
+                    }
+                }
                 specs.push(BarSpec {
                     top,
                     height,
@@ -499,8 +549,8 @@ pub(crate) fn PageRangeOverlay(
                     style: format!(
                         "top:{top:.2}px;height:{height:.2}px;background:{};",
                         bar_gradient(
-                            true,
-                            true,
+                            visual_first,
+                            visual_last,
                             "var(--deep-border)",
                             "var(--deep-border)",
                             "var(--deep-body)"
@@ -521,8 +571,22 @@ pub(crate) fn PageRangeOverlay(
                     });
                 }
             } else {
+                // The old per-page bar chose its cap colour from `first/last + placed`: the clicked
+                // anchor endpoint was deep, the hovered endpoint light. Carry that rule onto the
+                // single segment instead of painting both ends light.
+                let anchor_page = anchor.get().map(|(_, page)| page);
                 for (from, to) in add_segments(start, end, &set) {
                     if let Some((top, height)) = page_span(&layout, from, to) {
+                        let top_color = if anchor_page == Some(from) {
+                            "var(--deep-border)"
+                        } else {
+                            "var(--light-border)"
+                        };
+                        let bottom_color = if anchor_page == Some(to) {
+                            "var(--deep-border)"
+                        } else {
+                            "var(--light-border)"
+                        };
                         specs.push(BarSpec {
                             top,
                             height,
@@ -532,8 +596,8 @@ pub(crate) fn PageRangeOverlay(
                                 bar_gradient(
                                     true,
                                     true,
-                                    "var(--light-border)",
-                                    "var(--light-border)",
+                                    top_color,
+                                    bottom_color,
                                     "var(--light-body)"
                                 )
                             ),
@@ -577,7 +641,11 @@ pub(crate) fn PageRangeOverlay(
             {
                 continue;
             }
-            if let Some(metric) = layout.pages.get((*page - 1) as usize) {
+            if let Some(metric) = layout
+                .pages
+                .get((*page - 1) as usize)
+                .filter(|metric| metric.visible)
+            {
                 out.push(OutlineSpec {
                     top: metric.top,
                     height: metric.height,
@@ -590,7 +658,11 @@ pub(crate) fn PageRangeOverlay(
         if let Some((start, end)) = state.candidate {
             if state.subtract {
                 for page in start..=end {
-                    if let Some(metric) = layout.pages.get((page - 1) as usize) {
+                    if let Some(metric) = layout
+                        .pages
+                        .get((page - 1) as usize)
+                        .filter(|metric| metric.visible)
+                    {
                         out.push(OutlineSpec {
                             top: metric.top,
                             height: metric.height,
@@ -602,7 +674,11 @@ pub(crate) fn PageRangeOverlay(
             } else {
                 for page in start..=end {
                     if set.binary_search(&page).is_err() {
-                        if let Some(metric) = layout.pages.get((page - 1) as usize) {
+                        if let Some(metric) = layout
+                            .pages
+                            .get((page - 1) as usize)
+                            .filter(|metric| metric.visible)
+                        {
                             out.push(OutlineSpec {
                                 top: metric.top,
                                 height: metric.height,
@@ -615,7 +691,11 @@ pub(crate) fn PageRangeOverlay(
             }
         } else if let Some((_, page, _)) = state.open {
             if set.binary_search(&page).is_err() {
-                if let Some(metric) = layout.pages.get((page - 1) as usize) {
+                if let Some(metric) = layout
+                    .pages
+                    .get((page - 1) as usize)
+                    .filter(|metric| metric.visible)
+                {
                     out.push(OutlineSpec {
                         top: metric.top,
                         height: metric.height,
@@ -647,13 +727,30 @@ pub(crate) fn PageRangeOverlay(
 
     let activate = Callback::new(move |(page, kind, side): (u32, u8, u8)| {
         suppressed_action.set(Some((page, kind, side)));
+        let total_pages = layout.get_untracked().pages.len() as u32;
         match kind {
             0 => choose_endpoint(
-                page, 0, page_set, anchor, hover_page, hover_kind, hover_side, undo_push,
+                page,
+                0,
+                page_set,
+                total_pages,
+                anchor,
+                hover_page,
+                hover_kind,
+                hover_side,
+                undo_push,
                 scope_mode,
             ),
             1 => choose_endpoint(
-                page, 1, page_set, anchor, hover_page, hover_kind, hover_side, undo_push,
+                page,
+                1,
+                page_set,
+                total_pages,
+                anchor,
+                hover_page,
+                hover_kind,
+                hover_side,
+                undo_push,
                 scope_mode,
             ),
             _ => toggle_page(
@@ -729,7 +826,11 @@ pub(crate) fn PageRangeOverlay(
                 }
                 let page = action_page.get();
                 let geometry = layout.get();
-                let Some(metric) = geometry.pages.get(page.saturating_sub(1) as usize) else {
+                let Some(metric) = geometry
+                    .pages
+                    .get(page.saturating_sub(1) as usize)
+                    .filter(|metric| metric.visible)
+                else {
                     return ().into_any();
                 };
                 let top = metric.top;

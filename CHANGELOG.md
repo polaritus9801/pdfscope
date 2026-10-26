@@ -10,6 +10,8 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Page-range parity: deep clicked-anchor cap, total-page endpoint fallback, visual-base cap/gap
+  rules, visible-page metrics for paged/spread layouts and the complete parity audit.
 - A committed page action suppresses the same page/kind/side zone until the pointer moves to another
   zone, preventing the button and preview from reappearing under a stationary pointer.
 - Page-range action buttons no longer flicker under the pointer: the toolbar is pointer-transparent,

@@ -26,13 +26,15 @@ Raw output: [overlay-baseline.json](overlay-baseline.json).
   pointer is `.page-overlay-hit`, so the hit-strip/toolbar flicker cannot silently return.
 - It toggles page 1, then moves 1 px inside the same third and asserts the action and preview stay
   hidden; this guards the post-click `mouseenter` feel.
+- It asserts the anchor-end cap of a 500-page addition is `--deep-border` and the hover end is
+  `--light-border`, guarding the placed-endpoint bar colour.
 
 ## Results
 
 | Pages | Load (ms) | DOM nodes | Page shells | Hover (ms) | 500-page preview (ms) | 500-page commit (ms) | Heap (MB) |
 |---:|---:|---:|---:|---:|---:|---:|---:|
-| 1000 | 728 | 2,270 | 1,000 | 32.8 | 33.3 | 32.2 | 6.4 |
-| 3000 | 1,437 | 6,285 | 3,000 | 33.4 | 33.6 | 34.6 | 17.1 |
+| 1000 | 761 | 2,270 | 1,000 | 32.9 | 33.4 | 32.3 | 6.4 |
+| 3000 | 1,415 | 6,285 | 3,000 | 33.4 | 31.0 | 31.9 | 9.2 |
 
 All action/bar/overlay counts are O(1) at rest:
 
