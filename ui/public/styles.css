@@ -308,12 +308,22 @@ html[data-range-side="both"] .stage {
 /* Replaces the platform vertical scrollbar; horizontal scrolling (when zoomed beyond the stage)
    stays native. The rail sits in the right gutter and never changes the PDF layout. */
 html.ruler-ready .stage {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+  /* The page ruler replaces only the vertical scrollbar. The horizontal axis keeps the system
+     scrollbar; no custom overlay is used. */
+  scrollbar-width: auto;
+  -ms-overflow-style: auto;
+  overflow-x: auto;
 }
 
-html.ruler-ready .stage::-webkit-scrollbar {
+/* Hide only the vertical native track; the horizontal system scrollbar remains. */
+html.ruler-ready .stage::-webkit-scrollbar:vertical {
   display: none;
+  width: 0;  /* size */
+}
+
+html.ruler-ready .stage::-webkit-scrollbar:horizontal {
+  display: block;
+  height: 16px;  /* size */
 }
 
 .page-ruler {

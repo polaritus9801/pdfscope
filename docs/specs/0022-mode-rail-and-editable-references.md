@@ -756,3 +756,10 @@ image/file previews, or report orphan/unknown references. The old hover-only pur
 The navigation rail shows a small marker at the hovered page's position while the page bar is
 hovered, so the hovered page is visible even when the rail is scrolled away from it. The marker is
 pointer-transparent and does not change scroll position.
+
+### Horizontal scrollbar
+
+The page ruler replaces only the vertical scrollbar. The horizontal axis keeps the system scrollbar
+(`overflow-x: auto`); the native vertical track is hidden with a `::-webkit-scrollbar:vertical`
+rule only. The system scrollbar may be overlay-hidden by macOS until the reader scrolls, but it is
+not replaced by a custom widget and cannot change the stage height by appearing.

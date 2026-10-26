@@ -10,6 +10,8 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- The reader's horizontal axis keeps the system scrollbar when the zoomed page overflows sideways;
+  only the native vertical track is hidden by the page ruler.
 - The navigation rail shows a pointer-transparent marker at the hovered page while the page bar is
   hovered.
 - Thumbnail rails and the page-reference manager now fit each page inside a common square bound while
