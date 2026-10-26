@@ -10,6 +10,10 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Three selectable zoom engines, persisted as `pdfscope.zoom-mode` and available on the future web
+  path: `scroll` (PDF.js-style eased document anchor), `magnify` (NSScrollView immediate
+  magnification semantics, explicitly a web simulation) and `camera` (temporary affine transform
+  during the gesture, committed to the scroll layout on settle). Default remains `scroll`.
 - Thumbnail rails and the page-reference manager now fit each page inside a square bound while
   preserving its own aspect ratio, then wrap the tiles continuously. A 16:9 row stays full-width
   and compact; A4 becomes a narrower, full-height tile with no letterbox bands.

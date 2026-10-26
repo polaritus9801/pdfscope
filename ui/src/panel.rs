@@ -67,6 +67,7 @@ pub(crate) const PAGE_REPEAT_KEY: &str = "pdfscope.page-repeat";
 pub(crate) const PAGE_BAR_SIDE_KEY: &str = "pdfscope.page-bar-side";
 pub(crate) const SCROLL_SKIN_KEY: &str = "pdfscope.scroll-skin";
 pub(crate) const PAGE_RULER_KEY: &str = "pdfscope.page-ruler";
+pub(crate) const ZOOM_MODE_KEY: &str = "pdfscope.zoom-mode";
 
 /// Appearance preference for the custom page-ruler scrollbar. Future skins are new values here plus
 /// one CSS block keyed by `data-scroll-skin`; the reader layout does not change.
@@ -128,6 +129,46 @@ pub(crate) fn write_page_ruler_visible(visible: bool) {
         let _ = storage.set_item(PAGE_RULER_KEY, if visible { "on" } else { "off" });
     }
     apply_page_ruler_visible(visible);
+}
+
+/// Zoom engine preference: PDF.js-style scroll anchoring, NSScrollView-style immediate
+/// magnification, or a transform camera. All three are web implementations; native is explicitly
+/// a web semantic mode, not a claim that NSScrollView is available in WKWebView.
+pub(crate) fn read_zoom_mode() -> String {
+    web_sys::window()
+        .and_then(|window| window.local_storage().ok().flatten())
+        .and_then(|storage| storage.get_item(ZOOM_MODE_KEY).ok().flatten())
+        .filter(|value| matches!(value.as_str(), "scroll" | "magnify" | "camera"))
+        .unwrap_or_else(|| "scroll".to_owned())
+}
+
+pub(crate) fn apply_zoom_mode(value: &str) {
+    let value = if matches!(value, "scroll" | "magnify" | "camera") {
+        value
+    } else {
+        "scroll"
+    };
+    if let Some(root) = web_sys::window()
+        .and_then(|window| window.document())
+        .and_then(|document| document.document_element())
+    {
+        let _ = root.set_attribute("data-zoom-mode", value);
+    }
+    let _ = crate::call("setZoomMode", &[JsValue::from_str(value)]);
+}
+
+pub(crate) fn write_zoom_mode(value: &str) {
+    let value = if matches!(value, "scroll" | "magnify" | "camera") {
+        value
+    } else {
+        "scroll"
+    };
+    if let Some(storage) =
+        web_sys::window().and_then(|window| window.local_storage().ok().flatten())
+    {
+        let _ = storage.set_item(ZOOM_MODE_KEY, value);
+    }
+    apply_zoom_mode(value);
 }
 
 /// Reading preference: place the page-range bar on the left, right, both sides or nowhere.

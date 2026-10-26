@@ -55,6 +55,11 @@ let zoomOrigin = null;
 /// Fixed document-space point under the zoom pointer for the whole gesture. Re-measuring the
 /// previous frame made sub-pixel scrollbar rounding accumulate into a slow vertical drift.
 let zoomAnchor = null;
+let zoomMode =
+  (typeof document !== "undefined" && document.documentElement?.dataset.zoomMode) || "scroll";
+/// Only used by the camera mode. The page column's layout is frozen while this is non-null; the
+/// visible scale/translation is applied directly to #pages and committed on settle.
+let camera = null;
 let zoomDirect = false;
 let zoomFrame = 0;
 let zoomLastTime = 0;
@@ -705,7 +710,7 @@ function resolveOrigin(origin) {
 }
 
 function reportZoom(settled) {
-  const percent = Math.round(displayScale * 100);
+  const percent = Math.round((camera?.scale ?? displayScale) * 100);
   if (!settled && percent === lastReportedZoom) return;
   lastReportedZoom = percent;
   window.__pdfscopeZoom?.({ percent, settled });
@@ -741,11 +746,16 @@ function captureZoomAnchor(origin) {
 function setZoomTarget(scale, { direct = false, origin = null } = {}) {
   if (!document_) return;
   const resolved = resolveOrigin(origin);
-  if (!zoomAnchor || zoomAnchor.x !== resolved.x || zoomAnchor.y !== resolved.y) {
+  if (zoomMode === "camera" && zoomAnchor) {
+    // A moving pinch centre is pan, not a new anchor: the content point captured at gesture/zoom
+    // start follows the centre while the scale changes.
+    zoomAnchor.x = resolved.x;
+    zoomAnchor.y = resolved.y;
+  } else if (!zoomAnchor || zoomAnchor.x !== resolved.x || zoomAnchor.y !== resolved.y) {
     zoomAnchor = captureZoomAnchor(resolved);
   }
   targetScale = clamp(scale, MIN_SCALE, MAX_SCALE);
-  zoomDirect = direct;
+  zoomDirect = direct || zoomMode === "magnify";
   zoomOrigin = resolved;
   zooming = true;
   clearSettle();
@@ -794,10 +804,16 @@ function zoomStep(now) {
         : displayScale + difference * (1 - Math.exp(-delta / 45));
   }
 
-  applyDisplayScale(nextScale, origin);
+  if (zoomMode === "camera") {
+    if (!camera) startCamera();
+    applyCamera(nextScale);
+  } else {
+    applyDisplayScale(nextScale, origin);
+  }
   reportZoom(false);
 
-  if (Math.abs(targetScale - displayScale) > 0.0005) {
+  const visualScale = camera?.scale ?? displayScale;
+  if (Math.abs(targetScale - visualScale) > 0.0005) {
     zoomFrame = requestAnimationFrame(zoomStep);
   } else {
     scheduleSettle();
@@ -842,6 +858,60 @@ function positionHorizontally(scale, anchor) {
     void stage.scrollWidth;
     stage.scrollLeft = Math.min(-left, Math.max(0, stage.scrollWidth - viewport));
   }
+}
+
+function startCamera() {
+  const pages = pagesElement();
+  if (!pages) return;
+  const rect = pages.getBoundingClientRect();
+  camera = {
+    layoutLeft: rect.left,
+    layoutTop: rect.top,
+    scale: displayScale,
+  };
+  pages.style.transformOrigin = "0 0";
+  pages.style.willChange = "transform";
+}
+
+/// Camera mode: no layout or scroll write per frame. Translate/scale the rendered page column
+/// directly, exactly like a compositor viewport; the scroll model is committed once on settle.
+function applyCamera(scale) {
+  const pages = pagesElement();
+  if (!pages || !camera || !zoomAnchor) return;
+  const desiredLeft = zoomAnchor.x - zoomAnchor.contentX * scale;
+  const desiredTop = zoomAnchor.y - zoomAnchor.contentY * scale;
+  camera.scale = scale;
+  pages.style.transform =
+    `translate3d(${desiredLeft - camera.layoutLeft}px, ` +
+    `${desiredTop - camera.layoutTop}px, 0) scale(${scale})`;
+}
+
+function resetCameraTransform() {
+  const pages = pagesElement();
+  if (pages) {
+    pages.style.removeProperty("transform");
+    pages.style.removeProperty("will-change");
+  }
+}
+
+function commitCamera() {
+  const stage = stageElement();
+  const pages = pagesElement();
+  if (!stage || !pages || !camera || !zoomAnchor) {
+    camera = null;
+    resetCameraTransform();
+    return;
+  }
+  const anchor = zoomAnchor;
+  const scale = targetScale;
+  resetCameraTransform();
+  setDisplayScale(scale);
+  updateScalerSize();
+  // The camera placed the anchor point exactly; recreate that placement in the scroll layout.
+  const rect = pages.getBoundingClientRect();
+  stage.scrollTop += rect.top + anchor.contentY * scale - anchor.y;
+  positionHorizontally(scale, anchor);
+  camera = null;
 }
 
 /// Applies a new visual scale without reflowing the pages. The point under `origin` is restored from
@@ -895,24 +965,29 @@ function scheduleSettle() {
 function finishZoom() {
   settleTimer = 0;
   if (!document_) return;
-  if (Math.abs(targetScale - displayScale) > 1e-7) {
-    applyDisplayScale(targetScale, resolveOrigin(zoomOrigin));
+  const cameraWasActive = Boolean(camera);
+  if (camera) {
+    commitCamera();
+  } else {
+    if (Math.abs(targetScale - displayScale) > 1e-7) {
+      applyDisplayScale(targetScale, resolveOrigin(zoomOrigin));
+    }
+    // The visual state must equal the target even if the last frame stopped inside the easing
+    // epsilon. Any residual is sub-pixel; the reading line has already been anchored.
+    setDisplayScale(targetScale);
+    updateScalerSize();
   }
-  // The visual state must equal the target even if the last frame stopped inside the easing
-  // epsilon. Any residual is sub-pixel; the reading line has already been anchored.
-  setDisplayScale(targetScale);
-  updateScalerSize();
   zoomAnchor = null;
   zooming = false;
   reportZoom(true);
-  // The zoom anchor already chose the horizontal scroll position; recenter vertically only.
-  centerAtRest(false);
+  // The anchor already chose both scroll positions; the camera must not recenter after commit.
+  centerAtRest(false, !cameraWasActive);
   refreshPageRuler();
   updateWindow(true).catch(() => {});
   pagesElement()?.classList.remove("zooming");
 }
 
-function centerAtRest(forceHorizontal = true) {
+function centerAtRest(forceHorizontal = true, centerVertical = true) {
   const stage = stageElement();
   const scaler = scalerElement();
   if (!stage || !scaler) return;
@@ -920,7 +995,9 @@ function centerAtRest(forceHorizontal = true) {
   const available = stageContentHeight(stage);
   const scaledHeight = baseHeight * displayScale;
   scaler.style.marginTop =
-    scaledHeight + 0.5 < available ? `${(available - scaledHeight) / 2}px` : "0px";
+    centerVertical && scaledHeight + 0.5 < available
+      ? `${(available - scaledHeight) / 2}px`
+      : "0px";
 
   if (forceHorizontal) positionHorizontally(displayScale, null);
 }
@@ -1403,7 +1480,13 @@ function gestureOrigin(event) {
 function onGestureStart(event) {
   if (!document_) return;
   event.preventDefault();
-  gesture = { startScale: displayScale, origin: gestureOrigin(event) };
+  const origin = gestureOrigin(event);
+  gesture = { startScale: displayScale, origin };
+  if (zoomMode === "camera") {
+    // Capture before the first gesturechange so the point under the initial centroid, not under
+    // the already-moved centroid, is the content that pans with the fingers.
+    zoomAnchor = captureZoomAnchor(origin);
+  }
   zooming = true;
   clearSettle();
   pagesElement()?.classList.add("zooming");
@@ -2986,6 +3069,23 @@ window.PDFScope = {
     return true;
   },
 
+  /// Selects the web zoom engine: scroll (PDF.js-style), magnify (NSScrollView semantics) or
+  /// camera (temporary compositor transform). The NSScrollView option is a web semantic mode.
+  setZoomMode(mode) {
+    const next = ["scroll", "magnify", "camera"].includes(mode) ? mode : "scroll";
+    if (next === zoomMode) return;
+    if (camera) {
+      finishZoom();
+    }
+    zoomMode = next;
+    document.documentElement?.setAttribute("data-zoom-mode", next);
+    try {
+      localStorage.setItem("pdfscope.zoom-mode", next);
+    } catch {
+      /* private mode or no storage */
+    }
+  },
+
   /// Toggles the page marks only. The custom thumb stays the scrollbar in either state.
   setPageRulerVisible(visible) {
     pageRulerVisible = Boolean(visible);
@@ -3606,6 +3706,10 @@ function stopZoom() {
   gesture = null;
   zoomOrigin = null;
   zoomAnchor = null;
+  if (camera) {
+    camera = null;
+    resetCameraTransform();
+  }
   pendingPanX = 0;
   pendingPanY = 0;
   pagesElement()?.classList.remove("zooming");
@@ -3624,6 +3728,7 @@ let pageRulerVisible =
 function initPageRuler() {
   if (pageRuler) return;
   pageRulerVisible = document.documentElement?.dataset.pageRuler !== "off";
+  zoomMode = document.documentElement?.dataset.zoomMode || zoomMode;
   const shell = document.querySelector(".stage-shell");
   if (!shell) {
     setTimeout(initPageRuler, 50);
