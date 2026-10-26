@@ -489,9 +489,7 @@ html[data-scroll-skin="gray"] .page-ruler {
 
 .pages {
   width: 100%;
-  transform:
-    translate3d(var(--page-offset-x, 0px), var(--page-offset-y, 0px), 0)
-    scale(var(--view-scale, 1));
+  transform: scale(var(--view-scale, 1));
   transform-origin: 0 0;
   display: flex;
   flex-direction: column;

@@ -10,12 +10,11 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
-- Pinch startup no longer paints a queued previous-zoom frame; the first gesture sample is eased
-  over one frame. Visual placement is folded into the scroll every frame, so the system horizontal
-  thumb tracks the gesture and no longer jumps only when the pinch is released.
-- Zoom placement is now one continuous function: the page blends from fit centring to the pointer
-  anchor with a scale-free smoothstep weight, so crossing fit width no longer changes the page's
-  pivot in one frame. Panel-drag geometry remains unchanged.
+- Zoom uses the scroll-anchored model: the page is centred only while it fits, and pointer-driven
+  `scrollLeft` is left alone after overflow. The experimental forced-centre transform bridge and
+  per-frame scroll fold are removed, so there is no final scrollbar or page transaction at release.
+- Pinch startup cancels a queued frame from the previous zoom and eases only the first gesture
+  sample; an unapplied remainder at gesture end eases instead of snapping.
 - The reader's horizontal axis keeps the system scrollbar when the zoomed page overflows sideways;
   only the native vertical track is hidden by the page ruler.
 - The navigation rail shows a pointer-transparent marker at the hovered page while the page bar is
