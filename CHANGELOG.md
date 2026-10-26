@@ -10,6 +10,8 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Page-ruler and manager polish: neutral 50% major ticks, stable layering, distinct current/selected
+  manager states, and hover previews that do not re-anchor the reader.
 - Reader page ruler: canvas page/chapter ticks, current-page line, draggable viewport thumb,
   hover page/section preview, click/drag/wheel/keyboard navigation and an ARIA scrollbar. The
   navigation pane and manager now use the quiet 4 px scrollbar treatment, and manager card drags

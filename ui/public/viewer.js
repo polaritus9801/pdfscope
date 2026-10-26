@@ -3508,7 +3508,6 @@ function initPageRuler() {
     stage: null,
     measureFrame: 0,
     viewportFrame: 0,
-    drawnCurrent: 0,
   };
   pageRuler.ctx = pageRuler.canvas.getContext("2d");
   document.documentElement.classList.add("ruler-ready");
@@ -3618,22 +3617,34 @@ function measurePageRuler() {
   const pagesRect = pages.getBoundingClientRect();
   const pagesTop = pagesRect.top - stageRect.top + stage.scrollTop;
   ruler.total = Math.max(1, stage.scrollHeight);
+  const maxScroll = Math.max(0, ruler.total - stage.clientHeight);
   ruler.marks = pageElements
     .map((page) => {
       const number = Number(page.dataset.page);
       const rect = page.getBoundingClientRect();
       const top = pagesTop + (rect.top - pagesRect.top);
+      // The page tick is placed where the viewport must be positioned to centre this page in the
+      // reader. That makes the tick line up with the middle of the scrollbar thumb, not its top.
+      const centerScroll = clamp(
+        top + rect.height / 2 - stage.clientHeight / 2,
+        0,
+        maxScroll,
+      );
       return {
         number,
         top,
-        fraction: clamp(top / ruler.total, 0, 1),
         height: rect.height,
+        centerScroll,
+        centerFraction: clamp(
+          (centerScroll + stage.clientHeight / 2) / ruler.total,
+          0,
+          1,
+        ),
       };
     })
     .filter((mark) => Number.isFinite(mark.number) && mark.number > 0)
     .sort((a, b) => a.number - b.number);
   ruler.element.setAttribute("aria-valuemax", String(document_.numPages || ruler.marks.length));
-  ruler.drawnCurrent = 0;
   drawPageRuler();
   updatePageRulerViewport();
 }
@@ -3654,17 +3665,15 @@ function updatePageRulerViewport() {
   const scrollHeight = Math.max(1, stage.scrollHeight);
   const maxScroll = Math.max(0, scrollHeight - stage.clientHeight);
   const thumbHeight = Math.min(track, Math.max(22, (stage.clientHeight / scrollHeight) * track));
-  const thumbTop =
-    maxScroll > 0 ? (stage.scrollTop / maxScroll) * Math.max(0, track - thumbHeight) : 0;
+  // The thumb's centre follows the viewport centre, matching the page-centre ticks.
+  const thumbCenter =
+    ((stage.scrollTop + stage.clientHeight / 2) / scrollHeight) * track;
+  const thumbTop = clamp(thumbCenter - thumbHeight / 2, 0, Math.max(0, track - thumbHeight));
   ruler.thumb.style.height = `${thumbHeight}px`;
   ruler.thumb.style.top = `${thumbTop}px`;
   ruler.thumb.hidden = maxScroll <= 1;
   ruler.element.setAttribute("aria-valuenow", String(currentPage));
   ruler.element.setAttribute("aria-valuetext", `第 ${currentPage} 页`);
-  if (ruler.drawnCurrent !== currentPage) {
-    ruler.drawnCurrent = currentPage;
-    drawPageRuler();
-  }
 }
 
 function rulerSectionFor(page) {
@@ -3677,16 +3686,12 @@ function rulerSectionFor(page) {
   return best;
 }
 
-function pageMarkForNumber(number) {
-  return pageRuler?.marks.find((mark) => mark.number === number) ?? null;
-}
-
 function pageMarkAtY(y) {
   const ruler = pageRuler;
   if (!ruler || ruler.marks.length === 0) return null;
   let best = ruler.marks[0];
   for (const mark of ruler.marks) {
-    if (mark.fraction * ruler.trackHeight <= y) best = mark;
+    if (mark.centerFraction * ruler.trackHeight <= y) best = mark;
     else break;
   }
   return best;
@@ -3697,8 +3702,16 @@ function pageRulerColors() {
   return {
     border: style.getPropertyValue("--border-strong").trim() || "#cbb8ec",
     faint: style.getPropertyValue("--ink-faint").trim() || "#8c7aa2",
-    accent: style.getPropertyValue("--accent").trim() || "#7f5cbf",
   };
+}
+
+function pageMajorStep(count) {
+  const target = 16;
+  const raw = count / target;
+  const power = 10 ** Math.floor(Math.log10(Math.max(1, raw)));
+  const normalized = raw / power;
+  const nice = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
+  return Math.max(1, Math.round(nice * power));
 }
 
 function drawPageRuler() {
@@ -3710,40 +3723,53 @@ function drawPageRuler() {
   const context = ruler.ctx;
   context.clearRect(0, 0, 16, height);
 
-  const marks = ruler.marks;
-  const step = Math.max(1, Math.ceil(marks.length / 400));
-  context.strokeStyle = colors.faint;
-  context.lineWidth = 1;
-  for (let index = 0; index < marks.length; index += step) {
-    const y = Math.min(height - 1, Math.max(0, marks[index].fraction * height));
-    context.globalAlpha = index % 10 === 0 ? 0.78 : 0.46;
-    context.beginPath();
-    context.moveTo(index % 10 === 0 ? 5 : 9, y + 0.5);
-    context.lineTo(16, y + 0.5);
-    context.stroke();
-  }
-  context.globalAlpha = 1;
-
-  // Top-level outline entries become quiet chapter bands.
-  const seen = new Set();
-  context.fillStyle = colors.accent;
+  // One bookmark per page; the shallowest entry wins and determines the bar length.
+  const bookmarks = new Map();
   for (const section of ruler.sections) {
-    if (!section || section.depth !== 0 || !(section.page > 0) || seen.has(section.page)) continue;
-    seen.add(section.page);
-    const mark = pageMarkForNumber(section.page);
-    if (!mark) continue;
-    const y = Math.min(height - 2, Math.max(0, mark.fraction * height));
-    context.globalAlpha = 0.42;
-    context.fillRect(0, y, 16, 2);
+    if (!section || !(section.page > 0)) continue;
+    const current = bookmarks.get(section.page);
+    if (!current || section.depth < current.depth) {
+      bookmarks.set(section.page, {
+        depth: Number(section.depth) || 0,
+        title: String(section.title ?? ""),
+      });
+    }
+  }
+  const hasBookmarks = bookmarks.size > 0;
+  const depths = [...bookmarks.values()].map((bookmark) => bookmark.depth);
+  const depthMin = hasBookmarks ? Math.min(...depths) : 0;
+  const depthMax = hasBookmarks ? Math.max(...depths) : 0;
+  const depthSpan = Math.max(1, depthMax - depthMin);
+  const majorStep = pageMajorStep(ruler.marks.length);
+  const maxTicks = Math.max(80, Math.min(500, Math.floor(height / 2)));
+  const sampleStep = Math.max(1, Math.ceil(ruler.marks.length / maxTicks));
+  const longest = 16;
+  const shortest = 8;
+
+  context.lineWidth = 1;
+  context.strokeStyle = colors.faint;
+  context.fillStyle = colors.faint;
+  for (let index = 0; index < ruler.marks.length; index += 1) {
+    const mark = ruler.marks[index];
+    const bookmark = bookmarks.get(mark.number);
+    const major = !hasBookmarks && (mark.number === 1 || mark.number % majorStep === 0);
+    if (!bookmark && !major && index % sampleStep !== 0) continue;
+    const y = Math.min(height - 1, Math.max(0, mark.centerFraction * height));
+    if (bookmark) {
+      const ratio = Math.min(1, Math.max(0, (bookmark.depth - depthMin) / depthSpan));
+      const length = Math.round(longest - ratio * (longest - shortest));
+      context.globalAlpha = 0.62;
+      context.fillRect(16 - length, y - 1, length, 2);
+    } else {
+      const length = major ? longest : shortest;
+      context.globalAlpha = major ? 0.58 : 0.34;
+      context.beginPath();
+      context.moveTo(16 - length, y + 0.5);
+      context.lineTo(16, y + 0.5);
+      context.stroke();
+    }
   }
   context.globalAlpha = 1;
-
-  const current = pageMarkForNumber(currentPage);
-  if (current) {
-    const y = Math.min(height - 2, Math.max(0, current.fraction * height));
-    context.fillStyle = colors.accent;
-    context.fillRect(0, y, 16, 2);
-  }
 }
 
 function hidePageRulerHover() {
@@ -3769,7 +3795,10 @@ function updatePageRulerHover(event) {
     hidePageRulerHover();
     return;
   }
-  const tickY = Math.min(ruler.trackHeight - 1, Math.max(0, mark.fraction * ruler.trackHeight));
+  const tickY = Math.min(
+    ruler.trackHeight - 1,
+    Math.max(0, mark.centerFraction * ruler.trackHeight),
+  );
   ruler.hoverLine.style.top = `${tickY}px`;
   ruler.hoverLine.hidden = false;
 
@@ -3832,7 +3861,7 @@ function updatePageRulerHover(event) {
 function rulerScrollToPage(mark) {
   const stage = pageRuler?.stage;
   if (!stage || !mark) return;
-  stage.scrollTo({ top: Math.max(0, mark.top - 16), behavior: "auto" });
+  stage.scrollTo({ top: Math.max(0, mark.centerScroll), behavior: "auto" });
 }
 
 function onPageRulerPointerDown(event) {
@@ -3844,13 +3873,7 @@ function onPageRulerPointerDown(event) {
   if (ruler.thumb.contains(event.target)) {
     const stage = ruler.stage;
     if (!stage || ruler.thumb.hidden) return;
-    ruler.drag = {
-      pointerId: event.pointerId,
-      startY: event.clientY,
-      startScroll: stage.scrollTop,
-      travel: Math.max(1, ruler.trackHeight - ruler.thumb.offsetHeight),
-      maxScroll: Math.max(1, stage.scrollHeight - stage.clientHeight),
-    };
+    ruler.drag = { pointerId: event.pointerId };
     ruler.thumb.setPointerCapture(event.pointerId);
     return;
   }
@@ -3865,10 +3888,11 @@ function onPageRulerPointerMove(event) {
   if (ruler.drag) {
     const stage = ruler.stage;
     if (!stage) return;
-    const delta = event.clientY - ruler.drag.startY;
-    const next =
-      ruler.drag.startScroll + (delta / ruler.drag.travel) * ruler.drag.maxScroll;
-    stage.scrollTop = clamp(next, 0, ruler.drag.maxScroll);
+    const rect = ruler.element.getBoundingClientRect();
+    const y = clamp(event.clientY - rect.top, 0, ruler.trackHeight);
+    const contentCenter = (y / ruler.trackHeight) * stage.scrollHeight;
+    const maxScroll = Math.max(0, stage.scrollHeight - stage.clientHeight);
+    stage.scrollTop = clamp(contentCenter - stage.clientHeight / 2, 0, maxScroll);
     return;
   }
   updatePageRulerHover(event);

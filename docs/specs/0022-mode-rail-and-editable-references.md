@@ -681,3 +681,11 @@ subtracts. No hover translate or shadow is applied to manager cards.
 
 **Navigation scrollbars.** 目录 and 缩略图 use the AI-panel recipe: 4 px, transparent track, rounded
 `--border-strong` thumb, no accent/hover variant.
+
+### Page-ruler fixes
+
+Manager selection stays inside the card (no translate/shadow hover), the current page and the
+selection state are distinct, and successful range commits clear the live preview. Ruler ticks use
+neutral ink, page majors are 50% of the longest tick, and the rail/canvas/hover layers are stacked
+so the thumb and hover line cannot disappear behind the canvas. Hover changes page/section without
+re-anchoring the scroll; the thumb is the only drag target.

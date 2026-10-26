@@ -321,8 +321,13 @@ html[data-range-side="both"] .stage {
 /* ── Page ruler ─────────────────────────────────────────────────────────────────────────────── */
 /* Replaces the platform vertical scrollbar; horizontal scrolling (when zoomed beyond the stage)
    stays native. The rail sits in the right gutter and never changes the PDF layout. */
-html[data-scroll-style="ruler"].ruler-ready .stage::-webkit-scrollbar:vertical {
-  width: 0;  /* size */
+html[data-scroll-style="ruler"].ruler-ready .stage {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+html[data-scroll-style="ruler"].ruler-ready .stage::-webkit-scrollbar {
+  display: none;
 }
 
 html[data-scroll-style="native"] .page-ruler {
@@ -336,6 +341,7 @@ html[data-scroll-style="native"] .page-ruler {
   z-index: 6;
   width: 16px;  /* size */
   height: 100%;
+  background: color-mix(in srgb, var(--surface) 92%, var(--border));
   outline: none;
   touch-action: none;
   cursor: default;
@@ -347,11 +353,13 @@ html[data-scroll-style="native"] .page-ruler {
   bottom: 0;
   left: 0;
   width: 1px;  /* size */
-  background: color-mix(in srgb, var(--border-strong) 55%, transparent);
+  background: color-mix(in srgb, var(--ink-faint) 28%, transparent);
   content: "";
 }
 
 .page-ruler canvas {
+  position: relative;
+  z-index: 1;
   display: block;
   width: 16px;  /* size */
   height: 100%;
@@ -359,13 +367,22 @@ html[data-scroll-style="native"] .page-ruler {
 
 .page-ruler-thumb {
   position: absolute;
-  right: 3px;  /* size */
-  width: 8px;  /* size */
-  min-height: 22px;  /* size */
-  background: color-mix(in srgb, var(--accent) 23%, transparent);
-  border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  right: 2px;  /* size */
+  z-index: 3;
+  width: 12px;  /* size */
+  min-height: 32px;  /* size */
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent) 58%, var(--surface)),
+    color-mix(in srgb, var(--accent) 88%, var(--surface))
+  );
+  border: 1px solid color-mix(in srgb, var(--surface) 84%, transparent);
   border-radius: 999px;  /* size */
+  box-shadow:
+    0 2px 7px rgb(60 44 94 / 22%),  /* size */
+    inset 0 1px 0 rgb(255 255 255 / 48%);  /* size */
   cursor: grab;
+  transition: filter var(--duration) var(--ease);
 }
 
 .page-ruler-thumb:active {
@@ -374,11 +391,12 @@ html[data-scroll-style="native"] .page-ruler {
 
 .page-ruler-hover-line {
   position: absolute;
-  right: 2px;  /* size */
-  width: 12px;  /* size */
+  right: 0;
+  z-index: 0;
+  width: 16px;  /* size */
   height: 2px;  /* size */
   margin-top: -1px;  /* size */
-  background: var(--accent);
+  background: color-mix(in srgb, var(--ink-muted) 58%, transparent);
   border-radius: 1px;  /* size */
   pointer-events: none;
 }
@@ -397,7 +415,7 @@ html[data-scroll-style="native"] .page-ruler {
   line-height: 1.45;
   pointer-events: none;
   white-space: nowrap;
-  z-index: 2;
+  z-index: 4;
 }
 
 .page-ruler-tooltip-page {
@@ -422,6 +440,7 @@ html[data-scroll-style="native"] .page-ruler {
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow-2);
   pointer-events: none;
+  z-index: 4;
 }
 
 .page-ruler-preview img {
@@ -2386,8 +2405,7 @@ mark.find-hit {
   border-radius: var(--radius-xs);
 }
 
-.thumb.current .thumb-number,
-.manager-thumb.selected .thumb-number {
+.thumb.current .thumb-number {
   color: var(--accent-ink);
   background: var(--accent);
   border-color: var(--accent);
@@ -2788,7 +2806,9 @@ mark.find-hit {
   border: 0;
   cursor: pointer;
   opacity: 0;
-  transition: opacity var(--duration) var(--ease);
+  /* Geometry and shadow stay fixed while the button fades in; changing either read as a tiny
+     vertical jump on hover. */
+  transition: none;
 }
 
 .page-bar-start,
@@ -2972,6 +2992,7 @@ html[data-range-side="both"] .page-bar-actions.range-right {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--surface);
+  transition: none;
 }
 
 .manager-thumb:hover {
@@ -2990,16 +3011,20 @@ html[data-range-side="both"] .page-bar-actions.range-right {
   pointer-events: none;
 }
 
-.manager-thumb.drag-preview {
+/* Add previews use the same wide ring as a committed selection, without the check badge.
+   Subtract previews simply drop the ring; the check stays until pointer-up removes the page. */
+.manager-thumb.drag-preview:not(.drag-subtract) {
   border-color: var(--accent);
-  background: var(--accent-soft);
-  box-shadow: inset 0 0 0 1px var(--accent);  /* size */
+  background: var(--surface);
+  box-shadow:
+    0 0 0 1px var(--accent),  /* size */
+    0 0 0 3px var(--accent-soft);  /* size */
 }
 
 .manager-thumb.drag-preview.drag-subtract {
-  border-color: var(--danger);
-  background: color-mix(in srgb, var(--danger) 9%, var(--surface));
-  box-shadow: inset 0 0 0 1px var(--danger);  /* size */
+  border-color: var(--border);
+  background: var(--surface);
+  box-shadow: none;
 }
 
 .manager-thumb.selected {
