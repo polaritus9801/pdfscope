@@ -33,8 +33,8 @@ Raw output: [overlay-baseline.json](overlay-baseline.json).
 
 | Pages | Load (ms) | DOM nodes | Page shells | Hover (ms) | 500-page preview (ms) | 500-page commit (ms) | Heap (MB) |
 |---:|---:|---:|---:|---:|---:|---:|---:|
-| 1000 | 763 | 2,271 | 1,000 | 33.3 | 32.8 | 33.1 | 6.5 |
-| 3000 | 1,434 | 6,286 | 3,000 | 33.3 | 33.6 | 32.9 | 17.2 |
+| 1000 | 764 | 2,271 | 1,000 | 33.2 | 33.4 | 32.3 | 6.6 |
+| 3000 | 1,437 | 6,286 | 3,000 | 33.3 | 33.1 | 35.3 | 18.2 |
 
 All action/bar/overlay counts are O(1) at rest:
 
