@@ -742,3 +742,11 @@ The ruler preview image is placed above the pointer and the page/section label b
 16 px gap centred on the pointer. The pair is clamped as one block inside the rail when space is
 short. The composer placeholder now tests for a structurally empty document (one empty textblock),
 not `textContent === ""`, so blank paragraphs and spaces do not show it.
+
+### Reference bands and context activation
+
+Page-backed references (text, box and page ranges) paint persistent full-rail translucent bands on
+the page ruler, with rest/hover/focus alpha, full width and no pointer interception. Hover/focus is
+shared by page frames, context chips, historical reference rows and `@` pills; focus keeps its band.
+Context clicks focus text/box references, navigate pages, scroll answer references, open real
+image/file previews, or report orphan/unknown references. The old hover-only purple dot is removed.

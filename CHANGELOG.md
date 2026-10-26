@@ -10,6 +10,9 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Persistent page-ruler reference bands with rest/hover/focus states, shared by page frames, context
+  chips, history rows and `@` pills; context clicks focus refs, preview images/files, navigate pages
+  or report unavailable references.
 - Ruler preview image/label now straddle the pointer with a centred 16 px gap, and the composer
   placeholder only appears for a structurally empty document.
 - Page-range parity: deep clicked-anchor cap, total-page endpoint fallback, visual-base cap/gap

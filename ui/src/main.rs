@@ -2005,6 +2005,8 @@ fn App() -> impl IntoView {
                     next_answer=next_answer
                     next_ref=next_ref
                     document_key=file_name
+                    active_ref=active_ref
+                    focused_ref=focused_ref
                 />
                 </div>
             </div>

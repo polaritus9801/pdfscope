@@ -446,6 +446,7 @@ struct ReferenceActions {
     web: Callback<()>,
     add_all: Callback<TurnContext>,
     hover: Callback<Option<(u32, (f64, f64, f64, f64))>>,
+    hover_key: Callback<(String, bool)>,
 }
 
 /// The paperclip/count capsule and its reference popover. Clicking a row keeps the popover open and
@@ -472,14 +473,23 @@ fn reference_capsule(
             let hover = actions;
             let click = actions;
             let quote = passage.quote.clone();
+            let key = format!("p:{}", passage.id);
+            let hover_key = key.clone();
+            let leave_key = key;
             rows.push(
                 view! {
                     <button
                         type="button"
                         class="refs-row"
                         data-ref-page=page
-                        on:mouseenter=move |_| hover.hover.run(Some((page, rect)))
-                        on:mouseleave=move |_| hover.hover.run(None)
+                        on:mouseenter=move |_| {
+                            hover.hover.run(Some((page, rect)));
+                            hover.hover_key.run((hover_key.clone(), true));
+                        }
+                        on:mouseleave=move |_| {
+                            hover.hover.run(None);
+                            hover.hover_key.run((leave_key.clone(), false));
+                        }
                         on:click=move |_| click.passage.run(passage.clone())
                     >
                         <span class="refs-kind">{icon("quote", 12)}</span>
@@ -495,14 +505,23 @@ fn reference_capsule(
             let rect = region.rect;
             let hover = actions;
             let click = actions;
+            let key = format!("r:{}", region.id);
+            let hover_key = key.clone();
+            let leave_key = key;
             rows.push(
                 view! {
                     <button
                         type="button"
                         class="refs-row"
                         data-ref-page=page
-                        on:mouseenter=move |_| hover.hover.run(Some((page, rect)))
-                        on:mouseleave=move |_| hover.hover.run(None)
+                        on:mouseenter=move |_| {
+                            hover.hover.run(Some((page, rect)));
+                            hover.hover_key.run((hover_key.clone(), true));
+                        }
+                        on:mouseleave=move |_| {
+                            hover.hover.run(None);
+                            hover.hover_key.run((leave_key.clone(), false));
+                        }
                         on:click=move |_| click.region.run(region.clone())
                     >
                         <span class="refs-kind">{icon("image", 12)}</span>
@@ -516,14 +535,23 @@ fn reference_capsule(
         for page in context.pages.iter().copied() {
             let hover = actions;
             let click = actions;
+            let key = format!("page:{page}");
+            let hover_key = key.clone();
+            let leave_key = key;
             rows.push(
                 view! {
                     <button
                         type="button"
                         class="refs-row"
                         data-ref-page=page
-                        on:mouseenter=move |_| hover.hover.run(Some((page, (0.0, 0.0, 1.0, 1.0))))
-                        on:mouseleave=move |_| hover.hover.run(None)
+                        on:mouseenter=move |_| {
+                            hover.hover.run(Some((page, (0.0, 0.0, 1.0, 1.0))));
+                            hover.hover_key.run((hover_key.clone(), true));
+                        }
+                        on:mouseleave=move |_| {
+                            hover.hover.run(None);
+                            hover.hover_key.run((leave_key.clone(), false));
+                        }
                         on:click=move |_| click.page.run(page)
                     >
                         <span class="refs-kind">{icon("page", 12)}</span>
@@ -538,11 +566,20 @@ fn reference_capsule(
             let click = actions;
             let quote = answer.quote.clone();
             let label = answer.label.clone();
+            let key = format!("a:{}", answer.id);
+            let hover_key = key.clone();
+            let leave_key = key;
             rows.push(
                 view! {
                     <button
                         type="button"
                         class="refs-row"
+                        on:mouseenter=move |_| {
+                            click.hover_key.run((hover_key.clone(), true));
+                        }
+                        on:mouseleave=move |_| {
+                            click.hover_key.run((leave_key.clone(), false));
+                        }
                         on:click=move |_| click.answer.run(answer.clone())
                     >
                         <span class="refs-kind">{icon("sparkle", 12)}</span>
@@ -556,11 +593,20 @@ fn reference_capsule(
         for image in context.images.iter().cloned() {
             let click = actions;
             let name = image.name.clone();
+            let key = format!("img:{}", image.id);
+            let hover_key = key.clone();
+            let leave_key = key;
             rows.push(
                 view! {
                     <button
                         type="button"
                         class="refs-row"
+                        on:mouseenter=move |_| {
+                            click.hover_key.run((hover_key.clone(), true));
+                        }
+                        on:mouseleave=move |_| {
+                            click.hover_key.run((leave_key.clone(), false));
+                        }
                         on:click=move |_| click.image.run(image.clone())
                     >
                         <span class="refs-kind">{icon("image", 12)}</span>
@@ -574,11 +620,20 @@ fn reference_capsule(
         for file in context.files.iter().cloned() {
             let click = actions;
             let name = file.name.clone();
+            let key = format!("file:{}", file.id);
+            let hover_key = key.clone();
+            let leave_key = key;
             rows.push(
                 view! {
                     <button
                         type="button"
                         class="refs-row"
+                        on:mouseenter=move |_| {
+                            click.hover_key.run((hover_key.clone(), true));
+                        }
+                        on:mouseleave=move |_| {
+                            click.hover_key.run((leave_key.clone(), false));
+                        }
                         on:click=move |_| click.file.run(file.clone())
                     >
                         <span class="refs-kind">{icon("file", 12)}</span>
@@ -835,6 +890,14 @@ struct UserImage {
     image: String,
 }
 
+/// A real content preview opened from a context reference. Files currently carry extracted text;
+/// images carry their actual data URL (never the page thumbnail).
+#[derive(Clone, PartialEq)]
+enum ReferencePreview {
+    Image { name: String, image: String },
+    File { name: String, text: String },
+}
+
 #[component]
 pub fn AiPanel(
     passages: RwSignal<Vec<Passage>>,
@@ -858,6 +921,8 @@ pub fn AiPanel(
     next_answer: RwSignal<u64>,
     next_ref: RwSignal<u64>,
     document_key: RwSignal<String>,
+    active_ref: RwSignal<Option<(u8, u64)>>,
+    focused_ref: RwSignal<Option<(u8, u64)>>,
 ) -> impl IntoView {
     let model = RwSignal::new("未配置".to_owned());
     let answer = RwSignal::new(String::new());
@@ -870,6 +935,7 @@ pub fn AiPanel(
     let open_refs = RwSignal::new(Option::<RefTarget>::None);
     let active_reference = RwSignal::new(Option::<String>::None);
     let hover_reference = RwSignal::new(Option::<String>::None);
+    let reference_preview = RwSignal::new(Option::<ReferencePreview>::None);
     let orphan_refs = RwSignal::new(Vec::<String>::new());
     let send_warning = RwSignal::new(false);
     let force_send = RwSignal::new(false);
@@ -1277,18 +1343,6 @@ pub fn AiPanel(
         notify.run(format!("已添加 {missing} 项引用"));
     });
 
-    let reference_actions = ReferenceActions {
-        passage: activate_passage,
-        region: activate_region,
-        page: activate_page,
-        answer: activate_answer,
-        image: activate_image,
-        file: activate_file,
-        web: activate_web,
-        add_all: add_all_references,
-        hover: Callback::new(move |target| hovered.set(target)),
-    };
-
     Effect::new(move |_| {
         let Some(document) = web_sys::window().and_then(|window| window.document()) else {
             return;
@@ -1297,12 +1351,32 @@ pub fn AiPanel(
             Closure::<dyn Fn(web_sys::KeyboardEvent)>::new(move |event: web_sys::KeyboardEvent| {
                 if event.key() == "Escape" {
                     open_refs.set(None);
+                    reference_preview.set(None);
                 }
             });
         let _ =
             document.add_event_listener_with_callback("keydown", handler.as_ref().unchecked_ref());
         handler.forget();
     });
+
+    fn reference_key(kind: u8, id: u64) -> String {
+        if kind == 0 {
+            format!("p:{id}")
+        } else {
+            format!("r:{id}")
+        }
+    }
+
+    fn reference_parts(key: &str) -> Option<(u8, u64)> {
+        key.strip_prefix("p:")
+            .and_then(|id| id.parse::<u64>().ok())
+            .map(|id| (0, id))
+            .or_else(|| {
+                key.strip_prefix("r:")
+                    .and_then(|id| id.parse::<u64>().ok())
+                    .map(|id| (1, id))
+            })
+    }
 
     let reference_location = move |key: &str| -> Option<(u32, (f64, f64, f64, f64))> {
         if let Some(id) = key.strip_prefix("p:").and_then(|id| id.parse::<u64>().ok()) {
@@ -1329,19 +1403,94 @@ pub fn AiPanel(
 
     let focus_reference = Callback::new(move |key: String| {
         active_reference.set(Some(key.clone()));
-        if let Some((page_number, _)) = reference_location(&key) {
-            // Do not run the reader's global clearSelection here: this path can originate from an
-            // inline @ pill, and clearing the document selection would remove the composer caret.
+
+        // Do not run the reader's global clearSelection here: this path can originate from an
+        // inline @ pill, and clearing the document selection would remove the composer caret.
+        if let Some((kind, id)) = reference_parts(&key) {
+            focused_ref.set(Some((kind, id)));
+            if let Some((page_number, rect)) = reference_location(&key) {
+                let total = pages.get_untracked();
+                if total > 0 {
+                    let target = page_number.clamp(1, total);
+                    page.set(target);
+                    let rect_value = js_sys::Array::new();
+                    rect_value.push(&JsValue::from_f64(rect.0));
+                    rect_value.push(&JsValue::from_f64(rect.1));
+                    rect_value.push(&JsValue::from_f64(rect.2));
+                    rect_value.push(&JsValue::from_f64(rect.3));
+                    let _ = crate::call(
+                        "revealReference",
+                        &[JsValue::from(target), rect_value.into()],
+                    );
+                }
+            }
+        } else if let Some(page_number) = key
+            .strip_prefix("page:")
+            .and_then(|page| page.parse::<u32>().ok())
+        {
+            focused_ref.set(None);
             let total = pages.get_untracked();
             if total > 0 {
                 let target = page_number.clamp(1, total);
                 page.set(target);
                 let _ = crate::call("flash", &[JsValue::from(target)]);
             }
+        } else if let Some(id) = key
+            .strip_prefix("img:")
+            .and_then(|id| id.parse::<u64>().ok())
+        {
+            focused_ref.set(None);
+            if let Some(image) = images
+                .get_untracked()
+                .into_iter()
+                .find(|image| image.id == id)
+            {
+                reference_preview.set(Some(ReferencePreview::Image {
+                    name: image.name,
+                    image: image.image,
+                }));
+            } else {
+                notify.run("这张图片已不在上下文里".to_owned());
+            }
+        } else if let Some(id) = key
+            .strip_prefix("file:")
+            .and_then(|id| id.parse::<u64>().ok())
+        {
+            focused_ref.set(None);
+            if let Some(file) = files.get_untracked().into_iter().find(|file| file.id == id) {
+                reference_preview.set(Some(ReferencePreview::File {
+                    name: file.name,
+                    text: file.text,
+                }));
+            } else {
+                notify.run("这个文件已不在上下文里".to_owned());
+            }
+        } else if let Some(id) = key.strip_prefix("a:").and_then(|id| id.parse::<u64>().ok()) {
+            focused_ref.set(None);
+            if let Some(answer) = answers
+                .get_untracked()
+                .into_iter()
+                .find(|answer| answer.id == id)
+            {
+                let found = crate::call("scrollToAnswer", &[JsValue::from_str(&answer.quote)])
+                    .and_then(|value| value.as_bool())
+                    .unwrap_or(false);
+                if !found {
+                    notify.run("这条回答引用已不可定位".to_owned());
+                }
+            } else {
+                notify.run("这条回答引用已不可定位".to_owned());
+            }
+        } else {
+            focused_ref.set(None);
+            notify.run("这条引用已不可定位".to_owned());
         }
     });
     let hover_reference_on = Callback::new(move |key: String| {
         hover_reference.set(Some(key.clone()));
+        if let Some((kind, id)) = reference_parts(&key) {
+            active_ref.set(Some((kind, id)));
+        }
         if let Some((page, rect)) = reference_location(&key) {
             hovered.set(Some((page, rect)));
         }
@@ -1350,7 +1499,145 @@ pub fn AiPanel(
         if hover_reference.get_untracked().as_deref() == Some(key.as_str()) {
             hover_reference.set(None);
             hovered.set(None);
+            if let Some((kind, id)) = reference_parts(&key) {
+                if active_ref.get_untracked() == Some((kind, id)) {
+                    active_ref.set(None);
+                }
+            }
         }
+    });
+    let hover_key = Callback::new(move |(key, on): (String, bool)| {
+        if on {
+            hover_reference_on.run(key);
+        } else {
+            hover_reference_off.run(key);
+        }
+    });
+    let reference_actions = ReferenceActions {
+        passage: activate_passage,
+        region: activate_region,
+        page: activate_page,
+        answer: activate_answer,
+        image: activate_image,
+        file: activate_file,
+        web: activate_web,
+        add_all: add_all_references,
+        hover: Callback::new(move |target| hovered.set(target)),
+        hover_key,
+    };
+
+    // A hover on a page frame publishes the same key as the shelf/@ representations, and a page
+    // frame focus publishes the same key as a shelf selection. The returns are intentionally
+    // one-way: shelf hover writes active_ref explicitly above; frame hover writes hover_reference
+    // here; neither creates a signal loop.
+    Effect::new(move |_| {
+        if let Some((kind, id)) = active_ref.get() {
+            let key = reference_key(kind, id);
+            if hover_reference.get_untracked().as_deref() != Some(key.as_str()) {
+                hover_reference.set(Some(key));
+            }
+        } else if hover_reference
+            .get_untracked()
+            .as_deref()
+            .is_some_and(|key| key.starts_with("p:") || key.starts_with("r:"))
+        {
+            hover_reference.set(None);
+            hovered.set(None);
+        }
+    });
+
+    Effect::new(move |_| {
+        if let Some((kind, id)) = focused_ref.get() {
+            active_reference.set(Some(reference_key(kind, id)));
+        } else if active_reference
+            .get_untracked()
+            .as_deref()
+            .is_some_and(|key| key.starts_with("p:") || key.starts_with("r:"))
+        {
+            active_reference.set(None);
+        }
+    });
+
+    // Publish the persistent rail bands. Bands carry page-normalised extents; the ruler maps them
+    // through page geometry and never scans reference DOM on scroll.
+    Effect::new(move |_| {
+        let active = active_reference.get();
+        let hover = hover_reference.get();
+        let focused = focused_ref.get().map(|(kind, id)| reference_key(kind, id));
+        let state_for = |key: &str| {
+            if active.as_deref() == Some(key) || focused.as_deref() == Some(key) {
+                "focus"
+            } else if hover.as_deref() == Some(key) {
+                "hover"
+            } else {
+                "rest"
+            }
+        };
+        let bands = js_sys::Array::new();
+        let push_band =
+            |key: &str, start_page: u32, end_page: u32, start_top: f64, end_bottom: f64| {
+                let band = js_sys::Object::new();
+                let _ =
+                    js_sys::Reflect::set(&band, &JsValue::from_str("key"), &JsValue::from_str(key));
+                let _ = js_sys::Reflect::set(
+                    &band,
+                    &JsValue::from_str("startPage"),
+                    &JsValue::from_f64(f64::from(start_page)),
+                );
+                let _ = js_sys::Reflect::set(
+                    &band,
+                    &JsValue::from_str("endPage"),
+                    &JsValue::from_f64(f64::from(end_page)),
+                );
+                let _ = js_sys::Reflect::set(
+                    &band,
+                    &JsValue::from_str("startTop"),
+                    &JsValue::from_f64(start_top),
+                );
+                let _ = js_sys::Reflect::set(
+                    &band,
+                    &JsValue::from_str("endBottom"),
+                    &JsValue::from_f64(end_bottom),
+                );
+                let _ = js_sys::Reflect::set(
+                    &band,
+                    &JsValue::from_str("state"),
+                    &JsValue::from_str(state_for(key)),
+                );
+                bands.push(&band);
+            };
+
+        for passage in passages.get() {
+            let key = format!("p:{}", passage.id);
+            push_band(
+                &key,
+                passage.page,
+                passage.page,
+                passage.rect.1,
+                passage.rect.1 + passage.rect.3,
+            );
+        }
+        for region in regions.get() {
+            let key = format!("r:{}", region.id);
+            push_band(
+                &key,
+                region.page,
+                region.page,
+                region.rect.1,
+                region.rect.1 + region.rect.3,
+            );
+        }
+        let mut ranges: Vec<(u32, u32)> = Vec::new();
+        for page_number in page_set.get() {
+            match ranges.last_mut() {
+                Some((_, end)) if *end + 1 == page_number => *end = page_number,
+                _ => ranges.push((page_number, page_number)),
+            }
+        }
+        for (start, end) in ranges {
+            push_band(&format!("page:{start}"), start, end, 0.0, 1.0);
+        }
+        let _ = crate::call("setReferenceBands", &[bands.into()]);
     });
 
     let manager_open = RwSignal::new(false);
@@ -4871,6 +5158,88 @@ pub fn AiPanel(
                                 </div>
                             </div>
                         </div>
+                    </Show>
+
+                    <Show when=move || reference_preview.get().is_some()>
+                        {move || {
+                            reference_preview.get().map(|preview| match preview {
+                                ReferencePreview::Image { name, image } => {
+                                    let close_name = name.clone();
+                                    view! {
+                                        <div
+                                            class="reference-preview-overlay"
+                                            on:click=move |_| reference_preview.set(None)
+                                        >
+                                            <div
+                                                class="reference-preview-card"
+                                                role="dialog"
+                                                aria-modal="true"
+                                                aria-label=format!("图片预览：{close_name}")
+                                                on:click=move |event: web_sys::MouseEvent| event.stop_propagation()
+                                            >
+                                                <div class="reference-preview-head">
+                                                    <div>
+                                                        <strong>{name.clone()}</strong>
+                                                        <small>"图片"</small>
+                                                    </div>
+                                                    <button
+                                                        class="icon-button"
+                                                        title="关闭"
+                                                        aria-label="关闭图片预览"
+                                                        on:click=move |_| reference_preview.set(None)
+                                                    >
+                                                        {icon("close", 16)}
+                                                    </button>
+                                                </div>
+                                                <div class="reference-preview-image">
+                                                    <img src=image alt=name draggable="false" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                        .into_any()
+                                }
+                                ReferencePreview::File { name, text } => {
+                                    let close_name = name.clone();
+                                    let has_text = !text.trim().is_empty();
+                                    view! {
+                                        <div
+                                            class="reference-preview-overlay"
+                                            on:click=move |_| reference_preview.set(None)
+                                        >
+                                            <div
+                                                class="reference-preview-card file"
+                                                role="dialog"
+                                                aria-modal="true"
+                                                aria-label=format!("文件预览：{close_name}")
+                                                on:click=move |event: web_sys::MouseEvent| event.stop_propagation()
+                                            >
+                                                <div class="reference-preview-head">
+                                                    <div>
+                                                        <strong>{name.clone()}</strong>
+                                                        <small>"文件文本"</small>
+                                                    </div>
+                                                    <button
+                                                        class="icon-button"
+                                                        title="关闭"
+                                                        aria-label="关闭文件预览"
+                                                        on:click=move |_| reference_preview.set(None)
+                                                    >
+                                                        {icon("close", 16)}
+                                                    </button>
+                                                </div>
+                                                {if has_text {
+                                                    view! { <pre class="reference-preview-text">{text}</pre> }.into_any()
+                                                } else {
+                                                    view! { <p class="reference-preview-empty">"这个文件没有可预览的文本。"</p> }.into_any()
+                                                }}
+                                            </div>
+                                        </div>
+                                    }
+                                        .into_any()
+                                }
+                            })
+                        }}
                     </Show>
 
                 </aside>

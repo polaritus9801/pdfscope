@@ -2872,6 +2872,8 @@ window.PDFScope = {
       pageRuler.sections = [];
       pageRuler.sectionsDocument = null;
       pageRuler.marks = [];
+      pageRuler.referenceBands = [];
+      renderReferenceBands();
       pageRuler.element.hidden = true;
     }
     stopZoom();
@@ -2931,6 +2933,17 @@ window.PDFScope = {
     input.files = transfer.files;
     input.dispatchEvent(new Event("change", { bubbles: true }));
     return true;
+  },
+
+  /// Rust publishes on-reference/focus changes; bands are page-normalised and persist until replaced.
+  setReferenceBands(bands) {
+    const next = Array.isArray(bands) ? bands : [];
+    if (!pageRuler) {
+      pendingReferenceBands = next;
+      return;
+    }
+    pageRuler.referenceBands = next;
+    renderReferenceBands();
   },
 
   /// A small page image for a reference whose page is outside the reader's viewport.
@@ -3443,6 +3456,36 @@ window.PDFScope = {
     scheduleUpdate(false);
   },
 
+  /// Focus/context routing: scroll so the reference box is visible, not merely its page.
+  revealReference(pageNumber, rect) {
+    if (!document_) return false;
+    const page = pageElement(clampedPage(pageNumber));
+    if (!page) return false;
+    const values = Array.isArray(rect) ? rect : [];
+    const fraction = clamp((Number(values[1]) || 0) + (Number(values[3]) || 0) / 2, 0, 1);
+    scrollToAnchor({ page: clampedPage(pageNumber), fraction });
+    this.flash(pageNumber);
+    return true;
+  },
+
+  /// Scroll a context answer reference into view. The quote is the stable link available in the
+  /// transcript model; return false so the context panel can show an unavailable-reference notice.
+  scrollToAnswer(quote) {
+    const needle = String(quote ?? "").replace(/\s+/g, " ").trim().slice(0, 96);
+    if (!needle) return false;
+    const turns = [...document.querySelectorAll(".turn")];
+    const target = turns.find((turn) =>
+      (turn.textContent ?? "").replace(/\s+/g, " ").includes(needle),
+    );
+    if (!target) return false;
+    target.scrollIntoView({ block: "center", behavior: "auto" });
+    target.classList.remove("answer-reference-flash");
+    void target.offsetWidth;
+    target.classList.add("answer-reference-flash");
+    setTimeout(() => target.classList.remove("answer-reference-flash"), 900);
+    return true;
+  },
+
   zoomTo(percent, options = {}) {
     if (pageMode !== "continuous") return;
     requestZoomTo(percent, options);
@@ -3512,6 +3555,7 @@ function stopZoom() {
 // page and the viewport window. Page geometry is read from the already-rendered page elements; ticks
 // are drawn on one canvas, so scrolling only updates the thumb and the current-page line.
 let pageRuler = null;
+let pendingReferenceBands = [];
 
 function initPageRuler() {
   if (pageRuler) return;
@@ -3530,6 +3574,7 @@ function initPageRuler() {
   element.setAttribute("aria-valuemin", "1");
   element.setAttribute("aria-controls", "pages");
   element.innerHTML = `
+    <div class="page-ruler-bands" aria-hidden="true"></div>
     <canvas aria-hidden="true"></canvas>
     <div class="page-ruler-thumb" hidden></div>
     <div class="page-ruler-hover-line" hidden></div>
@@ -3544,6 +3589,8 @@ function initPageRuler() {
   pageRuler = {
     element,
     canvas: element.querySelector("canvas"),
+    bandsLayer: element.querySelector(".page-ruler-bands"),
+    referenceBands: [],
     thumb: element.querySelector(".page-ruler-thumb"),
     hoverLine: element.querySelector(".page-ruler-hover-line"),
     tooltip: element.querySelector(".page-ruler-tooltip"),
@@ -3647,6 +3694,49 @@ function schedulePageRulerMeasure() {
   });
 }
 
+/// Persistent reference bands on the rail. Rust sends page-normalised extents plus a state; the
+/// viewer maps them through the already-measured page marks, so scrolling never re-lays them out.
+function renderReferenceBands() {
+  const ruler = pageRuler;
+  if (!ruler?.bandsLayer) return;
+  const layer = ruler.bandsLayer;
+  layer.replaceChildren();
+  if (ruler.referenceBands.length === 0 || ruler.marks.length === 0) return;
+  const marks = new Map(ruler.marks.map((mark) => [mark.number, mark]));
+  const total = Math.max(1, ruler.total);
+  const track = ruler.trackHeight;
+  const rows = [];
+  for (const band of ruler.referenceBands) {
+    const start = marks.get(Number(band.startPage));
+    const end = marks.get(Number(band.endPage ?? band.startPage));
+    if (!start || !end) continue;
+    const startTop = Number(band.startTop ?? 0);
+    const endBottom = Number(band.endBottom ?? 1);
+    let top = ((start.top + clamp(startTop, 0, 1) * start.height) / total) * track;
+    let bottom = ((end.top + clamp(endBottom, 0, 1) * end.height) / total) * track;
+    top = clamp(top, 0, track);
+    bottom = clamp(bottom, 0, track);
+    if (bottom - top < 3) {
+      const centre = (top + bottom) / 2;
+      top = clamp(centre - 1.5, 0, Math.max(0, track - 3));
+      bottom = Math.min(track, top + 3);
+    }
+    rows.push({ top, height: bottom - top, state: band.state || "rest", key: band.key || "" });
+  }
+  // Small nested references paint after large containing ones; translucent fills still accumulate.
+  rows.sort((a, b) => b.height - a.height);
+  const fragment = document.createDocumentFragment();
+  for (const row of rows) {
+    const element = document.createElement("div");
+    element.className = `page-ruler-band state-${row.state}`;
+    element.style.top = `${row.top}px`;
+    element.style.height = `${row.height}px`;
+    if (row.key) element.dataset.key = row.key;
+    fragment.append(element);
+  }
+  layer.append(fragment);
+}
+
 function measurePageRuler() {
   const ruler = pageRuler;
   if (!ruler) return;
@@ -3702,6 +3792,11 @@ function measurePageRuler() {
     .sort((a, b) => a.number - b.number);
   ruler.element.setAttribute("aria-valuemax", String(document_.numPages || ruler.marks.length));
   drawPageRuler();
+  if (pendingReferenceBands.length) {
+    ruler.referenceBands = pendingReferenceBands;
+    pendingReferenceBands = [];
+  }
+  renderReferenceBands();
   updatePageRulerViewport();
 }
 
