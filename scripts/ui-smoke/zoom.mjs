@@ -241,12 +241,14 @@ try {
       color: getComputedStyle(box.querySelector(".ref-action-pin")).color,
       border: getComputedStyle(box).borderColor,
       borderWidth: getComputedStyle(box).borderWidth,
+      shadow: getComputedStyle(box).boxShadow,
     };
   })()`);
   check(pinnedPage.eye === 1, "pinning adds the eye", JSON.stringify(pinnedPage));
   check(pinnedPage.color === "rgb(212, 175, 55)", "pinned pin is gold", pinnedPage.color);
   check(pinnedPage.border === "rgb(212, 175, 55)", "pinned page outline is gold", pinnedPage.border);
-  check(pinnedPage.borderWidth === "2px", "pinned page outline is two pixels", pinnedPage.borderWidth);
+  check(pinnedPage.borderWidth === "1px", "pinned page keeps its layout border", pinnedPage.borderWidth);
+  check(pinnedPage.shadow.includes("inset") && pinnedPage.shadow.includes("212, 175, 55"), "pinned page has a gold inset ring", pinnedPage.shadow);
   await evaluate(`document.querySelector(".ref-page-box .ref-action-pin")?.click()`);
   await sleep(100);
   await evaluate(`(() => {

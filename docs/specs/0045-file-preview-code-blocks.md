@@ -8,8 +8,9 @@ Date: 2026-10-29
 
 Use the bundled highlight.js distribution (BSD-3-Clause) for syntax highlighting; no network
 requests. `ui/public/code.js` enhances every rendered `pre > code` in answers, transcripts and the
-reference preview, and adds one copy control at the block's top-right. The original text is copied,
-not the highlighted DOM.
+reference preview, and adds one copy control at the block's top-right. The pre is wrapped in a non-scrolling code frame so
+the copy control does not move with horizontal code scrolling. The original text is copied, not the
+highlighted DOM.
 
 The reference file preview is format-aware using the bytes already extracted for the attachment:
 

@@ -46,19 +46,20 @@ title tooltip is used.
 
 The non-page shelf content sits in one vertical scroll capped at `min(30vh, 300px)`. The media strip
 is a flex-none row inside that same scroll, so images and text move together as one surface rather
-than being squeezed or pinned independently. The file strip, still one fixed row with a narrow
-horizontal scrollbar, sits outside that scroll; the page row sits below it and is never part of the
+than being squeezed or pinned independently. The file strip is one fixed row with no visible
+horizontal scrollbar and sits outside that scroll; the page row sits below it and is never part of the
 scroll or the collapse. A small chevron button, four times the old width and absolutely centred
 in the shelf header, hides all non-page content. The page row uses an inner white rounded input and
 keeps the outer pale-purple container; its label is optically nudged up against the icon.
 
 ## Interaction refinements
 
-The four actions are a fixed 20px square with 16px marks. A hovered composer mention reopens a
+The four actions are a fixed 20px square with a 14px optical mark height; the eye is wider because
+its source glyph is wider, but every mark shares the same height. A hovered composer mention reopens a
 folded shelf and calls `revealShelfReference` so the matching media/text/file/page row is scrolled
 into view. Eye is absent from the DOM until pin is active; there is no hidden placeholder. A pinned pin and its card use the gold accent and a two-pixel gold ring (pinned
 hover uses a deeper gold); an unpinned pin remains lilac on hover. Hover/mention rows use a thin
-one-pixel accent ring. Selected/focused references use a two-pixel `#b49be2` ring. Bordered cards
+one-pixel accent ring. Selected/focused references use a two-pixel `#7f5cbf` ring. Bordered cards
 change their existing border; the borderless text row uses an inset ring.
 The file card keeps its natural width and information by default. On hover the action tray, with its
 own border and background, appears at the vertical centre on the right and may cover the right-hand
@@ -66,6 +67,12 @@ text; no permanent space is reserved for it. Text/answer action groups align to 
 the type icon and its page/answer ordinal in one compact rounded badge; the old separate grey label is
 removed. The collapse control is absolutely centred in the shelf header
 and is 88px wide. The page label is nudged one pixel up against its icon.
+
+A selection inside a rendered answer uses the same floating bubble as a PDF text selection:
+“加入引用” adds only the selected substring as an answer reference, and “复制” copies that substring.
+The bubble sits above the current-page reference outline. The page shell carries the committed
+current-page outline itself so the bubble is not trapped below the transformed page stack. Empty
+scanned text layers no longer render a helper message.
 
 ## Constraints
 

@@ -109,12 +109,15 @@ minor releases may contain breaking changes; they are always called out.
 
 - Code blocks and file code previews now have a Follow System/Light/Dark code theme in Appearance.
 - Text references combine their type icon and page/answer ordinal in one compact badge; selected
-  references use a 2px #b49be2 ring and pinned references a 2px gold ring.
+  references use a 2px #7f5cbf ring and pinned references a 2px gold ring.
 - The media strip and text rows now share one uncoupled scroll, and file hover actions overlay the
   natural-width card instead of permanently reserving space.
 - Pinned context references use a bright-gold pin and a two-pixel gold outline; the eye is absent
-  until pinned, action and glyph widths are uniform, file actions sit in a bordered hover tray, and
+  until pinned, action and glyph heights are uniform, file actions sit in a bordered hover tray, and
   every panel close button shares the settings close mark.
+- Code copy controls stay fixed outside horizontally scrolling code, and a selected portion of an
+  answer can be added as an answer reference through the same bubble used for PDF selections.
+- Scanned pages no longer show the “扫描页 · 暂不支持选择” helper.
 - File previews now render Markdown, tables for CSV/TSV, pretty JSON and syntax-highlighted source,
   with a shared close button and copy control. Answer code blocks use the bundled highlight.js and
   copy their raw source.

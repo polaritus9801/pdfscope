@@ -30,7 +30,15 @@
         }
       }
       const pre = code.parentElement;
-      if (!pre || pre.querySelector(":scope > .code-copy")) continue;
+      if (!pre) continue;
+      let frame = pre.parentElement?.classList.contains("code-frame") ? pre.parentElement : null;
+      if (!frame) {
+        frame = document.createElement("div");
+        frame.className = "code-frame";
+        pre.before(frame);
+        frame.append(pre);
+      }
+      if (frame.querySelector(":scope > .code-copy")) continue;
       const button = document.createElement("button");
       button.type = "button";
       button.className = "code-copy";
@@ -47,7 +55,7 @@
           button.classList.remove("is-copied");
         }, 1300);
       });
-      pre.append(button);
+      frame.append(button);
     }
   }
 
@@ -66,4 +74,87 @@
     childList: true,
     subtree: true,
   });
+})();
+
+// A reply can be quoted partially, with the same compact bubble used for PDF text selections.
+(() => {
+  let bar = null;
+  let quote = "";
+
+  function hide() {
+    bar?.remove();
+    bar = null;
+    quote = "";
+  }
+
+  function currentAnswerSelection() {
+    const selection = window.getSelection();
+    if (!selection || selection.isCollapsed || selection.rangeCount === 0) return null;
+    const range = selection.getRangeAt(0);
+    const node = range.commonAncestorContainer;
+    const element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+    const answer = element?.closest(".answer-text");
+    if (!answer) return null;
+    const text = selection.toString().replace(/\s+/g, " ").trim();
+    if (!text) return null;
+    const rect = range.getBoundingClientRect();
+    if (!rect || rect.width === 0 || rect.height === 0) return null;
+    return { text, rect };
+  }
+
+  function show() {
+    const found = currentAnswerSelection();
+    if (!found) {
+      hide();
+      return;
+    }
+    hide();
+    quote = found.text;
+    bar = document.createElement("div");
+    bar.className = "selection-bar answer-selection-bar";
+    bar.innerHTML =
+      '<span class="selection-page">回答</span>' +
+      '<span class="selection-quote"></span>' +
+      '<button type="button" class="button button-primary selection-action">加入引用</button>' +
+      '<button type="button" class="button selection-action">复制</button>';
+    bar.querySelector(".selection-quote").textContent =
+      found.text.length > 32 ? `${found.text.slice(0, 32)}…` : found.text;
+    const left = Math.min(
+      Math.max(found.rect.left + found.rect.width / 2, 120),
+      window.innerWidth - 120,
+    );
+    const above = found.rect.top > 80;
+    bar.style.left = `${left}px`;
+    bar.style.top = `${above ? found.rect.top : found.rect.bottom}px`;
+    bar.classList.toggle("below", !above);
+    bar.addEventListener("pointerdown", (event) => event.preventDefault());
+    const buttons = bar.querySelectorAll("button");
+    buttons[0].addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (quote) window.__pdfscopeAnswerQuote?.(quote);
+      window.getSelection()?.removeAllRanges();
+      hide();
+    });
+    buttons[1].addEventListener("click", async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      try {
+        await navigator.clipboard.writeText(quote);
+      } catch {
+        /* clipboard denied */
+      }
+      hide();
+    });
+    document.body.append(bar);
+  }
+
+  document.addEventListener("mouseup", () => {
+    requestAnimationFrame(show);
+  });
+  document.addEventListener("selectionchange", () => {
+    if (window.getSelection()?.isCollapsed) hide();
+  });
+  window.addEventListener("scroll", hide, true);
+  window.addEventListener("resize", hide);
 })();

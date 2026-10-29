@@ -1165,7 +1165,7 @@ fn ReferenceActions(
                     on_insert.run(());
                 }
             >
-                {icon("at", 16)}
+                {crate::icons::at_action(16)}
             </button>
             <button
                 type="button"
@@ -1489,6 +1489,29 @@ pub fn AiPanel(
                 quote: answer.quote.clone(),
             });
         });
+    });
+    // JS reports a text selection inside a rendered answer. Add exactly that substring as an
+    // answer reference, leaving the full answer untouched.
+    Effect::new(move |_| {
+        let callback = Closure::<dyn Fn(String)>::new(move |quote: String| {
+            let quote = quote.trim().to_owned();
+            if quote.is_empty() {
+                return;
+            }
+            activate_answer.run(crate::AnswerRef {
+                id: 0,
+                label: "回答".to_owned(),
+                quote,
+            });
+        });
+        if let Some(window) = web_sys::window() {
+            let _ = js_sys::Reflect::set(
+                &window,
+                &JsValue::from_str("__pdfscopeAnswerQuote"),
+                callback.as_ref(),
+            );
+        }
+        callback.forget();
     });
     let activate_image = Callback::new(move |image: UserImage| {
         let duplicate = images
