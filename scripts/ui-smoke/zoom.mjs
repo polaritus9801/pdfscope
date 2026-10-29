@@ -240,11 +240,13 @@ try {
       eye: box.querySelectorAll(".ref-action-eye").length,
       color: getComputedStyle(box.querySelector(".ref-action-pin")).color,
       border: getComputedStyle(box).borderColor,
+      borderWidth: getComputedStyle(box).borderWidth,
     };
   })()`);
   check(pinnedPage.eye === 1, "pinning adds the eye", JSON.stringify(pinnedPage));
-  check(pinnedPage.color === "rgb(178, 122, 29)", "pinned pin is gold", pinnedPage.color);
-  check(pinnedPage.border === "rgb(178, 122, 29)", "pinned page outline is gold", pinnedPage.border);
+  check(pinnedPage.color === "rgb(212, 175, 55)", "pinned pin is gold", pinnedPage.color);
+  check(pinnedPage.border === "rgb(212, 175, 55)", "pinned page outline is gold", pinnedPage.border);
+  check(pinnedPage.borderWidth === "2px", "pinned page outline is two pixels", pinnedPage.borderWidth);
   await evaluate(`document.querySelector(".ref-page-box .ref-action-pin")?.click()`);
   await sleep(100);
   await evaluate(`(() => {

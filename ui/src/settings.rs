@@ -12,6 +12,34 @@ use crate::panel::{
     text_of, write_page_bar_side, write_page_ruler_visible, write_scroll_skin,
 };
 
+const CODE_THEME_KEY: &str = "pdfscope.code-theme";
+
+fn read_code_theme() -> String {
+    web_sys::window()
+        .and_then(|window| window.local_storage().ok().flatten())
+        .and_then(|storage| storage.get_item(CODE_THEME_KEY).ok().flatten())
+        .filter(|value| matches!(value.as_str(), "system" | "light" | "dark"))
+        .unwrap_or_else(|| "system".to_owned())
+}
+
+fn apply_code_theme(theme: &str) {
+    if let Some(root) = web_sys::window()
+        .and_then(|window| window.document())
+        .and_then(|document| document.document_element())
+    {
+        let _ = root.set_attribute("data-code-theme", theme);
+    }
+}
+
+fn write_code_theme(value: &str) {
+    if let Some(storage) =
+        web_sys::window().and_then(|window| window.local_storage().ok().flatten())
+    {
+        let _ = storage.set_item(CODE_THEME_KEY, value);
+    }
+    apply_code_theme(value);
+}
+
 /// Publishes the timeout to the bridge, in milliseconds; zero disables the watchdog.
 fn apply_request_timeout(seconds: &str) {
     let Some(window) = web_sys::window() else {
@@ -100,6 +128,7 @@ pub(crate) fn SettingsSheet(
     let form_prompt = RwSignal::new(String::new());
 
     let form_theme = RwSignal::new("system".to_owned());
+    let form_code_theme = RwSignal::new("system".to_owned());
 
     let form_max = RwSignal::new(String::new());
 
@@ -130,6 +159,13 @@ pub(crate) fn SettingsSheet(
     let tab = RwSignal::new(0_u8);
 
     let form_error = RwSignal::new(Option::<String>::None);
+
+    // Code highlighting is independent of the interface theme; default to the OS.
+    Effect::new(move |_| {
+        let stored = read_code_theme();
+        apply_code_theme(&stored);
+        form_code_theme.set(stored);
+    });
 
     // Load the stored configuration once.
     Effect::new(move |_| {
@@ -505,6 +541,34 @@ pub(crate) fn SettingsSheet(
                                                             class="theme-card"
                                                             class:active=move || form_theme.get() == value
                                                             on:click=move |_| form_theme.set(value.to_owned())
+                                                        >
+                                                            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" inner_html=path></svg>
+                                                            <span>{label}</span>
+                                                        </button>
+                                                    }
+                                                })
+                                                .collect_view()}
+                                        </div>
+                                        <h3>"代码块"</h3>
+                                        <p class="settings-hint">
+                                            "代码块和代码文件预览的明暗；默认跟随系统。"
+                                        </p>
+                                        <div class="theme-cards">
+                                            {[
+                                                ("system", "跟随系统", "<rect x=\"3\" y=\"4\" width=\"18\" height=\"13\" rx=\"2\"/><path d=\"M8 20h8M12 17v3\"/>"),
+                                                ("light", "浅色", "<circle cx=\"12\" cy=\"12\" r=\"4\"/><path d=\"M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19\"/>"),
+                                                ("dark", "深色", "<path d=\"M20 14a8 8 0 1 1-9.9-7.7A7 7 0 0 0 20 14Z\"/>"),
+                                            ]
+                                                .into_iter()
+                                                .map(|(value, label, path)| {
+                                                    view! {
+                                                        <button
+                                                            class="theme-card"
+                                                            class:active=move || form_code_theme.get() == value
+                                                            on:click=move |_| {
+                                                                form_code_theme.set(value.to_owned());
+                                                                write_code_theme(value);
+                                                            }
                                                         >
                                                             <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" inner_html=path></svg>
                                                             <span>{label}</span>

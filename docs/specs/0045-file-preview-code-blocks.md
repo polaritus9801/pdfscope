@@ -23,6 +23,12 @@ The reference file preview is format-aware using the bytes already extracted for
 The preview header shows the extension and original byte size when known. Every preview header uses
 the shared panel close button.
 
+## Theme
+
+The settings sheet exposes a separate code theme: Follow System (default), Light or Dark. It is
+stored under `pdfscope.code-theme` and applies `data-code-theme` to the document root, affecting
+both answer code blocks and file previews. The setting is independent of the interface theme.
+
 ## Acceptance
 
 - A Rust/Markdown/CSV/JSON preview selects the correct renderer without executing file HTML.

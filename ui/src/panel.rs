@@ -1177,7 +1177,7 @@ fn ReferenceActions(
                     on_remove.run(());
                 }
             >
-                {icon("close", 16)}
+                {crate::icons::close_action(16)}
             </button>
         </div>
     }
@@ -5113,9 +5113,11 @@ pub fn AiPanel(
                                                             }
                                                         }
                                                     >
-                                                        <span class="ref-text-kind">{icon("quote", 12)}</span>
+                                                        <span class="ref-text-kind">
+                                                            {icon("quote", 12)}
+                                                            <span class="ref-text-index">{page_number.to_string()}</span>
+                                                        </span>
                                                         <span class="ref-text-copy">{passage.quote.clone()}</span>
-                                                        <span class="ref-text-page">{format!("p.{page_number}")}</span>
                                                         <ReferenceActions
                                                             key=key.clone()
                                                             pinned=pinned_keys
@@ -5132,7 +5134,8 @@ pub fn AiPanel(
                                             .collect_view()}
                                         {cited
                                             .into_iter()
-                                            .map(|answer| {
+                                            .enumerate()
+                                            .map(|(answer_index, answer)| {
                                                 let id = answer.id;
                                                 let key = format!("a:{id}");
                                                 let hover_key = key.clone();
@@ -5173,9 +5176,11 @@ pub fn AiPanel(
                                                             }
                                                         }
                                                     >
-                                                        <span class="ref-text-kind">{icon("sparkle", 12)}</span>
+                                                        <span class="ref-text-kind">
+                                                            {icon("sparkle", 12)}
+                                                            <span class="ref-text-index">{(answer_index + 1).to_string()}</span>
+                                                        </span>
                                                         <span class="ref-text-copy">{answer.quote.clone()}</span>
-                                                        <span class="ref-text-page">{answer.label.clone()}</span>
                                                         <ReferenceActions
                                                             key=key.clone()
                                                             pinned=pinned_keys

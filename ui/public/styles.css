@@ -3577,6 +3577,7 @@ body.composer-resizing * {
 /* Media references: screenshots and external images share one square strip. */
 .ref-media-strip {
   display: flex;
+  flex: none;
   gap: var(--space-2);
   overflow-x: auto;
   padding-bottom: 2px;  /* size */
@@ -3713,12 +3714,21 @@ body.composer-resizing * {
   flex: none;
   align-items: center;
   justify-content: center;
-  width: 18px;  /* size */
+  gap: 2px;  /* size */
+  min-width: 18px;  /* size */
   height: 18px;  /* size */
   margin-top: 1px;  /* size */
+  padding: 0 4px;  /* size */
   color: var(--accent);
   background: color-mix(in srgb, var(--accent) 12%, transparent);
   border-radius: var(--radius-xs);
+}
+
+.ref-text-index {
+  color: var(--accent);
+  font-size: 10px;  /* size */
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
 }
 
 .ref-text-copy {
@@ -6521,9 +6531,9 @@ html[data-page-ruler="off"] .page-ruler-preview {
 .markdown pre {
   position: relative;
   padding: var(--space-3);
-  color: #abb2bf;
-  background: #282c34;
-  border: 1px solid #3b4048;  /* size */
+  color: var(--code-fg);
+  background: var(--code-bg);
+  border: 1px solid var(--code-border);  /* size */
   border-radius: var(--radius-sm);
 }
 
@@ -6545,9 +6555,9 @@ html[data-page-ruler="off"] .page-ruler-preview {
   width: 26px;  /* size */
   height: 26px;  /* size */
   padding: 0;
-  color: #abb2bf;
-  background: #3b4048;
-  border: 1px solid #4b5263;  /* size */
+  color: var(--code-muted);
+  background: var(--code-copy-bg);
+  border: 1px solid var(--code-copy-border);  /* size */
   border-radius: 6px;  /* size */
   cursor: pointer;
 }
@@ -6556,8 +6566,8 @@ html[data-page-ruler="off"] .page-ruler-preview {
 .reference-preview-card pre .code-copy:hover,
 .markdown pre .code-copy.is-copied,
 .reference-preview-card pre .code-copy.is-copied {
-  color: #ffffff;
-  border-color: #7f5cbf;
+  color: var(--code-fg);
+  border-color: var(--accent);
 }
 
 /* Rich file preview: rendered Markdown, tabular CSV, and highlighted source. */
@@ -6570,8 +6580,8 @@ html[data-page-ruler="off"] .page-ruler-preview {
 .reference-preview-text.code {
   position: relative;
   padding: var(--space-4);
-  color: #abb2bf;
-  background: #282c34;
+  color: var(--code-fg);
+  background: var(--code-bg);
   border: 0;
   white-space: pre;
 }
@@ -6701,9 +6711,9 @@ html[data-page-ruler="off"] .page-ruler-preview {
 
 /* File actions stay clear of the name/size and sit in their own bordered tray. */
 .ref-file-card {
-  min-width: 240px;  /* size */
+  min-width: 184px;  /* size */
   max-width: 260px;  /* size */
-  padding-right: 88px;  /* size */
+  padding-right: 8px;  /* size */
 }
 
 .ref-file-card:hover .ref-file-copy,
@@ -6812,10 +6822,208 @@ html[data-page-ruler="off"] .page-ruler-preview {
 }
 
 
-.ref-media-strip {
-  position: sticky;
-  top: 0;
-  z-index: 3;
-  padding-top: 2px;  /* size */
-  background: var(--surface);
+
+/* Selected references use the purple focus ring; hover and mention links stay thin. */
+:root {
+  --gold: #d4af37;
+  --gold-strong: #b8860b;
+  --gold-soft: #fbf4dc;
+  --focus-ring: #b49be2;
+}
+
+[data-theme="dark"] {
+  --gold: #e7c65f;
+  --gold-strong: #f1d98a;
+  --gold-soft: #3a311c;
+}
+
+.ref-text-row.reference-hover,
+.ref-media-thumb.reference-hover,
+.ref-file-card.reference-hover,
+.ref-page-box.reference-hover,
+.attach-chip.reference-hover,
+.attach-thumb.reference-hover {
+  border-width: 1px;  /* size */
+  border-color: var(--accent-strong);
+  box-shadow: none;
+}
+
+.ref-text-row.reference-hover {
+  box-shadow: inset 0 0 0 1px var(--accent-strong);
+}
+
+.ref-text-row.selected {
+  box-shadow: inset 0 0 0 2px var(--focus-ring);
+}
+
+.ref-media-thumb.selected,
+.ref-file-card.selected,
+.ref-page-box.selected,
+.attach-chip.selected,
+.attach-thumb.selected {
+  border-width: 2px;  /* size */
+  border-color: var(--focus-ring);
+  box-shadow: none;
+}
+
+.ref-text-row.ref-pinned:not(.selected) {
+  box-shadow: inset 0 0 0 2px var(--gold);
+}
+
+.ref-media-thumb.ref-pinned:not(.selected),
+.ref-file-card.ref-pinned:not(.selected),
+.ref-page-box.ref-pinned:not(.selected) {
+  border-width: 2px;  /* size */
+  border-color: var(--gold);
+  box-shadow: none;
+}
+
+.ref-media-thumb.ref-pinned.reference-hover:not(.selected),
+.ref-file-card.ref-pinned.reference-hover:not(.selected),
+.ref-page-box.ref-pinned.reference-hover:not(.selected) {
+  border-color: var(--gold-strong);
+}
+
+.ref-action > svg * {
+  vector-effect: non-scaling-stroke;
+}
+
+
+/* Focus wins over the pinned colour while the same reference is active. */
+.ref-text-row.selected {
+  box-shadow: inset 0 0 0 2px var(--focus-ring);
+}
+
+.ref-media-thumb.selected,
+.ref-file-card.selected,
+.ref-page-box.selected,
+.attach-chip.selected,
+.attach-thumb.selected {
+  border-width: 2px;  /* size */
+  border-color: var(--focus-ring);
+  box-shadow: none;
+}
+
+/* Code theme: follows the OS by default; the settings sheet can pin light or dark. */
+:root {
+  --code-bg: #f6f8fa;
+  --code-fg: #24292f;
+  --code-muted: #57606a;
+  --code-border: #d0d7de;
+  --code-copy-bg: #eaeef2;
+  --code-copy-border: #d0d7de;
+  --code-comment: #6e7781;
+  --code-keyword: #cf222e;
+  --code-string: #0a3069;
+  --code-number: #0550ae;
+  --code-title: #8250df;
+  --code-attr: #116329;
+  --code-built: #953800;
+}
+
+[data-code-theme="dark"] {
+  --code-bg: #282c34;
+  --code-fg: #abb2bf;
+  --code-muted: #9aa4b2;
+  --code-border: #3b4048;
+  --code-copy-bg: #3b4048;
+  --code-copy-border: #4b5263;
+  --code-comment: #5c6370;
+  --code-keyword: #c678dd;
+  --code-string: #98c379;
+  --code-number: #d19a66;
+  --code-title: #61afef;
+  --code-attr: #e06c75;
+  --code-built: #e6c07b;
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-code-theme="system"] {
+    --code-bg: #282c34;
+    --code-fg: #abb2bf;
+    --code-muted: #9aa4b2;
+    --code-border: #3b4048;
+    --code-copy-bg: #3b4048;
+    --code-copy-border: #4b5263;
+    --code-comment: #5c6370;
+    --code-keyword: #c678dd;
+    --code-string: #98c379;
+    --code-number: #d19a66;
+    --code-title: #61afef;
+    --code-attr: #e06c75;
+    --code-built: #e6c07b;
+  }
+}
+
+.hljs-comment,
+.hljs-quote {
+  color: var(--code-comment);
+  font-style: italic;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal,
+.hljs-section,
+.hljs-link {
+  color: var(--code-keyword);
+}
+
+.hljs-string,
+.hljs-regexp,
+.hljs-addition,
+.hljs-meta-string {
+  color: var(--code-string);
+}
+
+.hljs-number,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-variable,
+.hljs-template-variable {
+  color: var(--code-number);
+}
+
+.hljs-title,
+.hljs-name,
+.hljs-selector-id,
+.hljs-selector-class {
+  color: var(--code-title);
+}
+
+.hljs-attr,
+.hljs-attribute {
+  color: var(--code-attr);
+}
+
+.hljs-built_in,
+.hljs-type,
+.hljs-class .hljs-title {
+  color: var(--code-built);
+}
+
+.hljs-meta,
+.hljs-deletion {
+  color: var(--code-comment);
+}
+
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-strong {
+  font-weight: 600;
+}
+
+/* Keyboard focus uses the same purple focus ring as an active reference. */
+.ref-text-row:focus-within {
+  box-shadow: inset 0 0 0 2px var(--focus-ring);
+}
+
+.ref-media-thumb:focus-within,
+.ref-file-card:focus-within,
+.ref-page-box:focus-within {
+  border-width: 2px;  /* size */
+  border-color: var(--focus-ring);
+  box-shadow: none;
 }

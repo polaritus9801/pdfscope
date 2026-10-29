@@ -98,7 +98,7 @@ minor releases may contain breaking changes; they are always called out.
 
 - Removed the mode-height floor that kept the composer at the taller preview height: it left a blank
   white strip under the shorter plain-text layout, most obvious with stacked display formulas.
-- Capped automatic composer growth at 30% of the AI panel height. Long content scrolls inside the
+- Capped automatic composer growth at 35% of the AI panel height. Long content scrolls inside the
   input instead of hiding the answer; a manual top-edge drag is a floor that can raise it above the
   cap. Restored drafts scroll the caret into view.
 - PDF.js's hidden measurement canvas no longer contributes a 19px line box to `body`. Focusing the
@@ -107,14 +107,19 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
-- Pinned context references now use a gold pin and gold outline; the eye is absent until pinned,
-  action widths and ring thickness are uniform, file actions sit in a bordered hover tray, the media
-  strip stays sticky while text scrolls, and every panel close button shares the settings close mark.
+- Code blocks and file code previews now have a Follow System/Light/Dark code theme in Appearance.
+- Text references combine their type icon and page/answer ordinal in one compact badge; selected
+  references use a 2px #b49be2 ring and pinned references a 2px gold ring.
+- The media strip and text rows now share one uncoupled scroll, and file hover actions overlay the
+  natural-width card instead of permanently reserving space.
+- Pinned context references use a bright-gold pin and a two-pixel gold outline; the eye is absent
+  until pinned, action and glyph widths are uniform, file actions sit in a bordered hover tray, and
+  every panel close button shares the settings close mark.
 - File previews now render Markdown, tables for CSV/TSV, pretty JSON and syntax-highlighted source,
   with a shared close button and copy control. Answer code blocks use the bundled highlight.js and
   copy their raw source.
-- Context references use gold for pinned state, a single ring width, hover reveal from composer
-  mentions, a fixed file row and sticky media strip, and a centred 88px shelf collapse control.
+- Context references reveal the matching row when a composer mention is hovered, keep the file row
+  fixed, and use a centred 88px shelf collapse control.
 - Context references now expose eye, pin, @ and X actions. Pinned references survive a send and are persisted per document; the eye toggles their inclusion without dropping the pin.
 - The non-page reference tray is height-capped and collapsible; the file strip stays fixed outside the tray and the page row remains always visible. The composer's automatic growth cap is now 35% of the panel.
 - The composer context shelf now groups references by kind: square screenshot/image media in insertion order,
