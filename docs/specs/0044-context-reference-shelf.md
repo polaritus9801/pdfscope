@@ -54,8 +54,10 @@ keeps the outer pale-purple container; its label is optically nudged up against 
 
 ## Interaction refinements
 
-The four action buttons are 20px squares and use the original 16px SVG source size with the
-icon set's 1.6px line stroke; the source glyphs themselves differ in shape. A hovered composer mention reopens a
+The four action buttons default to 20px squares and the original 16px SVG source size with the
+icon set's 1.6px line stroke. Global master variables (`--ref-action-box`, `--ref-icon-box`,
+`--ref-icon-stroke`) control all four; per-action overrides (`--ref-action-*-box`,
+`--ref-icon-*-box`) let one action differ while defaulting to the master. A hovered composer mention reopens a
 folded shelf and calls `revealShelfReference` so the matching media/text/file/page row is scrolled
 into view. Eye is absent from the DOM until pin is active; there is no hidden placeholder. A pinned pin and its card use the gold accent and a two-pixel gold ring (pinned
 hover uses a deeper gold); an unpinned pin remains lilac on hover. Hover/mention rows use a thin

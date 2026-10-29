@@ -7164,13 +7164,6 @@ html[data-page-ruler="off"] .page-ruler-preview {
   transform: translate(-50%, 8px);  /* size */
 }
 
-/* The eye is wider than tall; give it intrinsic width so every glyph has one height. */
-.ref-action-eye > svg {
-  width: 18.7px;  /* size */
-  height: 14px;  /* size */
-  max-width: 19px;  /* size */
-}
-
 /* Lift the transformed pages above the range overlay so answer/PDF selection bubbles can sit
    above the current-page outline; the page shell owns that outline instead. */
 .pages {
@@ -7184,39 +7177,69 @@ html[data-page-ruler="off"] .page-ruler-preview {
 }
 
 /* ── Reference action tuning knobs ───────────────────────────────────────────────────────────
-   Change these three values to tune every action button without hunting through the blocks above.
-   Button box, source SVG box and line-icon stroke are intentionally independent. */
+   MASTER: change --ref-action-box and --ref-icon-box. The four actions inherit those values.
+   PER ACTION: override the corresponding --ref-*-box below. These affect every screenshot, text,
+   file and page reference because the action component is shared.
+
+   Example: make only the eye larger than the other actions by setting its two per-action boxes.
+*/
 :root {
+  /* master switches */
   --ref-action-box: 20px;  /* size */
   --ref-icon-box: 16px;  /* size */
   --ref-icon-stroke: 1.6;  /* size */
+
+  /* per-action box sizes; defaults follow the master */
+  --ref-action-eye-box: var(--ref-action-box);
+  --ref-action-pin-box: var(--ref-action-box);
+  --ref-action-at-box: var(--ref-action-box);
+  --ref-action-remove-box: var(--ref-action-box);
+
+  /* per-action glyph sizes; defaults follow the master */
+  --ref-icon-eye-box: var(--ref-icon-box);
+  --ref-icon-pin-box: var(--ref-icon-box);
+  --ref-icon-at-box: var(--ref-icon-box);
+  --ref-icon-remove-box: var(--ref-icon-box);
 }
 
 .ref-action {
-  flex: 0 0 var(--ref-action-box);
-  width: var(--ref-action-box);
-  height: var(--ref-action-box);
+  flex: 0 0 var(--ref-action-size, var(--ref-action-box));
+  width: var(--ref-action-size, var(--ref-action-box));
+  height: var(--ref-action-size, var(--ref-action-box));
 }
 
-.ref-action > svg,
-.ref-action-eye > svg {
-  width: var(--ref-icon-box);
-  height: var(--ref-icon-box);
+.ref-action-eye {
+  --ref-action-size: var(--ref-action-eye-box);
+  --ref-icon-size: var(--ref-icon-eye-box);
+}
+
+.ref-action-pin {
+  --ref-action-size: var(--ref-action-pin-box);
+  --ref-icon-size: var(--ref-icon-pin-box);
+}
+
+.ref-action-at {
+  --ref-action-size: var(--ref-action-at-box);
+  --ref-icon-size: var(--ref-icon-at-box);
+}
+
+.ref-action-remove {
+  --ref-action-size: var(--ref-action-remove-box);
+  --ref-icon-size: var(--ref-icon-remove-box);
+}
+
+.ref-action > svg {
+  width: var(--ref-icon-size, var(--ref-icon-box));
+  height: var(--ref-icon-size, var(--ref-icon-box));
   max-width: none;
 }
 
 .ref-actions-media .ref-action {
-  width: var(--ref-action-box);
-  height: var(--ref-action-box);
+  width: var(--ref-action-size, var(--ref-action-box));
+  height: var(--ref-action-size, var(--ref-action-box));
 }
 
 .ref-action-at > svg,
 .ref-action-remove > svg {
   stroke-width: var(--ref-icon-stroke);
-}
-
-/* Tunable source extents for the filled marks. */
-.ref-action-pin > svg {
-  width: var(--ref-icon-box);
-  height: var(--ref-icon-box);
 }

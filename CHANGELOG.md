@@ -109,8 +109,9 @@ minor releases may contain breaking changes; they are always called out.
 
 - Pinned references (including files and images) persist in IndexedDB instead of localStorage, so
   large snapshots no longer report a false storage failure.
-- The action glyphs are back to the initial 16px source size and 1.6px line stroke for manual
-  tuning; the gold/focus card rings remain independent of the icon box.
+- The action glyphs are back to the initial source size and line stroke for manual tuning. One
+  master pair of box variables drives all four actions, and each action has its own defaulting
+  override; the gold/focus card rings remain independent of the icon box.
 - Code blocks and file code previews now have a Follow System/Light/Dark code theme in Appearance.
 - Text references combine their type icon and page/answer ordinal in one compact badge; selected
   references use a 2px #7f5cbf ring and pinned references a 2px gold ring.
