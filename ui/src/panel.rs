@@ -308,6 +308,85 @@ fn file_size_label(size: u64) -> String {
     }
 }
 
+fn file_extension(name: &str) -> String {
+    name.rsplit_once('.')
+        .map(|(_, extension)| extension.to_ascii_lowercase())
+        .unwrap_or_default()
+}
+
+/// highlight.js language id for a source-like attachment.
+fn file_language(name: &str) -> Option<&'static str> {
+    match file_extension(name).as_str() {
+        "rs" => Some("rust"),
+        "ts" | "tsx" => Some("typescript"),
+        "js" | "jsx" | "mjs" | "cjs" => Some("javascript"),
+        "py" => Some("python"),
+        "java" => Some("java"),
+        "kt" | "kts" => Some("kotlin"),
+        "c" | "h" => Some("c"),
+        "cc" | "cpp" | "cxx" | "hpp" | "hh" => Some("cpp"),
+        "cs" => Some("csharp"),
+        "go" => Some("go"),
+        "rb" => Some("ruby"),
+        "php" => Some("php"),
+        "swift" => Some("swift"),
+        "sh" | "bash" | "zsh" | "fish" => Some("bash"),
+        "ps1" => Some("powershell"),
+        "sql" => Some("sql"),
+        "css" | "scss" | "sass" | "less" => Some("css"),
+        "html" | "htm" | "xml" => Some("xml"),
+        "json" | "jsonl" => Some("json"),
+        "yaml" | "yml" => Some("yaml"),
+        "toml" => Some("toml"),
+        "ini" => Some("ini"),
+        "md" | "mdx" | "markdown" => Some("markdown"),
+        "lua" => Some("lua"),
+        "r" => Some("r"),
+        _ => None,
+    }
+}
+
+fn is_csv_preview(name: &str) -> bool {
+    matches!(file_extension(name).as_str(), "csv" | "tsv")
+}
+
+fn parse_csv_rows(text: &str, delimiter: char) -> Vec<Vec<String>> {
+    let mut rows = Vec::new();
+    let mut row = Vec::new();
+    let mut cell = String::new();
+    let mut quoted = false;
+    let mut chars = text.chars().peekable();
+    while let Some(character) = chars.next() {
+        match character {
+            '"' if quoted && chars.peek() == Some(&'"') => {
+                chars.next();
+                cell.push('"');
+            }
+            '"' => quoted = !quoted,
+            character if character == delimiter && !quoted => {
+                row.push(std::mem::take(&mut cell));
+            }
+            '\n' if !quoted => {
+                row.push(std::mem::take(&mut cell));
+                rows.push(std::mem::take(&mut row));
+            }
+            '\r' => {}
+            character => cell.push(character),
+        }
+    }
+    if !cell.is_empty() || !row.is_empty() {
+        row.push(cell);
+        rows.push(row);
+    }
+    rows
+}
+
+fn pretty_json(text: &str) -> Option<String> {
+    serde_json::from_str::<serde_json::Value>(text)
+        .ok()
+        .and_then(|value| serde_json::to_string_pretty(&value).ok())
+}
+
 /// A compact icon action with a tooltip and an accessible name.
 fn icon_action(
     name: &'static str,
@@ -829,14 +908,7 @@ fn reference_capsule(
                             {icon("plus", 12)}
                             <span>"全部"</span>
                         </button>
-                        <button
-                            type="button"
-                            class="question-refs-close"
-                            title="关闭"
-                            on:click=move |_| open_refs.set(None)
-                        >
-                            {icon("close", 12)}
-                        </button>
+                        {crate::icons::close_button("icon-button", "关闭", move |_| open_refs.set(None))}
                     </div>
                 </div>
                 <div class="question-refs-list">{rows.collect_view()}</div>
@@ -1053,21 +1125,22 @@ fn ReferenceActions(
     });
     view! {
         <div class=format!("ref-actions ref-actions-{layout}")>
-            <button
-                type="button"
-                class="ref-action ref-action-eye"
-                class:is-hidden=move || !pinned_now.get()
-                class:active=move || eye_on.get()
-                aria-label="本次上下文可见"
-                aria-pressed=move || eye_on.get().to_string()
-                on:mousedown=move |event: web_sys::MouseEvent| event.prevent_default()
-                on:click=move |event: web_sys::MouseEvent| {
-                    event.stop_propagation();
-                    on_eye.run(());
-                }
-            >
-                {crate::icons::eye_mark(16)}
-            </button>
+            <Show when=move || pinned_now.get()>
+                <button
+                    type="button"
+                    class="ref-action ref-action-eye"
+                    class:active=move || eye_on.get()
+                    aria-label="本次上下文可见"
+                    aria-pressed=move || eye_on.get().to_string()
+                    on:mousedown=move |event: web_sys::MouseEvent| event.prevent_default()
+                    on:click=move |event: web_sys::MouseEvent| {
+                        event.stop_propagation();
+                        on_eye.run(());
+                    }
+                >
+                    {crate::icons::eye_mark(16)}
+                </button>
+            </Show>
             <button
                 type="button"
                 class="ref-action ref-action-pin"
@@ -1150,8 +1223,15 @@ struct PinnedContext {
 /// images carry their actual data URL (never the page thumbnail).
 #[derive(Clone, PartialEq)]
 enum ReferencePreview {
-    Image { name: String, image: String },
-    File { name: String, text: String },
+    Image {
+        name: String,
+        image: String,
+    },
+    File {
+        name: String,
+        text: String,
+        size: u64,
+    },
 }
 
 #[component]
@@ -1750,6 +1830,7 @@ pub fn AiPanel(
                 reference_preview.set(Some(ReferencePreview::File {
                     name: file.name,
                     text: file.text,
+                    size: file.size,
                 }));
             } else {
                 notify.run("这个文件已不在上下文里".to_owned());
@@ -1800,6 +1881,13 @@ pub fn AiPanel(
             hover_reference_on.run(key);
         } else {
             hover_reference_off.run(key);
+        }
+    });
+    // A mention hover must not only tint the row; if the row is horizontally scrolled out of the
+    // media strip or vertically below the tray, bring it back into view.
+    Effect::new(move |_| {
+        if let Some(key) = hover_reference.get() {
+            let _ = crate::call("revealShelfReference", &[JsValue::from_str(&key)]);
         }
     });
     let reference_actions = ReferenceActions {
@@ -4047,13 +4135,7 @@ pub fn AiPanel(
                         <div class="history-drawer">
                             <header class="history-head">
                                 <span class="history-heading">"对话"</span>
-                                <button
-                                    class="icon-button"
-                                    title="关闭"
-                                    on:click=move |_| history_open.set(false)
-                                >
-                                    {icon("close", 16)}
-                                </button>
+                                {crate::icons::close_button("icon-button", "关闭", move |_| history_open.set(false))}
                             </header>
                             <div class="history-tools">
                                 <input
@@ -4864,7 +4946,7 @@ pub fn AiPanel(
                                                 let action_insert = Callback::new(move |_| {
                                                     insert_ref.run((
                                                         format!("r:{id}"),
-                                                        format!("图 p.{page_number}"),
+                                                        format!("截图 p.{page_number}"),
                                                     ));
                                                 });
                                                 let action_pin = Callback::new(move |_| pin_ref.run(action_key.clone()));
@@ -4873,6 +4955,7 @@ pub fn AiPanel(
                                                 view! {
                                                     <div
                                                         class="ref-media-thumb"
+                                                        data-ref-key=key.clone()
                                                         class:ref-pinned=move || pinned_keys.get().iter().any(|entry| entry == &pin_class)
                                                         class:ref-hidden=move || hidden_keys.get().iter().any(|entry| entry == &hidden_class)
                                                         style:order=move || media_order
@@ -4919,6 +5002,7 @@ pub fn AiPanel(
                                             .into_iter()
                                             .map(|picture| {
                                                 let id = picture.id;
+                                                let picture_name = picture.name.clone();
                                                 let key = format!("img:{id}");
                                                 let hover_key = key.clone();
                                                 let leave_key = key.clone();
@@ -4931,7 +5015,10 @@ pub fn AiPanel(
                                                 let hidden_class = key.clone();
                                                 let eye_class = key.clone();
                                                 let action_insert = Callback::new(move |_| {
-                                                    insert_ref.run((format!("img:{id}"), "图片".to_owned()));
+                                                    insert_ref.run((
+                                                        format!("img:{id}"),
+                                                        format!("图片 {picture_name}"),
+                                                    ));
                                                 });
                                                 let action_pin = Callback::new(move |_| pin_ref.run(action_key.clone()));
                                                 let action_eye = Callback::new(move |_| eye_ref.run(eye_class.clone()));
@@ -4939,6 +5026,7 @@ pub fn AiPanel(
                                                 view! {
                                                     <div
                                                         class="ref-media-thumb"
+                                                        data-ref-key=key.clone()
                                                         class:ref-pinned=move || pinned_keys.get().iter().any(|entry| entry == &pin_class)
                                                         class:ref-hidden=move || hidden_keys.get().iter().any(|entry| entry == &hidden_class)
                                                         style:order=move || media_order
@@ -5003,6 +5091,7 @@ pub fn AiPanel(
                                                 view! {
                                                     <div
                                                         class="ref-text-row"
+                                                        data-ref-key=key.clone()
                                                         class:reference-hover=move || hover_reference.get().as_deref() == Some(hover_class.as_str())
                                                         class:selected=move || active_reference.get().as_deref() == Some(selected_class.as_str())
                                                         class:ref-pinned=move || pinned_keys.get().iter().any(|entry| entry == &pin_class)
@@ -5062,6 +5151,7 @@ pub fn AiPanel(
                                                 view! {
                                                     <div
                                                         class="ref-text-row"
+                                                        data-ref-key=key.clone()
                                                         class:reference-hover=move || hover_reference.get().as_deref() == Some(hover_class.as_str())
                                                         class:selected=move || active_reference.get().as_deref() == Some(selected_class.as_str())
                                                         class:ref-pinned=move || pinned_keys.get().iter().any(|entry| entry == &pin_class)
@@ -5130,6 +5220,7 @@ pub fn AiPanel(
                                                 view! {
                                                     <div
                                                         class="ref-file-card"
+                                                        data-ref-key=key.clone()
                                                         class:reference-hover=move || hover_reference.get().as_deref() == Some(hover_class.as_str())
                                                         class:selected=move || active_reference.get().as_deref() == Some(selected_class.as_str())
                                                         class:ref-pinned=move || pinned_keys.get().iter().any(|entry| entry == &pin_class)
@@ -5198,14 +5289,19 @@ pub fn AiPanel(
                             let page_action_eye = Callback::new(move |_| eye_ref.run("pages".to_owned()));
                             let page_row = view! {
                                 <div class="ref-page-wrap">
-                                    <div class="ref-page-box">
+                                    <div
+                                        class="ref-page-box"
+                                        data-ref-key="pages"
+                                        class:reference-hover=move || hover_reference.get().as_deref().is_some_and(|key| key == "pages" || key.starts_with("page:"))
+                                        class:ref-pinned=move || pinned_keys.get().iter().any(|entry| entry == "pages")
+                                    >
                                         <button
                                             class="ref-page-button"
                                             title="管理页面引用"
                                             on:click=move |_| manager_open.set(true)
                                         >
                                             <span class="ref-page-icon ref-icon ref-icon-page"></span>
-                                            <span>"页面引用"</span>
+                                            <span class="ref-page-label">"页面引用"</span>
                                         </button>
                                         <input
                                             class="ref-page-input"
@@ -5843,13 +5939,7 @@ pub fn AiPanel(
                             <div class="orphan-warning-dialog" role="dialog" aria-modal="true">
                                 <div class="orphan-warning-head">
                                     <h3>"有引用已删除"</h3>
-                                    <button
-                                        class="orphan-warning-close"
-                                        title="关闭"
-                                        on:click=move |_| edit_first_orphan.run(())
-                                    >
-                                        {icon("close", 18)}
-                                    </button>
+                                    {crate::icons::close_button("icon-button", "关闭", move |_| edit_first_orphan.run(()))}
                                 </div>
                                 <p>"红色 @ 引用对应的上下文已经删除，是否仍然发送？"</p>
                                 <div class="orphan-warning-actions">
@@ -5896,14 +5986,7 @@ pub fn AiPanel(
                                                         <strong>{name.clone()}</strong>
                                                         <small>"图片"</small>
                                                     </div>
-                                                    <button
-                                                        class="icon-button"
-                                                        title="关闭"
-                                                        aria-label="关闭图片预览"
-                                                        on:click=move |_| reference_preview.set(None)
-                                                    >
-                                                        {icon("close", 16)}
-                                                    </button>
+                                                    {crate::icons::close_button("icon-button", "关闭图片预览", move |_| reference_preview.set(None))}
                                                 </div>
                                                 <div class="reference-preview-image">
                                                     <img src=image alt=name draggable="false" />
@@ -5913,9 +5996,70 @@ pub fn AiPanel(
                                     }
                                         .into_any()
                                 }
-                                ReferencePreview::File { name, text } => {
+                                ReferencePreview::File { name, text, size } => {
                                     let close_name = name.clone();
                                     let has_text = !text.trim().is_empty();
+                                    let extension = file_extension(&name);
+                                    let meta = {
+                                        let size = file_size_label(size);
+                                        if size.is_empty() {
+                                            extension.to_ascii_uppercase()
+                                        } else {
+                                            format!("{} · {size}", extension.to_ascii_uppercase())
+                                        }
+                                    };
+                                    let language = file_language(&name);
+                                    let is_markdown = extension == "md" || extension == "markdown" || extension == "mdx";
+                                    let is_csv = is_csv_preview(&name);
+                                    let preview_body = if !has_text {
+                                        view! { <p class="reference-preview-empty">"这个文件没有可预览的文本。"</p> }.into_any()
+                                    } else if is_markdown {
+                                        view! {
+                                            <div class="markdown reference-preview-markdown" inner_html=pdfscope_core::to_html(&text)></div>
+                                        }.into_any()
+                                    } else if is_csv {
+                                        let delimiter = if extension == "tsv" { '\t' } else { ',' };
+                                        let mut rows = parse_csv_rows(&text, delimiter);
+                                        let truncated = rows.len() > 200;
+                                        rows.truncate(200);
+                                        let width = rows.iter().map(Vec::len).max().unwrap_or(0);
+                                        let header = rows.first().cloned().unwrap_or_default();
+                                        let body: Vec<Vec<String>> = rows.into_iter().skip(1).collect();
+                                        view! {
+                                            <div class="reference-preview-table-wrap">
+                                                <table class="reference-preview-table">
+                                                    <thead>
+                                                        <tr>
+                                                            {(0..width).map(|index| view! {
+                                                                <th>{header.get(index).cloned().unwrap_or_default()}</th>
+                                                            }).collect_view()}
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {body.into_iter().map(|row| view! {
+                                                            <tr>
+                                                                {(0..width).map(|index| view! {
+                                                                    <td>{row.get(index).cloned().unwrap_or_default()}</td>
+                                                                }).collect_view()}
+                                                            </tr>
+                                                        }).collect_view()}
+                                                    </tbody>
+                                                </table>
+                                                {truncated.then(|| view! { <p class="reference-preview-empty">"仅显示前 200 行。"</p> })}
+                                            </div>
+                                        }.into_any()
+                                    } else if extension == "json" || extension == "jsonl" {
+                                        let pretty = pretty_json(&text).unwrap_or(text.clone());
+                                        view! {
+                                            <pre class="reference-preview-text code"><code class="language-json">{pretty}</code></pre>
+                                        }.into_any()
+                                    } else if let Some(language) = language {
+                                        view! {
+                                            <pre class="reference-preview-text code"><code class=format!("language-{language}")>{text}</code></pre>
+                                        }.into_any()
+                                    } else {
+                                        view! { <pre class="reference-preview-text">{text}</pre> }.into_any()
+                                    };
                                     view! {
                                         <div
                                             class="reference-preview-overlay"
@@ -5931,22 +6075,11 @@ pub fn AiPanel(
                                                 <div class="reference-preview-head">
                                                     <div>
                                                         <strong>{name.clone()}</strong>
-                                                        <small>"文件文本"</small>
+                                                        <small>{meta}</small>
                                                     </div>
-                                                    <button
-                                                        class="icon-button"
-                                                        title="关闭"
-                                                        aria-label="关闭文件预览"
-                                                        on:click=move |_| reference_preview.set(None)
-                                                    >
-                                                        {icon("close", 16)}
-                                                    </button>
+                                                    {crate::icons::close_button("icon-button", "关闭文件预览", move |_| reference_preview.set(None))}
                                                 </div>
-                                                {if has_text {
-                                                    view! { <pre class="reference-preview-text">{text}</pre> }.into_any()
-                                                } else {
-                                                    view! { <p class="reference-preview-empty">"这个文件没有可预览的文本。"</p> }.into_any()
-                                                }}
+                                                {preview_body}
                                             </div>
                                         </div>
                                     }

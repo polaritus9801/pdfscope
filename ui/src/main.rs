@@ -1387,16 +1387,10 @@ fn App() -> impl IntoView {
                                 >
                                     "›"
                                 </button>
-                                <button
-                                    class="icon-button"
-                                    title="关闭"
-                                    on:click=move |_| {
-                                        find_open.set(false);
-                                        let _ = call("clearFind", &[]);
-                                    }
-                                >
-                                    "✕"
-                                </button>
+                                {crate::icons::close_button("icon-button", "关闭", move |_| {
+                                    find_open.set(false);
+                                    let _ = call("clearFind", &[]);
+                                })}
                             </div>
                         }
                             .into_any()
@@ -1425,13 +1419,7 @@ fn App() -> impl IntoView {
                                 <span class="outline-count">
                                     {move || format!("{} 页", pages.get())}
                                 </span>
-                                <button
-                                    class="icon-button"
-                                    title="关闭"
-                                    on:click=move |_| outline_open.set(false)
-                                >
-                                    "✕"
-                                </button>
+                                {crate::icons::close_button("icon-button", "关闭", move |_| outline_open.set(false))}
                             </div>
                             {move || {
                                 if rail_tab.get() == 1 {

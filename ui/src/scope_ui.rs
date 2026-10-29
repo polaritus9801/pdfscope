@@ -103,9 +103,7 @@ pub(crate) fn PageManager(
                                     "点击切换单页 · 拖拽选择范围 · Shift 加选 · ⌘/Ctrl 减选"
                                 </p>
                             </div>
-                            <button class="icon-button" title="关闭" on:click=move |_| open.set(false)>
-                                "✕"
-                            </button>
+                            {crate::icons::close_button("icon-button", "关闭", move |_| open.set(false))}
                         </header>
                         <div
                             class="manager-grid"

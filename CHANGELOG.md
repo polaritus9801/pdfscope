@@ -107,6 +107,14 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Pinned context references now use a gold pin and gold outline; the eye is absent until pinned,
+  action widths and ring thickness are uniform, file actions sit in a bordered hover tray, the media
+  strip stays sticky while text scrolls, and every panel close button shares the settings close mark.
+- File previews now render Markdown, tables for CSV/TSV, pretty JSON and syntax-highlighted source,
+  with a shared close button and copy control. Answer code blocks use the bundled highlight.js and
+  copy their raw source.
+- Context references use gold for pinned state, a single ring width, hover reveal from composer
+  mentions, a fixed file row and sticky media strip, and a centred 88px shelf collapse control.
 - Context references now expose eye, pin, @ and X actions. Pinned references survive a send and are persisted per document; the eye toggles their inclusion without dropping the pin.
 - The non-page reference tray is height-capped and collapsible; the file strip stays fixed outside the tray and the page row remains always visible. The composer's automatic growth cap is now 35% of the panel.
 - The composer context shelf now groups references by kind: square screenshot/image media in insertion order,

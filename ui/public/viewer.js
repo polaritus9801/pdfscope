@@ -3141,6 +3141,18 @@ window.PDFScope = {
     return Math.round(panelElement()?.getBoundingClientRect().width ?? 0);
   },
 
+  /// Reveals the shelf row for a composer @ mention without changing the reader position.
+  revealShelfReference(key) {
+    const escape = window.CSS?.escape
+      ? window.CSS.escape(key)
+      : String(key).replace(/["\\]/g, "\\$&");
+    let node = document.querySelector(`[data-ref-key="${escape}"]`);
+    if (!node && String(key).startsWith("page:")) {
+      node = document.querySelector('[data-ref-key="pages"]');
+    }
+    node?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  },
+
   /// Opens a citation in the system browser.
   openUrl(url) {
     window.open(url, "_blank", "noopener");

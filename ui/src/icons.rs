@@ -159,6 +159,32 @@ pub(crate) fn provider_mark(preset: &str, size: u32) -> AnyView {
 }
 
 /// A rounded tile holding the provider mark.
+/// The one close affordance used by every floating panel: same geometry, size and stroke weight as
+/// the settings sheet.
+pub(crate) fn close_button(
+    class: &'static str,
+    label: &'static str,
+    on_click: impl Fn(web_sys::MouseEvent) + 'static,
+) -> impl IntoView {
+    view! {
+        <button type="button" class=class title=label aria-label=label on:click=on_click>
+            <svg
+                viewBox="0 0 24 24"
+                width="18"
+                height="18"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                aria-hidden="true"
+                focusable="false"
+            >
+                <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+        </button>
+    }
+}
+
 pub(crate) fn pin_mark(size: u32) -> impl IntoView {
     view! {
         <svg width=size height=size viewBox="0 0 1024 1024" fill="currentColor" aria-hidden="true" focusable="false">

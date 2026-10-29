@@ -44,10 +44,23 @@ unpinned ones are consumed. Images/files are stored through the same local snaps
 shows a notice). Hover state is an inset border on the existing rounded rect; no outer ring or native
 title tooltip is used.
 
-The non-page shelf content sits in one vertical scroll capped at `min(30vh, 300px)`. The file strip,
-still one fixed row with a narrow horizontal scrollbar, sits outside that scroll; the page row sits
-below it and is never part of the scroll or the collapse. A small chevron button in the shelf header
-hides all non-page content.
+The non-page shelf content sits in one vertical scroll capped at `min(30vh, 300px)`. The media strip
+is sticky at its top so text cannot push images out of reach. The file strip, still one fixed row with
+a narrow horizontal scrollbar, sits outside that scroll; the page row sits below it and is never part
+of the scroll or the collapse. A small chevron button, four times the old width and absolutely centred
+in the shelf header, hides all non-page content. The page row uses an inner white rounded input and
+keeps the outer pale-purple container; its label is optically nudged up against the icon.
+
+## Interaction refinements
+
+The four actions are a fixed 20px square with 16px marks. Eye is absent from the DOM until pin is
+active; there is no hidden placeholder. A pinned pin and its card use the gold accent (pinned
+hover uses a deeper gold); an unpinned pin remains lilac on hover. Bordered cards change their
+existing one-pixel border for hover/focus/selection; the borderless text row uses one inset ring.
+The file card keeps its icon, name and size visible and shows the action tray, with its own border
+and background, at the vertical centre on the right. Text/answer action groups align to the same
+right edge as the page-row actions. The collapse control is absolutely centred in the shelf header
+and is 88px wide. The page label is nudged one pixel up against its icon.
 
 ## Constraints
 

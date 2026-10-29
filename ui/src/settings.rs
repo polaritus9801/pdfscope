@@ -438,15 +438,7 @@ pub(crate) fn SettingsSheet(
                     <div class="settings-dialog">
                         <header class="settings-head">
                             <h2>"设置"</h2>
-                            <button
-                                class="icon-button"
-                                title="关闭"
-                                on:click=move |_| open.set(false)
-                            >
-                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
-                                    <path d="M6 6l12 12M18 6L6 18" />
-                                </svg>
-                            </button>
+                            {crate::icons::close_button("icon-button", "关闭", move |_| open.set(false))}
                         </header>
 
                         <div class="settings-body">

@@ -212,12 +212,14 @@ try {
     return {
       count: box?.querySelectorAll(".ref-action").length ?? 0,
       white: getComputedStyle(document.querySelector(".ref-page-input")).backgroundColor,
-      eye: getComputedStyle(box.querySelector(".ref-action-eye")).visibility,
+      eye: box.querySelector(".ref-action-eye")
+        ? getComputedStyle(box.querySelector(".ref-action-eye")).visibility
+        : null,
     };
   })()`);
-  check(pageActions.count === 4, "page row has four actions", JSON.stringify(pageActions));
+  check(pageActions.count === 3, "page row has no eye until pinned", JSON.stringify(pageActions));
   check(pageActions.white === "rgb(255, 255, 255)", "page input is white", pageActions.white);
-  check(pageActions.eye === "hidden", "eye stays hidden until pinned", pageActions.eye);
+  check(pageActions.eye === null, "the eye is absent from the DOM until pinned");
   await evaluate(`(() => {
     const input = document.querySelector(".ref-page-input");
     input.value = "1-3, 5";
@@ -230,6 +232,21 @@ try {
     await evaluate(`document.querySelector(".shelf-title")?.textContent?.includes("4 项") === true`),
     "valid page ranges commit",
   );
+  await evaluate(`document.querySelector(".ref-page-box .ref-action-pin")?.click()`);
+  await sleep(120);
+  const pinnedPage = await evaluate(`(() => {
+    const box = document.querySelector(".ref-page-box");
+    return {
+      eye: box.querySelectorAll(".ref-action-eye").length,
+      color: getComputedStyle(box.querySelector(".ref-action-pin")).color,
+      border: getComputedStyle(box).borderColor,
+    };
+  })()`);
+  check(pinnedPage.eye === 1, "pinning adds the eye", JSON.stringify(pinnedPage));
+  check(pinnedPage.color === "rgb(178, 122, 29)", "pinned pin is gold", pinnedPage.color);
+  check(pinnedPage.border === "rgb(178, 122, 29)", "pinned page outline is gold", pinnedPage.border);
+  await evaluate(`document.querySelector(".ref-page-box .ref-action-pin")?.click()`);
+  await sleep(100);
   await evaluate(`(() => {
     const input = document.querySelector(".ref-page-input");
     input.value = "5-3";
@@ -286,6 +303,19 @@ try {
   })()`);
   check(fileCard.text.includes("sample.rs") && fileCard.text.includes("5 B"), "file card shows name and size", JSON.stringify(fileCard));
   check(fileCard.icon.includes("code/rust.svg"), "file card uses the language icon", fileCard.icon);
+  await evaluate(`document.querySelector(".ref-file-main")?.click()`);
+  await waitFor(`document.querySelector(".reference-preview-card") !== null`, "the file preview", 10_000);
+  await sleep(200);
+  const filePreview = await evaluate(`(() => ({
+    hljs: document.querySelectorAll(".reference-preview-card .hljs").length,
+    copy: document.querySelectorAll(".reference-preview-card .code-copy").length,
+    close: !!document.querySelector(".reference-preview-head .icon-button svg"),
+  }))()`);
+  check(filePreview.hljs === 1, "file preview syntax highlighting", JSON.stringify(filePreview));
+  check(filePreview.copy === 1, "file preview code copy control");
+  check(filePreview.close, "file preview uses the shared close icon");
+  await evaluate(`document.querySelector(".reference-preview-head .icon-button")?.click()`);
+  await sleep(150);
   await evaluate(`document.querySelector(".ref-file-card .ref-action-remove")?.click()`);
   await sleep(100);
 
