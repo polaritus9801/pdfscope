@@ -2906,6 +2906,54 @@ function commitPanelResize() {
   return width;
 }
 
+const PIN_DB_NAME = "pdfscope-pins";
+const PIN_STORE = "pins";
+let pinDbPromise = null;
+
+function openPinDatabase() {
+  if (pinDbPromise) return pinDbPromise;
+  pinDbPromise = new Promise((resolve, reject) => {
+    if (!window.indexedDB) {
+      reject(new Error("IndexedDB unavailable"));
+      return;
+    }
+    const request = window.indexedDB.open(PIN_DB_NAME, 1);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(PIN_STORE)) db.createObjectStore(PIN_STORE);
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error ?? new Error("IndexedDB open failed"));
+  });
+  return pinDbPromise;
+}
+
+function pinGet(db, key) {
+  return new Promise((resolve, reject) => {
+    const request = db.transaction(PIN_STORE, "readonly").objectStore(PIN_STORE).get(key);
+    request.onsuccess = () => resolve(typeof request.result === "string" ? request.result : null);
+    request.onerror = () => reject(request.error ?? new Error("IndexedDB read failed"));
+  });
+}
+
+function pinPut(db, key, value) {
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(PIN_STORE, "readwrite");
+    transaction.objectStore(PIN_STORE).put(value, key);
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error ?? new Error("IndexedDB write failed"));
+  });
+}
+
+function pinDelete(db, key) {
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(PIN_STORE, "readwrite");
+    transaction.objectStore(PIN_STORE).delete(key);
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error ?? new Error("IndexedDB delete failed"));
+  });
+}
+
 window.PDFScope = {
   /** @param {Uint8Array} bytes */
   async load(bytes, name = "") {
@@ -3189,29 +3237,52 @@ window.PDFScope = {
     }
   },
 
-  loadPinned(key) {
+  /// Pinned references are large (images, code, extracted office text), so IndexedDB is the
+  /// primary store and localStorage is only a migration fallback.
+  async loadPinnedAsync(key) {
+    const fallback = () => {
+      try {
+        return window.localStorage.getItem(`pdfscope.pinned.${key}`);
+      } catch {
+        return null;
+      }
+    };
     try {
-      return window.localStorage.getItem(`pdfscope.pinned.${key}`);
+      const db = await openPinDatabase();
+      const value = await pinGet(db, key);
+      if (value) return value;
+      const cached = fallback();
+      if (cached) await pinPut(db, key, cached);
+      return cached;
     } catch {
-      return null;
+      return fallback();
     }
   },
 
-  savePinned(key, json) {
+  async savePinnedAsync(key, json) {
     try {
-      window.localStorage.setItem(`pdfscope.pinned.${key}`, json);
+      const db = await openPinDatabase();
+      await pinPut(db, key, json);
+      try { window.localStorage.removeItem(`pdfscope.pinned.${key}`); } catch { /* quota */ }
       return true;
     } catch {
-      return false;
+      try {
+        window.localStorage.setItem(`pdfscope.pinned.${key}`, json);
+        return true;
+      } catch {
+        return false;
+      }
     }
   },
 
-  clearPinned(key) {
+  async clearPinnedAsync(key) {
+    try {
+      const db = await openPinDatabase();
+      await pinDelete(db, key);
+    } catch { /* IndexedDB unavailable */ }
     try {
       window.localStorage.removeItem(`pdfscope.pinned.${key}`);
-    } catch {
-      // Nothing to clear.
-    }
+    } catch { /* nothing to clear */ }
   },
 
   saveConversations(key, json) {

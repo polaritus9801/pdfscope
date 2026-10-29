@@ -185,29 +185,9 @@ pub(crate) fn close_button(
     }
 }
 
-/// The compact X used inside a reference action. Cropping the empty corners of the 24px grid
-/// makes its optical height match the filled pin/eye marks without enlarging the 16px box.
-pub(crate) fn close_action(size: u32) -> impl IntoView {
-    view! {
-        <svg width=size height=size viewBox="6 6 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false">
-            <path d="M6 6l12 12M18 6L6 18"></path>
-        </svg>
-    }
-}
-
-/// The @ action with a tight viewBox; its optical height then matches the filled marks.
-pub(crate) fn at_action(size: u32) -> impl IntoView {
-    view! {
-        <svg width=size height=size viewBox="2 2 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-            <circle cx="12" cy="12" r="4"></circle>
-            <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8"></path>
-        </svg>
-    }
-}
-
 pub(crate) fn pin_mark(size: u32) -> impl IntoView {
     view! {
-        <svg width=size height=size viewBox="136 136 752 752" fill="currentColor" aria-hidden="true" focusable="false">
+        <svg width=size height=size viewBox="0 0 1024 1024" fill="currentColor" aria-hidden="true" focusable="false">
             <path d="M878.3 392.1L631.9 145.7c-6.5-6.5-15-9.7-23.5-9.7s-17 3.2-23.5 9.7L423.8 306.9c-12.2-1.4-24.5-2-36.8-2-73.2 0-146.4 24.1-206.5 72.3-15.4 12.3-16.7 35.4-2.7 49.4l181.7 181.7-215.4 215.2c-2.6 2.6-4.3 6.1-4.6 9.8l-3.4 37.2c-0.9 9.4 6.6 17.4 15.9 17.4 0.5 0 1 0 1.5-0.1l37.2-3.4c3.7-0.3 7.2-2 9.8-4.6l215.4-215.4 181.7 181.7c6.5 6.5 15 9.7 23.5 9.7 9.7 0 19.3-4.2 25.9-12.4 56.3-70.3 79.7-158.3 70.2-243.4l161.1-161.1c12.9-12.8 12.9-33.8 0-46.8zM666.2 549.3l-24.5 24.5 3.8 34.4c3.7 33.7 1 67.2-8.2 99.7-5.4 19-12.8 37.1-22.2 54.2L262 408.8c12.9-7.1 26.3-13.1 40.3-17.9 27.2-9.4 55.7-14.1 84.7-14.1 9.6 0 19.3 0.5 28.9 1.6l34.4 3.8 24.5-24.5L608.5 224 800 415.5 666.2 549.3z"></path>
         </svg>
     }
@@ -215,7 +195,7 @@ pub(crate) fn pin_mark(size: u32) -> impl IntoView {
 
 pub(crate) fn eye_mark(size: u32) -> impl IntoView {
     view! {
-        <svg width=size height=size viewBox="85 192 854 640" fill="currentColor" aria-hidden="true" focusable="false">
+        <svg width=size height=size viewBox="0 0 1024 1024" fill="currentColor" aria-hidden="true" focusable="false">
             <path d="M512 832c-156.448 0-296.021-98.731-418.411-291.605a52.939 52.939 0 0 1 0-56.79C215.979 290.731 355.552 192 512 192c156.448 0 296.021 98.731 418.411 291.605a52.939 52.939 0 0 1 0 56.79C808.021 733.269 668.448 832 512 832zm0-576c-129.515 0-249.461 83.851-360.117 256C262.539 684.149 382.485 768 512 768c129.515 0 249.461-83.851 360.117-256C761.461 339.851 641.515 256 512 256zm0 405.333c-83.211 0-150.667-66.858-150.667-149.333S428.789 362.667 512 362.667 662.667 429.525 662.667 512 595.211 661.333 512 661.333zm0-64c47.552 0 86.101-38.208 86.101-85.333S559.552 426.667 512 426.667 425.899 464.875 425.899 512s38.549 85.333 86.101 85.333z"></path>
         </svg>
     }

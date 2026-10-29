@@ -40,8 +40,8 @@ reserved placeholder. Text/file/page rows order them linearly; screenshots and i
 place them at the four corners and hide the type badge while hovered. @ inserts the reference token
 at the composer caret (or end when unfocused); X removes it; pin persists it in a document-scoped
 snapshot; eye toggles inclusion in the current send. Pinned references survive a send and reload;
-unpinned ones are consumed. Images/files are stored through the same local snapshot (quota failure
-shows a notice). Hover state is an inset border on the existing rounded rect; no outer ring or native
+unpinned ones are consumed. Pinned snapshots are stored in IndexedDB (localStorage is only a
+migration fallback), so images and extracted files do not hit the small localStorage quota. Hover state is an inset border on the existing rounded rect; no outer ring or native
 title tooltip is used.
 
 The non-page shelf content sits in one vertical scroll capped at `min(30vh, 300px)`. The media strip
@@ -54,8 +54,8 @@ keeps the outer pale-purple container; its label is optically nudged up against 
 
 ## Interaction refinements
 
-The four actions are a fixed 20px square with a 14px optical mark height; the eye is wider because
-its source glyph is wider, but every mark shares the same height. A hovered composer mention reopens a
+The four action buttons are 20px squares and use the original 16px SVG source size with the
+icon set's 1.6px line stroke; the source glyphs themselves differ in shape. A hovered composer mention reopens a
 folded shelf and calls `revealShelfReference` so the matching media/text/file/page row is scrolled
 into view. Eye is absent from the DOM until pin is active; there is no hidden placeholder. A pinned pin and its card use the gold accent and a two-pixel gold ring (pinned
 hover uses a deeper gold); an unpinned pin remains lilac on hover. Hover/mention rows use a thin

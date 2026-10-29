@@ -107,14 +107,18 @@ minor releases may contain breaking changes; they are always called out.
 
 ### Added
 
+- Pinned references (including files and images) persist in IndexedDB instead of localStorage, so
+  large snapshots no longer report a false storage failure.
+- The action glyphs are back to the initial 16px source size and 1.6px line stroke for manual
+  tuning; the gold/focus card rings remain independent of the icon box.
 - Code blocks and file code previews now have a Follow System/Light/Dark code theme in Appearance.
 - Text references combine their type icon and page/answer ordinal in one compact badge; selected
   references use a 2px #7f5cbf ring and pinned references a 2px gold ring.
 - The media strip and text rows now share one uncoupled scroll, and file hover actions overlay the
   natural-width card instead of permanently reserving space.
 - Pinned context references use a bright-gold pin and a two-pixel gold outline; the eye is absent
-  until pinned, action and glyph heights are uniform, file actions sit in a bordered hover tray, and
-  every panel close button shares the settings close mark.
+  until pinned, the original icon geometry and line stroke are restored, file actions sit in a
+  bordered hover tray, and every panel close button shares the settings close mark.
 - Code copy controls stay fixed outside horizontally scrolling code, and a selected portion of an
   answer can be added as an answer reference through the same bubble used for PDF selections.
 - Scanned pages no longer show the “扫描页 · 暂不支持选择” helper.

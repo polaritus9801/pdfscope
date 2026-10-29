@@ -1165,7 +1165,7 @@ fn ReferenceActions(
                     on_insert.run(());
                 }
             >
-                {crate::icons::at_action(16)}
+                {icon("at", 16)}
             </button>
             <button
                 type="button"
@@ -1177,7 +1177,7 @@ fn ReferenceActions(
                     on_remove.run(());
                 }
             >
-                {crate::icons::close_action(16)}
+                {icon("close", 16)}
             </button>
         </div>
     }
@@ -2092,15 +2092,13 @@ pub fn AiPanel(
             hidden: hidden_keys.get_untracked(),
         };
         if let Ok(json) = serde_json::to_string(&snapshot) {
-            if crate::call(
-                "savePinned",
+            // IndexedDB is the primary store; it has room for images and extracted files that
+            // localStorage cannot hold. The JavaScript side falls back to localStorage only when
+            // IndexedDB is unavailable.
+            let _ = crate::call(
+                "savePinnedAsync",
                 &[JsValue::from_str(&document), JsValue::from_str(&json)],
-            )
-            .and_then(|value| value.as_bool())
-                != Some(true)
-            {
-                notify.run("图钉引用保存失败，可能是本地存储空间不足".to_owned());
-            }
+            );
         }
     };
     let toggle_pin = move |key: &str| {
@@ -2140,7 +2138,7 @@ pub fn AiPanel(
         hidden_keys.set(Vec::new());
         let document = document_key.get_untracked();
         if !document.is_empty() {
-            let _ = crate::call("clearPinned", &[JsValue::from_str(&document)]);
+            let _ = crate::call("clearPinnedAsync", &[JsValue::from_str(&document)]);
         }
     };
     let save_pins_cb = Callback::new(move |_: ()| save_pinned());
@@ -2152,8 +2150,8 @@ pub fn AiPanel(
             &[JsValue::from_str(&key), JsValue::from_str(&label)],
         );
     });
-    // Pinned references are document-scoped. Loading is intentionally a merge: the reader may
-    // already have selected text while the webview was restoring the document.
+    // Pinned references are document-scoped. IndexedDB is asynchronous, so the merge happens when
+    // the promise settles. The reader may already have selected text while this is in flight.
     Effect::new(move |_| {
         let document = document_key.get();
         if document.is_empty() || pinned_doc.get_untracked() == document {
@@ -2162,79 +2160,90 @@ pub fn AiPanel(
         pinned_doc.set(document.clone());
         pinned_keys.set(Vec::new());
         hidden_keys.set(Vec::new());
-        let loaded = crate::call("loadPinned", &[JsValue::from_str(&document)])
-            .and_then(|value| value.as_string())
-            .and_then(|json| serde_json::from_str::<PinnedContext>(&json).ok());
-        let Some(saved) = loaded else {
+        let Some(promise) = crate::call("loadPinnedAsync", &[JsValue::from_str(&document)]) else {
             return;
         };
-        let mut pins = Vec::new();
-        for passage in saved.passages {
-            let key = format!("p:{}", passage.id);
-            pins.push(key);
-            if !passages
-                .get_untracked()
-                .iter()
-                .any(|entry| entry.id == passage.id)
-            {
-                next_ref.update(|next| *next = (*next).max(passage.id + 1));
-                passages.update(|list| list.push(passage));
+        spawn_local(async move {
+            let Ok(value) = JsFuture::from(js_sys::Promise::from(promise)).await else {
+                return;
+            };
+            if document_key.get_untracked() != document {
+                return;
             }
-        }
-        for region in saved.regions {
-            let key = format!("r:{}", region.id);
-            pins.push(key);
-            if !regions
-                .get_untracked()
-                .iter()
-                .any(|entry| entry.id == region.id)
-            {
-                next_ref.update(|next| *next = (*next).max(region.id + 1));
-                regions.update(|list| list.push(region));
+            let Some(saved) = value
+                .as_string()
+                .and_then(|json| serde_json::from_str::<PinnedContext>(&json).ok())
+            else {
+                return;
+            };
+            let mut pins = Vec::new();
+            for passage in saved.passages {
+                let key = format!("p:{}", passage.id);
+                pins.push(key);
+                if !passages
+                    .get_untracked()
+                    .iter()
+                    .any(|entry| entry.id == passage.id)
+                {
+                    next_ref.update(|next| *next = (*next).max(passage.id + 1));
+                    passages.update(|list| list.push(passage));
+                }
             }
-        }
-        for answer in saved.answers {
-            let key = format!("a:{}", answer.id);
-            pins.push(key);
-            if !answers
-                .get_untracked()
-                .iter()
-                .any(|entry| entry.id == answer.id)
-            {
-                next_answer.update(|next| *next = (*next).max(answer.id + 1));
-                answers.update(|list| list.push(answer));
+            for region in saved.regions {
+                let key = format!("r:{}", region.id);
+                pins.push(key);
+                if !regions
+                    .get_untracked()
+                    .iter()
+                    .any(|entry| entry.id == region.id)
+                {
+                    next_ref.update(|next| *next = (*next).max(region.id + 1));
+                    regions.update(|list| list.push(region));
+                }
             }
-        }
-        for image in saved.images {
-            let key = format!("img:{}", image.id);
-            pins.push(key);
-            if !images
-                .get_untracked()
-                .iter()
-                .any(|entry| entry.id == image.id)
-            {
-                next_image.update(|next| *next = (*next).max(image.id + 1));
-                images.update(|list| list.push(image));
+            for answer in saved.answers {
+                let key = format!("a:{}", answer.id);
+                pins.push(key);
+                if !answers
+                    .get_untracked()
+                    .iter()
+                    .any(|entry| entry.id == answer.id)
+                {
+                    next_answer.update(|next| *next = (*next).max(answer.id + 1));
+                    answers.update(|list| list.push(answer));
+                }
             }
-        }
-        for file in saved.files {
-            let key = format!("file:{}", file.id);
-            pins.push(key);
-            if !files
-                .get_untracked()
-                .iter()
-                .any(|entry| entry.id == file.id)
-            {
-                next_file.update(|next| *next = (*next).max(file.id + 1));
-                files.update(|list| list.push(file));
+            for image in saved.images {
+                let key = format!("img:{}", image.id);
+                pins.push(key);
+                if !images
+                    .get_untracked()
+                    .iter()
+                    .any(|entry| entry.id == image.id)
+                {
+                    next_image.update(|next| *next = (*next).max(image.id + 1));
+                    images.update(|list| list.push(image));
+                }
             }
-        }
-        if !saved.pages.is_empty() {
-            pins.push("pages".to_owned());
-            page_set.set(saved.pages);
-        }
-        pinned_keys.set(pins);
-        hidden_keys.set(saved.hidden);
+            for file in saved.files {
+                let key = format!("file:{}", file.id);
+                pins.push(key);
+                if !files
+                    .get_untracked()
+                    .iter()
+                    .any(|entry| entry.id == file.id)
+                {
+                    next_file.update(|next| *next = (*next).max(file.id + 1));
+                    files.update(|list| list.push(file));
+                }
+            }
+            if !saved.pages.is_empty() {
+                pins.push("pages".to_owned());
+                page_set.set(saved.pages);
+            }
+            pinned_keys.set(pins);
+            hidden_keys.set(saved.hidden);
+        });
     });
     // Pinned page sets are part of the persistent snapshot; save when the manager or input changes
     // them (pin toggles save themselves).

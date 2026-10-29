@@ -7182,3 +7182,41 @@ html[data-page-ruler="off"] .page-ruler-preview {
   outline: 2px solid var(--accent);  /* size */
   outline-offset: -2px;  /* size */
 }
+
+/* ── Reference action tuning knobs ───────────────────────────────────────────────────────────
+   Change these three values to tune every action button without hunting through the blocks above.
+   Button box, source SVG box and line-icon stroke are intentionally independent. */
+:root {
+  --ref-action-box: 20px;  /* size */
+  --ref-icon-box: 16px;  /* size */
+  --ref-icon-stroke: 1.6;  /* size */
+}
+
+.ref-action {
+  flex: 0 0 var(--ref-action-box);
+  width: var(--ref-action-box);
+  height: var(--ref-action-box);
+}
+
+.ref-action > svg,
+.ref-action-eye > svg {
+  width: var(--ref-icon-box);
+  height: var(--ref-icon-box);
+  max-width: none;
+}
+
+.ref-actions-media .ref-action {
+  width: var(--ref-action-box);
+  height: var(--ref-action-box);
+}
+
+.ref-action-at > svg,
+.ref-action-remove > svg {
+  stroke-width: var(--ref-icon-stroke);
+}
+
+/* Tunable source extents for the filled marks. */
+.ref-action-pin > svg {
+  width: var(--ref-icon-box);
+  height: var(--ref-icon-box);
+}
