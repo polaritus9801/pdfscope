@@ -6701,8 +6701,8 @@ html[data-page-ruler="off"] .page-ruler-preview {
 
 /* File actions stay clear of the name/size and sit in their own bordered tray. */
 .ref-file-card {
-  min-width: 300px;  /* size */
-  max-width: 360px;  /* size */
+  min-width: 240px;  /* size */
+  max-width: 260px;  /* size */
   padding-right: 88px;  /* size */
 }
 

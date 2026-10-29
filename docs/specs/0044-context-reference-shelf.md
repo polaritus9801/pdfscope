@@ -53,12 +53,14 @@ keeps the outer pale-purple container; its label is optically nudged up against 
 
 ## Interaction refinements
 
-The four actions are a fixed 20px square with 16px marks. Eye is absent from the DOM until pin is
-active; there is no hidden placeholder. A pinned pin and its card use the gold accent (pinned
+The four actions are a fixed 20px square with 16px marks. A hovered composer mention reopens a
+folded shelf and calls `revealShelfReference` so the matching media/text/file/page row is scrolled
+into view. Eye is absent from the DOM until pin is active; there is no hidden placeholder. A pinned pin and its card use the gold accent (pinned
 hover uses a deeper gold); an unpinned pin remains lilac on hover. Bordered cards change their
 existing one-pixel border for hover/focus/selection; the borderless text row uses one inset ring.
-The file card keeps its icon, name and size visible and shows the action tray, with its own border
-and background, at the vertical centre on the right. Text/answer action groups align to the same
+The file card stays within its original width band (240–260px): its icon, name and size remain
+visible, while the action tray, with its own border and background, sits at the vertical centre on
+the right in reserved space. Text/answer action groups align to the same
 right edge as the page-row actions. The collapse control is absolutely centred in the shelf header
 and is 88px wide. The page label is nudged one pixel up against its icon.
 

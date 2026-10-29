@@ -1271,6 +1271,7 @@ pub fn AiPanel(
     let open_refs = RwSignal::new(Option::<RefTarget>::None);
     let active_reference = RwSignal::new(Option::<String>::None);
     let hover_reference = RwSignal::new(Option::<String>::None);
+    let shelf_collapsed = RwSignal::new(false);
     let reference_preview = RwSignal::new(Option::<ReferencePreview>::None);
     let orphan_refs = RwSignal::new(Vec::<String>::new());
     let send_warning = RwSignal::new(false);
@@ -1887,6 +1888,9 @@ pub fn AiPanel(
     // media strip or vertically below the tray, bring it back into view.
     Effect::new(move |_| {
         if let Some(key) = hover_reference.get() {
+            // A mention can be hovered while the shelf is folded; reopen it before revealing the
+            // matching row, otherwise the contextual feedback is invisible.
+            shelf_collapsed.set(false);
             let _ = crate::call("revealShelfReference", &[JsValue::from_str(&key)]);
         }
     });
@@ -2018,7 +2022,6 @@ pub fn AiPanel(
     });
 
     let manager_open = RwSignal::new(false);
-    let shelf_collapsed = RwSignal::new(false);
     let page_input = RwSignal::new(String::new());
     let page_input_dirty = RwSignal::new(false);
     let page_input_error = RwSignal::new(Option::<String>::None);
