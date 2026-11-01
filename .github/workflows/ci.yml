@@ -135,7 +135,7 @@ jobs:
       - name: Build UI for smoke
         run: trunk build
         working-directory: ui
-      - uses: browser-actions/setup-chrome@v1
+      - uses: browser-actions/setup-chrome@v2
         id: chrome
       - name: Run zoom/panel smoke
         env:
